@@ -1,0 +1,310 @@
+/** 轻量 SVG 图表:平滑面积图 + 横向条形榜单 */
+import { useMemo, useState } from 'react'
+import { fmtCompact } from '../lib/format'
+
+function smoothPath(pts: [number, number][]): string {
+  const n = pts.length
+  if (n === 0) return ''
+  if (n < 3) return 'M' + pts.map((p) => p.join(',')).join('L')
+  // Fritsch–Carlson 单调三次样条:切线在极值处归零,曲线不越出数据范围
+  // (Catmull-Rom 用相邻点算切线,遇到 0→峰值跳变时会向反方向过冲,跌破 0 轴)
+  const dx: number[] = []
+  const m: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = pts[i + 1][0] - pts[i][0]
+    m[i] = (pts[i + 1][1] - pts[i][1]) / (dx[i] || 1)
+  }
+  const t: number[] = [m[0]]
+  for (let i = 1; i < n - 1; i++) {
+    if (m[i - 1] * m[i] <= 0) {
+      t[i] = 0
+    } else {
+      const w1 = 2 * dx[i] + dx[i - 1]
+      const w2 = dx[i] + 2 * dx[i - 1]
+      t[i] = (w1 + w2) / (w1 / m[i - 1] + w2 / m[i])
+    }
+  }
+  t[n - 1] = m[n - 2]
+  let d = `M${pts[0][0]},${pts[0][1]}`
+  for (let i = 0; i < n - 1; i++) {
+    const x1 = pts[i][0]
+    const y1 = pts[i][1]
+    const x2 = pts[i + 1][0]
+    const y2 = pts[i + 1][1]
+    const h = dx[i]
+    const c1x = x1 + h / 3
+    const c1y = y1 + (t[i] * h) / 3
+    const c2x = x2 - h / 3
+    const c2y = y2 - (t[i + 1] * h) / 3
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`
+  }
+  return d
+}
+export function AreaChart({
+  series, height = 150, labels, showBlocked = true,
+}: {
+  series: { queries: number[]; blocked: number[] }
+  height?: number
+  labels?: string[]
+  showBlocked?: boolean
+}) {
+  const W = 340
+  const H = height
+  const PAD_T = 8
+  const PAD_B = 20
+  const [hover, setHover] = useState<number | null>(null)
+
+  const { qPts, bPts, max } = useMemo(() => {
+    const q = series.queries ?? []
+    const b = series.blocked ?? []
+    const max = Math.max(1, ...q)
+    const n = q.length
+    const toPts = (arr: number[]): [number, number][] =>
+      arr.map((v, i) => [(i / Math.max(1, n - 1)) * W, PAD_T + (1 - v / max) * (H - PAD_T - PAD_B)])
+    return { qPts: toPts(q), bPts: toPts(b), max }
+  }, [series, H])
+
+  const n = qPts.length
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * W
+    const idx = Math.round((x / W) * (n - 1))
+    setHover(Math.max(0, Math.min(n - 1, idx)))
+  }
+
+  if (!n) return <div className="skeleton" style={{ height }} />
+
+  const hoverX = hover != null ? (hover / (n - 1)) * W : 0
+  const labelStep = Math.ceil(n / 6)
+
+  return (
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="chart-touch w-full"
+        style={{ height }}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id="ag-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="ab-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--chart-2)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--chart-2)" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* 网格 */}
+        {[0.25, 0.5, 0.75].map((f) => (
+          <line
+            key={f}
+            x1={0}
+            x2={W}
+            y1={PAD_T + f * (H - PAD_T - PAD_B)}
+            y2={PAD_T + f * (H - PAD_T - PAD_B)}
+            stroke="var(--glass-border)"
+            strokeDasharray="3 5"
+            strokeWidth={1}
+          />
+        ))}
+
+        <path d={`${smoothPath(qPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill="url(#ag-fill)" />
+        {showBlocked && (
+          <path d={`${smoothPath(bPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill="url(#ab-fill)" opacity={0.8} />
+        )}
+        <path d={smoothPath(qPts)} fill="none" stroke="var(--chart-1)" strokeWidth={2.2} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {showBlocked && (
+          <path d={smoothPath(bPts)} fill="none" stroke="var(--chart-2)" strokeWidth={1.8} strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity={0.85} />
+        )}
+
+        {hover != null && (
+          <>
+            <line x1={hoverX} x2={hoverX} y1={PAD_T} y2={H - PAD_B} stroke="var(--t3)" strokeWidth={1} />
+            <circle cx={hoverX} cy={qPts[hover][1]} r={3.5} fill="var(--chart-1)" stroke="var(--bg)" strokeWidth={1.5} />
+            {showBlocked && <circle cx={hoverX} cy={bPts[hover][1]} r={3} fill="var(--chart-2)" stroke="var(--bg)" strokeWidth={1.5} />}
+          </>
+        )}
+      </svg>
+
+      {/* x 轴标签:SVG 的 preserveAspectRatio=none 会把 <text> 横向拉伸,故用 HTML 叠加在底部留白区 */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: PAD_B }}>
+        {labels?.map((l, i) =>
+          i % labelStep === 0 ? (
+            <span
+              key={i}
+              className="absolute text-[9.5px] leading-none text-t3"
+              style={{
+                left: `${(i / Math.max(1, n - 1)) * 100}%`,
+                bottom: 4,
+                transform: i === 0 ? undefined : i === n - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+              }}
+            >
+              {l}
+            </span>
+          ) : null
+        )}
+      </div>
+
+      {hover != null && (
+        <div
+          className="glass-strong pointer-events-none absolute top-0 rounded-xl px-2.5 py-1.5 text-[11px] leading-tight num"
+          style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, transform: `translateX(${hover > n * 0.7 ? '-105%' : hover < n * 0.2 ? '5%' : '-50%'})` }}
+        >
+          <div className="text-t2">{labels?.[hover]}</div>
+          <div style={{ color: 'var(--chart-1)' }}>查询 {fmtCompact(series.queries?.[hover] ?? 0)}</div>
+          {showBlocked && (
+            <div style={{ color: 'var(--chart-2)' }}>拦截 {fmtCompact(series.blocked?.[hover] ?? 0)}</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function BarList({ items, color = 'var(--accent)', max: maxProp }: { items: [string, number][]; color?: string; max?: number }) {
+  const max = maxProp ?? Math.max(1, ...items.map((i) => i[1]))
+  if (!items.length) return <p className="py-4 text-center text-[13px] text-t3">暂无数据</p>
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map(([label, value]) => (
+        <div key={label} className="flex items-center gap-2.5">
+          <span className="w-[46%] shrink-0 truncate text-[13px] text-t1" title={label}>
+            {label}
+          </span>
+          <div className="h-[7px] min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--glass)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(3, (value / max) * 100)}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 60%, transparent), ${color})` }}
+            />
+          </div>
+          <span className="w-11 shrink-0 text-right text-[12px] num text-t2">{fmtCompact(value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 环形图:请求构成等占比展示,附图例 */
+export function Donut({
+  segments, size = 170, thickness = 24, centerLabel, centerSub,
+}: {
+  segments: { label: string; value: number; color: string }[]
+  size?: number
+  thickness?: number
+  centerLabel?: string
+  centerSub?: string
+}) {
+  const total = segments.reduce((s, x) => s + x.value, 0)
+  const r = (size - thickness) / 2
+  const C = 2 * Math.PI * r
+  let acc = 0
+  return (
+    <div className="flex items-center gap-5">
+      <div className="relative flex-none" style={{ width: size, height: size }}>
+        <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--glass)" strokeWidth={thickness} />
+          {total > 0 &&
+            segments
+              .filter((s) => s.value > 0)
+              .map((s) => {
+                const frac = s.value / total
+                const dash = `${frac * C} ${C}`
+                const offset = -acc * C
+                acc += frac
+                return (
+                  <circle
+                    key={s.label}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={r}
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={thickness}
+                    strokeDasharray={dash}
+                    strokeDashoffset={offset}
+                    className="transition-all duration-500"
+                  />
+                )
+              })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[20px] font-bold leading-tight num text-t1">{centerLabel}</span>
+          {centerSub && <span className="text-[11px] text-t3">{centerSub}</span>}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-col gap-2">
+        {segments.map((s) => (
+          <div key={s.label} className="flex items-center gap-2 text-[12.5px]">
+            <span className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: s.color }} />
+            <span className="min-w-0 flex-1 truncate text-t2">{s.label}</span>
+            <span className="num text-t1">{fmtCompact(s.value)}</span>
+            <span className="w-12 text-right num text-t3">{total ? ((s.value / total) * 100).toFixed(1) : '0.0'}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** 排行表格:排名 + 名称 + 次数 + 占比条(桌面统计页用,比 BarList 更表格化) */
+export function RankTable({ items, color = 'var(--accent)', resolve }: {
+  items: [string, number][]
+  color?: string
+  resolve?: (key: string) => string
+}) {
+  const max = Math.max(1, ...items.map((i) => i[1]))
+  const total = items.reduce((s, i) => s + i[1], 0)
+  if (!items.length) return <p className="py-6 text-center text-[13px] text-t3">暂无数据</p>
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-3 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-t3">
+        <span className="w-6 text-center">#</span>
+        <span className="min-w-0 flex-1">名称</span>
+        <span className="w-20 text-right">次数</span>
+        <span className="w-24 text-right">占比</span>
+      </div>
+      {items.map(([key, value], i) => (
+        <div key={key} className="flex items-center gap-3 rounded-lg px-2 py-[7px] transition-colors hover:bg-white/[0.04]">
+          <span
+            className="w-6 flex-none text-center text-[12px] font-bold num"
+            style={{ color: i < 3 ? color : 'var(--t3)' }}
+          >
+            {i + 1}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-t1" title={key}>
+            {resolve ? resolve(key) : key}
+          </span>
+          <span className="w-20 flex-none text-right text-[13px] num text-t2">{fmtCompact(value)}</span>
+          <span className="flex w-24 flex-none items-center justify-end gap-2">
+            <span className="text-[11.5px] num text-t3">{total ? ((value / total) * 100).toFixed(1) : '0.0'}%</span>
+            <span className="h-[6px] w-10 overflow-hidden rounded-full" style={{ background: 'var(--glass)' }}>
+              <span
+                className="block h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.max(4, (value / max) * 100)}%`, background: color }}
+              />
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function StatTile({ label, value, sub, accent = 'var(--accent)', onClick, className = '' }: { label: string; value: React.ReactNode; sub?: string; accent?: string; onClick?: () => void; className?: string }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`glass specular relative overflow-hidden rounded-2xl px-3.5 py-3 ${onClick ? 'press cursor-pointer' : ''} ${className}`}
+    >
+      <div className="text-[12px] text-t2">{label}</div>
+      <div className="mt-0.5 text-[22px] font-bold leading-tight num" style={{ color: accent }}>
+        {value}
+      </div>
+      {sub && <div className="text-[11.5px] text-t3 num">{sub}</div>}
+    </div>
+  )
+}
