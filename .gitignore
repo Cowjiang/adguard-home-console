@@ -1,0 +1,12 @@
+node_modules
+dist
+_probe
+*.local
+.DS_Store
+.env
+.env.*
+
+*.md
+!README.md
+.idea
+_p*.cjs
