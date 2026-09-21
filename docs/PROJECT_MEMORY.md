@@ -76,6 +76,18 @@
 12. **`preserveAspectRatio="none"` 会把 SVG `<circle>` 拉成椭圆**(纵向 1:1、横向被拉伸),`vectorEffect` 只救描边不救形状——hover 数据点一律用 HTML 绝对定位圆点叠加(横向百分比定位 + 纵向像素定位,纵向缩放恒为 1);竖直 `<line>` 形状不受拉伸影响但仍需补 `vectorEffect="non-scaling-stroke"` 防止宽屏下被拉粗。
 13. **触屏设备 `<select>` 的焦点样式会残留**(iOS 从原生选择器选完不自动 blur,`:focus` 绿框一直挂着);**不能在 change 里同步 blur()**——与 iOS 自身的焦点恢复竞态,会导致下一次快速打开菜单被闪关。标准方案:触屏(`hover: none`)给元素加 `.no-ring` 类压掉 `:focus` 样式、真实 blur 时移除,桌面(`hover: hover`)选完直接 `blur()`;统一走 AdvancedSettings.tsx 的 `selectAfterChange()`。配套:`.field:focus` 只准用 `background-color`,**禁用 `background` 简写**——简写会重置 background-image/position,select 的小三角形(背景图绘制)每次焦点切换都会"瞬移"。
 14. **设置页表单控件不要用 `<label>` 包裹**——label 被点击时会聚焦关联输入框(点标题也触发),用户要求只有点击控件本身才聚焦;标题用 `div + span` 结构。Login 登录表单例外(点击文字聚焦账号/密码是标准登录体验)。
+15. **iOS 上连续弹出系统选择器有冷却**:WebKit 对关闭后约 300ms 内的再次 `showPicker()` 会静默吞掉(不报错不弹出),点击事件也不会到达页面。方案:`nativePickers.ts` 记录 `lastDismissAt`,冷却期内 `pickViaNativeSelect` 返回 false 回退自绘锚定菜单。苹果设备上的原生选择器入口用"胶囊 + 透明 select 铺满(`absolute inset-0`)+ 免交互图标/文字/箭头"结构——select 只负责弹出,显示全靠免交互层;select 会按最宽 option 撑宽,必须限制宽度否则胶囊变形。
+16. **`express.static` 会拦截 `/index.html`**:SPA 回退中间件拿不到该路径,`maxAge` 会把 index.html 缓存 1 小时导致 iOS 端测试一直跑旧 bundle——须在 static 之前显式路由 `/index.html` 并以 `no-cache` 下发(SPA 回退 `/` 同理)。
+
+## Git 工作流(2026-09-21 定稿)
+
+- **日常开发一律提交到 `dev` 分支并推送**——dev 的 push **不触发** Release 构建。
+- **发布 = `dev` 合并到 `main` 并推送**——main/master 的 push 触发 release.yml 打包出 release(agh-console.tar.gz)。
+- **Release 命名(开发期)**:tag/name 为 `v0.1.0-dev.{YYYYMMDD}.{短SHA}`,package.json 版本 `0.1.0`,正文含 commit SHA + 最近 10 条提交 + GitHub 自动 release notes;**不要标记 prerelease**——`/releases/latest` 会跳过 prerelease,server-pull.sh 就找不到包了。正式发布时把基础版本升到 `v1.0.0` 并去掉 `-dev` 后缀。
+- release.yml 每次构建后**删除其余全部 release 和 tag,只保留最新一个**(server-pull.sh 用 `/releases/latest` 且本地有回滚备份,删旧包安全)。
+- **不要直接 push main**,除非确实要发布一个新包;纯 docs/**.md 的 main 推送已被 workflow 的 paths-ignore 豁免,不触发构建。
+- `feat/ios-build` 是 iOS/Tauri 集成分支,跟随 dev 合并,不直接触发构建。
+- 旧历史备份在 `backup/main-20260921`、`backup/ios-20260921`(git 历史重写前存档),确认稳定后可删。
 
 ## 8. 动效现状(用户口味:克制优雅,勿夸张)
 
