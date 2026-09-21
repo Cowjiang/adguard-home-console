@@ -1,5 +1,5 @@
 /** 轻量 SVG 图表:平滑面积图 + 横向条形榜单 */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { fmtCompact } from '../lib/format'
 
 function smoothPath(pts: [number, number][]): string {
@@ -72,6 +72,44 @@ export function AreaChart({
     setHover(Math.max(0, Math.min(n - 1, idx)))
   }
 
+  // 触摸端长按唤出预览:按下后 350ms 内未移动(未滚动/未拖动)则固定显示十字线,
+  // 之后可继续横向拖动查看;提前移动则取消判定,让位给页面滚动或横向 scrub
+  const pressRef = useRef<{ startX: number; rect: DOMRect; timer: number | null; active: boolean } | null>(null)
+  const clearPressTimer = () => {
+    const p = pressRef.current
+    if (p?.timer != null) window.clearTimeout(p.timer)
+    if (p) p.timer = null
+  }
+  const onDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.pointerType !== 'touch') return
+    clearPressTimer()
+    const rect = e.currentTarget.getBoundingClientRect()
+    pressRef.current = { startX: e.clientX, rect, timer: null, active: false }
+    pressRef.current.timer = window.setTimeout(() => {
+      const p = pressRef.current
+      if (!p) return
+      p.timer = null
+      p.active = true
+      const x = ((p.startX - p.rect.left) / p.rect.width) * W
+      const idx = Math.round((x / W) * (n - 1))
+      setHover(Math.max(0, Math.min(n - 1, idx)))
+      navigator.vibrate?.(10)
+    }, 350)
+  }
+  const onMoveTouch = (e: React.PointerEvent<SVGSVGElement>) => {
+    onMove(e)
+    const p = pressRef.current
+    if (p && !p.active && p.timer != null && Math.abs(e.clientX - p.startX) > 8) {
+      window.clearTimeout(p.timer)
+      p.timer = null
+    }
+  }
+  const onEnd = () => {
+    clearPressTimer()
+    if (pressRef.current) pressRef.current.active = false
+    setHover(null)
+  }
+
   if (!n) return <div className="skeleton" style={{ height }} />
 
   const hoverX = hover != null ? (hover / (n - 1)) * W : 0
@@ -83,8 +121,11 @@ export function AreaChart({
         viewBox={`0 0 ${W} ${H}`}
         className="chart-touch w-full"
         style={{ height }}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerDown={onDown}
+        onPointerMove={onMoveTouch}
+        onPointerLeave={() => { clearPressTimer(); setHover(null) }}
+        onPointerUp={onEnd}
+        onPointerCancel={onEnd}
         preserveAspectRatio="none"
       >
         <defs>
@@ -122,11 +163,7 @@ export function AreaChart({
         )}
 
         {hover != null && (
-          <>
-            <line x1={hoverX} x2={hoverX} y1={PAD_T} y2={H - PAD_B} stroke="var(--t3)" strokeWidth={1} />
-            <circle cx={hoverX} cy={qPts[hover][1]} r={3.5} fill="var(--chart-1)" stroke="var(--bg)" strokeWidth={1.5} />
-            {showBlocked && <circle cx={hoverX} cy={bPts[hover][1]} r={3} fill="var(--chart-2)" stroke="var(--bg)" strokeWidth={1.5} />}
-          </>
+          <line x1={hoverX} x2={hoverX} y1={PAD_T} y2={H - PAD_B} stroke="var(--t3)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         )}
       </svg>
 
@@ -148,6 +185,26 @@ export function AreaChart({
           ) : null
         )}
       </div>
+
+      {/* 数据点:preserveAspectRatio=none 会把 <circle> 拉成椭圆,改用 HTML 叠加圆点保持正圆 */}
+      {hover != null && (
+        <>
+          <div
+            className="pointer-events-none absolute"
+            style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, top: qPts[hover][1], transform: 'translate(-50%, -50%)' }}
+          >
+            <span className="block rounded-full" style={{ width: 8, height: 8, background: 'var(--chart-1)', border: '1.5px solid var(--bg)' }} />
+          </div>
+          {showBlocked && (
+            <div
+              className="pointer-events-none absolute"
+              style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, top: bPts[hover][1], transform: 'translate(-50%, -50%)' }}
+            >
+              <span className="block rounded-full" style={{ width: 7, height: 7, background: 'var(--chart-2)', border: '1.5px solid var(--bg)' }} />
+            </div>
+          )}
+        </>
+      )}
 
       {hover != null && (
         <div
