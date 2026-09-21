@@ -22,34 +22,71 @@ function basicAuth(user: string, pass: string): string {
   return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)))
 }
 
+/** Tauri 壳探测:iOS/桌面壳内走 Rust 代理(agh_fetch),绕过 WebView 的 CORS */
+type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+function getTauriInvoke(): TauriInvoke | null {
+  const w = window as unknown as { __TAURI_INTERNALS__?: { invoke?: TauriInvoke } }
+  return w.__TAURI_INTERNALS__?.invoke ?? null
+}
+
+/** agh_fetch 返回结构(Rust 侧 AghFetchResult,serde 字段名保持 snake_case) */
+interface AghFetchResult {
+  status: number
+  content_type: string
+  body_text: string
+}
+
 export async function api<T = unknown>(
   cfg: SvrConfig,
   path: string,
   opts: { method?: string; body?: unknown; signal?: AbortSignal } = {}
 ): Promise<T> {
-  const url = '/api/agh' + path
-  const headers: Record<string, string> = {
-    'X-AGH-Target': cfg.url,
-    Authorization: basicAuth(cfg.username, cfg.password),
-  }
   const method = opts.method ?? 'GET'
-  if (method !== 'GET') headers['Content-Type'] = 'application/json'
-  const r = await fetch(url, {
-    method,
-    headers,
-    body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
-    signal: opts.signal,
-  })
-  const text = await r.text()
+  let status: number
+  let text: string
+  const invoke = getTauriInvoke()
+  if (invoke) {
+    // Tauri 壳:Rust 代理,行为对齐 server/index.mjs 的 proxyAGH
+    // (路径归一 /api/agh → /control、重定向、超时、错误语义均在 Rust 侧完成)
+    try {
+      const r = (await invoke('agh_fetch', {
+        method,
+        target: cfg.url,
+        authHeader: basicAuth(cfg.username, cfg.password),
+        pathWithQuery: '/api/agh' + path,
+        bodyJson: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
+      })) as AghFetchResult
+      status = r.status
+      text = r.body_text ?? ''
+    } catch (e) {
+      // IPC 层失败(命令缺失/序列化异常等):与网络错误同语义
+      throw new ApiError(502, String((e as Error)?.message ?? e))
+    }
+  } else {
+    const url = '/api/agh' + path
+    const headers: Record<string, string> = {
+      'X-AGH-Target': cfg.url,
+      Authorization: basicAuth(cfg.username, cfg.password),
+    }
+    if (method !== 'GET') headers['Content-Type'] = 'application/json'
+    const r = await fetch(url, {
+      method,
+      headers,
+      body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
+      signal: opts.signal,
+    })
+    status = r.status
+    text = await r.text()
+  }
   let data: any = undefined
   try {
     data = text ? JSON.parse(text) : undefined
   } catch {
     /* 非 JSON 响应 */
   }
-  if (!r.ok) {
-    const msg = data?.error || data?.message || text?.slice(0, 200) || `HTTP ${r.status}`
-    throw new ApiError(r.status, msg)
+  if (status < 200 || status >= 300) {
+    const msg = data?.error || data?.message || text?.slice(0, 200) || `HTTP ${status}`
+    throw new ApiError(status, msg)
   }
   return data as T
 }

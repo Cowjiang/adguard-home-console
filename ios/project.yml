@@ -1,0 +1,54 @@
+name: AdGuardConsole
+options:
+  bundleIdPrefix: com.adguardhome
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  AdGuardConsole:
+    type: application
+    platform: iOS
+    sources:
+      - path: AdGuardConsole
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.adguardhome.console
+        PRODUCT_NAME: AdGuardConsole
+        INFOPLIST_FILE: AdGuardConsole/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_STANDALONE_ICON_SCAN_FOLDER_PATH: ""
+  AdGuardConsoleTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: AdGuardConsole
+  AdGuardConsoleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: AdGuardConsole
+schemes:
+  AdGuardConsole:
+    build:
+      targets:
+        AdGuardConsole: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - AdGuardConsoleTests
+        - AdGuardConsoleUITests

@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth'
+import { useNativeTabBar } from '../lib/nativeTabbar'
 import { APP_NAME } from '../lib/constants'
 
 type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
@@ -190,6 +191,8 @@ function Sidebar() {
 }
 
 export default function Layout() {
+  // iOS Tauri 壳:原生液态玻璃 UITabBar 接管导航,CSS 标签栏让位
+  const nativeBar = useNativeTabBar()
   return (
     <div className="min-h-dvh lg:pl-60">
       <Ambient />
@@ -198,7 +201,7 @@ export default function Layout() {
       <main>
         <Outlet />
       </main>
-      <TabBar />
+      {!nativeBar && <TabBar />}
     </div>
   )
 }
