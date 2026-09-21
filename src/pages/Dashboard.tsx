@@ -6,7 +6,8 @@ import { ArrowDownRight, ArrowUpRight, ChevronDown, Globe, Laptop, ShieldAlert, 
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
 import { AreaChart, BarList, Donut, StatTile } from '../components/charts'
-import { Card, Loading, Segmented, Badge, EmptyState, Button, usePick } from '../components/ui'
+import { Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect } from '../components/ui'
+import { isAppleMobile } from '../lib/nativePickers'
 import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
 
@@ -31,6 +32,7 @@ const RANGE_OPTS = [
   { value: '24h', label: '24 小时' },
 ] as const
 type RangeKey = (typeof RANGE_OPTS)[number]['value']
+const RANGE_PICK_OPTS: { label: string; value: RangeKey }[] = RANGE_OPTS.map((o) => ({ label: o.label, value: o.value }))
 
 export default function Dashboard() {
   const { cfg, status } = useAuth()
@@ -125,13 +127,26 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <button
-            onClick={openRangePicker}
-            className="press glass flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-t1"
-          >
-            {rangeLabel}
-            <ChevronDown size={14} className="text-t2" />
-          </button>
+          {isAppleMobile() ? (
+            <span className="press glass relative flex h-[30px] flex-none items-center gap-1 rounded-full pl-3 pr-7 text-[12.5px] font-semibold text-t1">
+              <PickSelect
+                className="absolute inset-0 h-[30px] w-full cursor-pointer appearance-none bg-transparent text-transparent"
+                value={range}
+                options={RANGE_PICK_OPTS}
+                onPick={setRange}
+              />
+              <span className="pointer-events-none">{rangeLabel}</span>
+              <ChevronDown size={14} className="pointer-events-none absolute right-2 text-t2" />
+            </span>
+          ) : (
+            <button
+              onClick={openRangePicker}
+              className="press glass flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-t1"
+            >
+              {rangeLabel}
+              <ChevronDown size={14} className="text-t2" />
+            </button>
+          )}
         </div>
         <AreaChart series={{ queries: chart.queries, blocked: chart.blocked }} labels={chart.labels} height={160} />
       </Card>

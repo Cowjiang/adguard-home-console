@@ -309,10 +309,16 @@ const server = http.createServer(async (req, res) => {
     case 'PUT /querylog/config/update': state.querylogConfig = { ...state.querylogConfig, ...body }; return json(res, 200, {})
     case 'GET /stats/config': return json(res, 200, state.statsConfig)
     case 'PUT /stats/config/update': state.statsConfig = { ...state.statsConfig, ...body }; return json(res, 200, {})
+    case 'GET /dns_info':
     case 'GET /dns/info': return json(res, 200, state.dnsInfo)
+    case 'POST /dns_config':
     case 'PUT /dns/config': state.dnsInfo = { ...state.dnsInfo, ...body }; return json(res, 200, {})
+    case 'POST /test_upstream_dns': return json(res, 200, {})
     case 'GET /access/list': return json(res, 200, state.accessList)
+    case 'POST /access/set':
     case 'PUT /access/set': state.accessList = { allowed_clients: body.allowed_clients || [], disallowed_clients: body.disallowed_clients || [], blocked_hosts: body.blocked_hosts || [] }; return json(res, 200, {})
+    case 'POST /tls/validate': return json(res, 200, { valid_pair: true, warning_validation: '' })
+    case 'POST /tls/configure': return json(res, 200, {})
     case 'GET /tls/status': return json(res, 200, { enabled: false, server_name: '', force_https: false, serve_plain_dns: true, port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 853, valid_cert: false, valid_chain: false, valid_key: false, valid_pair: false })
     case 'GET /dhcp/status': return json(res, 200, { enabled: false, interface_name: '', v4: { gateway_ip: '', subnet_mask: '', range_start: '', range_end: '', lease_duration: 0 }, v6: { range_start: '', lease_duration: 0 }, leases: [], static_leases: [] })
     case 'GET /dhcp/interfaces': return json(res, 200, { interfaces: [] })

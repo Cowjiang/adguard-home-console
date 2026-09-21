@@ -8,7 +8,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type FilteringStatus, type RewriteEntry } from '../lib/api'
-import { Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast } from '../components/ui'
+import { Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
+import { isAppleMobile } from '../lib/nativePickers'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
 
 
@@ -26,9 +27,20 @@ export default function Protection() {
   const nav = useNavigate()
   const { cfg } = useAuth()
   const sheet = useSheet()
+  const pick = usePick({ menuOnMobile: true })
   const [refreshing, setRefreshing] = useState(false)
-
   const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
+
+  async function saveInterval(hours: number) {
+    if (!cfg || !filtering) return
+    try {
+      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours } })
+      mFiltering()
+      toast('更新间隔已保存')
+    } catch (e: any) {
+      toast('保存失败:' + e.message, 'err')
+    }
+  }
   const { data: rewrites } = useSWR<{ total: number } | RewriteEntry[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
   const { data: bsCurrent } = useSWR<{ ids: string[] }>(cfg ? ['bsg', cfg, '/blocked_services/get'] : null, swrFetcher)
   const { data: sb, mutate: mSb } = useSWR<any>(cfg ? ['sb', cfg, '/safesearch/status'] : null, swrFetcher)
@@ -53,6 +65,7 @@ export default function Protection() {
     if (!cfg || !filtering) return
     try {
       await api(cfg, '/filtering/config', { method: 'POST', body: { enabled, interval: filtering.interval } })
+      mFiltering()
       toast(enabled ? '过滤已开启' : '过滤已关闭')
     } catch (e: any) {
       toast('操作失败:' + e.message, 'err')
@@ -265,8 +278,27 @@ export default function Protection() {
           <Row
             icon={<IconBubble color="var(--t2)" bg="var(--glass)"><Timer size={17} /></IconBubble>}
             title="过滤器更新间隔"
-            value={filtering ? hoursLabel(filtering.interval) : '…'}
-            onClick={() => nav('/protection/filters')}
+            value={isAppleMobile() ? undefined : (filtering ? hoursLabel(filtering.interval) : '…')}
+            right={isAppleMobile() ? (
+              <div className="w-28 flex-none">
+                <PickSelect
+                  className="field num !py-1.5 !pr-8 text-right"
+                  value={filtering?.interval}
+                  options={[1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h }))}
+                  onPick={(v) => saveInterval(v)}
+                />
+              </div>
+            ) : undefined}
+            onClick={isAppleMobile() ? undefined : (e) => {
+              pick({
+                title: '过滤器更新间隔',
+                anchor: e.currentTarget,
+                align: 'right',
+                value: filtering?.interval,
+                options: [1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h })),
+                onPick: (v) => saveInterval(v),
+              })
+            }}
             last
           />
         </Rows>

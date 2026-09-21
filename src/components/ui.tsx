@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
 
 /* ---------- 页面容器与标题 ---------- */
 
@@ -343,11 +344,17 @@ function MenuHost({ children }: { children: ReactNode }) {
   // 渲染后测量菜单高度:默认展开在锚点下方,放不下则翻转到上方
   useLayoutEffect(() => {
     if (!st || !menuRef.current) return
-    const h = menuRef.current.offsetHeight
+    const el = menuRef.current
+    const h = el.offsetHeight
+    const w = el.offsetWidth
     const below = st.rect.bottom + 6
     const above = st.rect.top - 6 - h
     const top = below + h <= window.innerHeight - 8 || above < 8 ? below : Math.max(8, above)
-    if (menuRef.current.style.top !== `${top}px`) menuRef.current.style.top = `${top}px`
+    const left = st.req.align === 'left'
+      ? Math.min(st.rect.left, window.innerWidth - w - 8)
+      : Math.max(8, Math.min(st.rect.right - w, window.innerWidth - w - 8))
+    if (el.style.top !== `${top}px`) el.style.top = `${top}px`
+    if (el.style.left !== `${left}px`) el.style.left = `${left}px`
   }, [st])
 
   return (
@@ -357,7 +364,7 @@ function MenuHost({ children }: { children: ReactNode }) {
         createPortal(
           <div
             ref={menuRef}
-            className="glass-strong fixed z-[55] min-w-[160px] rounded-2xl p-1.5 shadow-2xl"
+            className="glass-strong fixed z-[55] min-w-[160px] max-w-[calc(100vw-16px)] rounded-2xl p-1.5 shadow-2xl"
             style={{
               // top 由 useLayoutEffect 按菜单实际高度计算
               top: st.rect.bottom + 6,
@@ -391,37 +398,80 @@ function MenuHost({ children }: { children: ReactNode }) {
   )
 }
 
-/** 单选选择器:桌面(≥lg)弹出锚点下拉菜单;移动端默认底部弹窗,传 menuOnMobile 则同样用锚点下拉 */
+/**
+ * 单选选择器:桌面(≥lg)弹出锚点下拉菜单;Tauri iOS 壳内优先试 WebKit 原生
+ * <select>(showPicker,方案 A 实验,见 lib/nativePickers.ts),失败回退 CSS
+ * 底部弹窗;普通移动浏览器默认底部弹窗,传 menuOnMobile 则同样用锚点下拉。
+ */
 export function usePick(opts?: { menuOnMobile?: boolean }) {
   const sheet = useSheet()
   const menu = useContext(MenuContext)
   const isDesktop = useIsDesktop()
   const menuOnMobile = opts?.menuOnMobile ?? false
   return <T extends string | number>(req: PickReq<T>) => {
+    if (isAppleMobile() && pickViaNativeSelect(req)) return
     if (isDesktop || menuOnMobile) {
       menu.open(req)
-    } else {
-      sheet.open(
-        <div className="flex flex-col gap-2">
-          {req.options.map((o) => (
-            <Button
-              key={o.value}
-              variant="glass"
-              size="lg"
-              onClick={() => {
-                sheet.close()
-                req.onPick(o.value)
-              }}
-            >
-              <span className={o.value === req.value ? 'text-accent' : ''}>{o.label}</span>
-              {o.value === req.value && <Check size={16} className="text-accent" />}
-            </Button>
-          ))}
-        </div>,
-        { title: req.title }
-      )
+      return
     }
+    sheet.open(
+      <div className="flex flex-col gap-2">
+        {req.options.map((o) => (
+          <Button
+            key={o.value}
+            variant="glass"
+            size="lg"
+            onClick={() => {
+              sheet.close()
+              req.onPick(o.value)
+            }}
+          >
+            <span className={o.value === req.value ? 'text-accent' : ''}>{o.label}</span>
+            {o.value === req.value && <Check size={16} className="text-accent" />}
+          </Button>
+        ))}
+      </div>,
+      { title: req.title }
+    )
   }
+}
+
+function pickText(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(pickText).join('')
+  const props = (node as { props?: { children?: ReactNode } }).props
+  return props ? pickText(props.children) : ''
+}
+
+/** 苹果移动设备用的真实原生 <select>:点击即弹系统选择器,无任何 JS 介入 */
+export function PickSelect<T extends string | number>({
+  value, options, onPick, className, placeholder,
+}: {
+  value?: T
+  options: { label: ReactNode; value: T }[]
+  onPick: (v: T) => void
+  className?: string
+  placeholder?: string
+}) {
+  const current = value != null ? String(value) : (placeholder ?? '')
+  return (
+    <select
+      className={`appearance-none outline-none ${className ?? ''}`}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
+      value={current}
+      onChange={(e) => {
+        const o = options.find((x) => String(x.value) === e.target.value)
+        if (o) onPick(o.value)
+        if (value == null && placeholder != null) e.currentTarget.value = placeholder
+      }}
+    >
+      {value == null && placeholder != null && <option value={placeholder}>{placeholder}</option>}
+      {options.map((o) => (
+        <option key={String(o.value)} value={String(o.value)}>{pickText(o.label)}</option>
+      ))}
+    </select>
+  )
 }
 
 /* ---------- 徽标 / 标签 ---------- */
