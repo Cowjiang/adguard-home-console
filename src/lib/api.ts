@@ -197,6 +197,10 @@ export interface TlsStatus {
   certificate_chain?: string
   private_key?: string
   private_key_saved?: boolean
+  certificate_path?: string
+  private_key_path?: string
+  port_dnscrypt?: number
+  dnscrypt_config_file?: string
 }
 
 export interface AghClient {

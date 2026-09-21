@@ -330,10 +330,10 @@ export function EncryptionSettings() {
           <div className="min-w-0 flex-1">
             <p className="text-[15.5px] font-bold text-t1">{data.enabled ? '加密已启用' : '加密未启用'}</p>
             <p className="text-[12.5px] text-t2">
-              {data.valid_pair ? '证书链有效' : '证书存在问题'} · {data.key_type}
+              证书链{data.valid_chain ? '有效' : '无效'} · 私钥{data.valid_key ? '有效' : '无效'}{data.key_type ? ` · ${data.key_type}` : ''}
             </p>
           </div>
-          {data.valid_pair && <Badge kind={expiring ? 'warn' : 'ok'}>{expiring ? '即将到期' : '证书有效'}</Badge>}
+          <Badge kind={!data.valid_pair || expiring ? 'warn' : 'ok'}>{!data.valid_pair ? '配对无效' : expiring ? '即将到期' : '证书有效'}</Badge>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12.5px]">
@@ -342,7 +342,7 @@ export function EncryptionSettings() {
           <CertInfo label="生效时间" value={fmtDate(data.not_before)} />
           <CertInfo label="到期时间" value={fmtDate(data.not_after)} />
           <CertInfo label="DNS 名称" value={(data.dns_names ?? []).join(', ')} />
-          <CertInfo label="服务器名称" value={data.server_name} />
+          <CertInfo label="证书路径" value={data.certificate_path} />
         </div>
         {data.warning_validation && (
           <p className="mt-3 rounded-xl px-3.5 py-2.5 text-[12px] leading-relaxed" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
@@ -356,27 +356,71 @@ export function EncryptionSettings() {
           <GroupTitle>端口与协议</GroupTitle>
           <Group>
         <Rows>
-          <Row title="启用加密(DNS-over-HTTPS/TLS/QUIC)" right={<Switch on={d.enabled ?? false} onChange={(v) => set('enabled', v)} />} />
-          <Row title="强制 HTTPS 访问" subtitle="网页管理界面强制跳转 HTTPS" right={<Switch on={d.force_https ?? false} onChange={(v) => set('force_https', v)} />} />
-          <Row title="允许明文 DNS" subtitle="关闭后仅接受加密 DNS 请求" right={<Switch on={d.serve_plain_dns ?? true} onChange={(v) => set('serve_plain_dns', v)} />} />
-          <Row title="HTTPS 端口" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.port_https ?? 443} onChange={(e) => set('port_https', Number(e.target.value))} />} />
-          <Row title="DoT 端口" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.port_dns_over_tls ?? 853} onChange={(e) => set('port_dns_over_tls', Number(e.target.value))} />} />
-          <Row title="DoQ 端口" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.port_dns_over_quic ?? 784} onChange={(e) => set('port_dns_over_quic', Number(e.target.value))} />} last />
+          <Row
+            title="启用加密"
+            subtitle="启用后管理界面经 HTTPS 访问,DNS 服务器监听 DoH/DoT/DoQ 加密请求"
+            right={<Switch on={d.enabled ?? false} onChange={(v) => set('enabled', v)} />}
+          />
+          <Row
+            title="允许明文 DNS"
+            subtitle="默认开启;关闭后强制所有设备使用加密 DNS,须至少启用一个加密协议"
+            right={<Switch on={d.serve_plain_dns ?? true} onChange={(v) => set('serve_plain_dns', v)} />}
+          />
+          <Row
+            title="强制 HTTPS 访问"
+            subtitle="勾选后自动将 HTTP 重定向到 HTTPS 地址"
+            right={<Switch on={d.force_https ?? false} onChange={(v) => set('force_https', v)} />}
+          />
+          <Row
+            title="HTTPS 端口"
+            subtitle="配置后管理界面可经 HTTPS 访问,并在 /dns-query 提供 DoH"
+            right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.port_https ?? 443} onChange={(e) => set('port_https', Number(e.target.value))} /></div>}
+          />
+          <Row
+            title="DNS-over-TLS 端口"
+            subtitle="配置后在此端口运行 DNS-over-TLS 服务器"
+            right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.port_dns_over_tls ?? 853} onChange={(e) => set('port_dns_over_tls', Number(e.target.value))} /></div>}
+          />
+          <Row
+            title="DNS-over-QUIC 端口"
+            subtitle="配置后在此端口运行 DNS-over-QUIC 服务器"
+            right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.port_dns_over_quic ?? 784} onChange={(e) => set('port_dns_over_quic', Number(e.target.value))} /></div>}
+            last
+          />
         </Rows>
       </Group>
         </div>
         <div>
-          <GroupTitle>证书</GroupTitle>
+          <GroupTitle>服务器名称与证书</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
-        <Field label="服务器名称(SNI)" value={d.server_name ?? ''} onChange={(v) => set('server_name', v)} placeholder="dns.example.com" />
         <label className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">证书链(PEM,留空沿用现有证书)</span>
-          <textarea className="field" style={{ minHeight: 80 }} value={d.certificate_chain ?? ''} onChange={(e) => set('certificate_chain', e.target.value)} spellCheck={false} placeholder={data.certificate_chain ? '已加载现有证书' : '-----BEGIN CERTIFICATE-----…'} />
+          <span className="mb-1 block text-[12.5px] text-t2">服务器名称(SNI)</span>
+          <input className="field !py-2.5 !text-[14px]" value={d.server_name ?? ''} onChange={(e) => set('server_name', e.target.value)} placeholder="dns.example.com" autoCapitalize="off" spellCheck={false} />
+          <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">须与证书中的一个 DNS 名称匹配;设置后 AGH 会检测客户端标识号、响应 DDR 查询,未设置则该功能禁用</span>
         </label>
         <label className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">私钥(PEM,留空沿用现有私钥)</span>
-          <textarea className="field" style={{ minHeight: 80 }} value={d.private_key ?? ''} onChange={(e) => set('private_key', e.target.value)} spellCheck={false} placeholder={data.private_key_saved ? '私钥已保存在服务器' : '-----BEGIN PRIVATE KEY-----…'} />
+          <span className="mb-1 block text-[12.5px] text-t2">证书文件路径</span>
+          <input className="field num !py-2.5 !text-[13px]" value={d.certificate_path ?? ''} onChange={(e) => set('certificate_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/cert.pem" autoCapitalize="off" spellCheck={false} />
+          <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">状态:证书链{data.valid_chain ? '有效' : '无效'} · 证书{data.valid_cert ? '有效' : '无效'}</span>
         </label>
+        <label className="block">
+          <span className="mb-1 block text-[12.5px] text-t2">证书内容(PEM,可选)</span>
+          <textarea className="field" style={{ minHeight: 72 }} value={d.certificate_chain ?? ''} onChange={(e) => set('certificate_chain', e.target.value)} spellCheck={false} placeholder={'留空则使用上方路径或服务器已加载的证书\n-----BEGIN CERTIFICATE-----…'} />
+        </label>
+      </Card>
+
+          <GroupTitle>私钥</GroupTitle>
+          <Card className="p-4 flex flex-col gap-3">
+        <label className="block">
+          <span className="mb-1 block text-[12.5px] text-t2">私钥文件路径</span>
+          <input className="field num !py-2.5 !text-[13px]" value={d.private_key_path ?? ''} onChange={(e) => set('private_key_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/key.pem" autoCapitalize="off" spellCheck={false} />
+          <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">状态:{data.key_type ? `该 ${data.key_type} 私钥` : '私钥'}{data.valid_key ? '有效' : '无效'}{data.private_key_saved ? ' · 已保存在服务器' : ''}</span>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[12.5px] text-t2">私钥内容(PEM,可选)</span>
+          <textarea className="field" style={{ minHeight: 72 }} value={d.private_key ?? ''} onChange={(e) => set('private_key', e.target.value)} spellCheck={false} placeholder={'留空则使用上方路径或服务器已加载的私钥\n-----BEGIN PRIVATE KEY-----…'} />
+        </label>
+        <p className="text-[11.5px] leading-relaxed text-t3">使用加密需为域名提供有效 SSL 证书链,可从 letsencrypt.org 免费获取或向受信任 CA 购买;PEM 内容与路径二选一,内容优先。</p>
       </Card>
         </div>
       </div>

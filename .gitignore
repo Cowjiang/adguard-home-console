@@ -6,7 +6,5 @@ _probe
 .env
 .env.*
 
-*.md
-!README.md
 .idea
 _p*.cjs
