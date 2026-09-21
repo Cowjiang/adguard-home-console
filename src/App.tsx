@@ -12,7 +12,7 @@ import TopListPage from './pages/TopListPage'
 import QueryLog from './pages/QueryLog'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
-import Settings, { GeneralSettings, SystemPage, AppSettings } from './pages/Settings'
+import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, AboutSettings } from './pages/Settings'
 import { FiltersPage, RulesPage, ServicesPage, RewritesPage, CheckHostPage } from './pages/FiltersPages'
 import { DnsSettings, AccessSettings, EncryptionSettings, DhcpSettings } from './pages/AdvancedSettings'
 
@@ -66,7 +66,10 @@ export default function App() {
               <Route path="/settings/encryption" element={<EncryptionSettings />} />
               <Route path="/settings/dhcp" element={<DhcpSettings />} />
               <Route path="/settings/system" element={<SystemPage />} />
-              <Route path="/settings/app" element={<AppSettings />} />
+              <Route path="/settings/appearance" element={<AppearanceSettings />} />
+              <Route path="/settings/server" element={<ServerSettings />} />
+              <Route path="/settings/about" element={<AboutSettings />} />
+              <Route path="/settings/app" element={<Navigate to="/settings" replace />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

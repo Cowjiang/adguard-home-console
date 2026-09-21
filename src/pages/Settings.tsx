@@ -1,10 +1,10 @@
-/** 设置中心 + 通用设置 + 系统管理 + 应用设置 */
+/** 设置中心 + 通用设置 + 系统管理 + 外观/服务器连接/关于 */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import {
-  ScrollText, BarChart3, Network, Lock, Wifi, Wrench, AppWindow,
-  ChevronRight, Trash, RotateCcw, DownloadCloud, Server, LogOut, SunMoon,
+  ScrollText, Network, Lock, Wifi, Wrench,
+  Trash, RotateCcw, DownloadCloud, Server, LogOut, SunMoon,
   Info, Eraser, ShieldQuestion,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
@@ -24,51 +24,52 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 
 export default function Settings() {
   const nav = useNavigate()
-  const { status } = useAuth()
   const isDesktop = useIsDesktop()
 
-  const items = [
+  const serverItems = [
     { icon: <ScrollText size={17} />, color: 'var(--accent-2)', title: '查询日志与统计', desc: '保留时长、隐私选项', to: '/settings/general' },
     { icon: <Network size={17} />, color: 'var(--accent)', title: 'DNS 设置', desc: '上游、缓存、DNSSEC、拦截模式', to: '/settings/dns' },
     { icon: <Wrench size={17} />, color: 'var(--violet)', title: '访问控制', desc: '允许/阻止的客户端与域名', to: '/settings/access' },
     { icon: <Lock size={17} />, color: 'var(--warn)', title: '加密设置', desc: 'HTTPS、DoH、DoT、DoQ 证书', to: '/settings/encryption' },
     { icon: <Wifi size={17} />, color: 'var(--ok)', title: 'DHCP 服务器', desc: '地址分配与静态租约', to: '/settings/dhcp' },
-    { icon: <AppWindow size={17} />, color: 'var(--accent-2)', title: '应用设置', desc: '主题、服务器、关于', to: '/settings/app' },
-  ]
-  const all = [
-    ...items,
     { icon: <ShieldQuestion size={17} />, color: 'var(--danger)', title: '系统管理', desc: '版本更新、重置数据', to: '/settings/system' },
   ]
-  // 桌面 2 列卡片,移动端保持单卡
-  const cols = isDesktop ? [all.slice(0, 4), all.slice(4)] : [all]
+  const appItems = [
+    { icon: <SunMoon size={17} />, color: 'var(--accent-2)', title: '外观', desc: '主题:跟随系统 / 浅色 / 深色', to: '/settings/appearance' },
+    { icon: <Server size={17} />, color: 'var(--accent)', title: '服务器连接', desc: '地址、凭据与重新连接', to: '/settings/server' },
+    { icon: <Info size={17} />, color: 'var(--violet)', title: '关于', desc: `${APP_NAME} v${APP_VERSION}`, to: '/settings/about' },
+  ]
+
+  const groups = [
+    { title: '服务器设置', items: serverItems },
+    { title: '应用设置', items: appItems },
+  ]
 
   return (
     <Screen>
-      <PageHeader title="设置" subtitle={`AdGuard Home ${status?.version ?? ''}`} />
+      <PageHeader title="设置" />
 
-      <GroupTitle>服务器</GroupTitle>
       <div className={isDesktop ? 'grid grid-cols-2 items-start gap-x-4' : ''}>
-        {cols.map((col, ci) => (
-          <Group key={ci}>
-            <Rows>
-              {col.map((it, i) => (
-                <Row
-                  key={it.to}
-                  icon={<IconBubble color={it.color} bg="color-mix(in srgb, currentColor 12%, transparent)">{it.icon}</IconBubble>}
-                  title={it.title}
-                  subtitle={it.desc}
-                  onClick={() => nav(it.to)}
-                  last={i === col.length - 1}
-                />
-              ))}
-            </Rows>
-          </Group>
+        {groups.map((g) => (
+          <div key={g.title}>
+            <GroupTitle>{g.title}</GroupTitle>
+            <Group>
+              <Rows>
+                {g.items.map((it, i) => (
+                  <Row
+                    key={it.to}
+                    icon={<IconBubble color={it.color} bg="color-mix(in srgb, currentColor 12%, transparent)">{it.icon}</IconBubble>}
+                    title={it.title}
+                    subtitle={it.desc}
+                    onClick={() => nav(it.to)}
+                    last={i === g.items.length - 1}
+                  />
+                ))}
+              </Rows>
+            </Group>
+          </div>
         ))}
       </div>
-
-      <p className="mt-6 text-center text-[11.5px] text-t3">
-        {APP_NAME} v{APP_VERSION}
-      </p>
     </Screen>
   )
 }
@@ -328,10 +329,41 @@ export function SystemPage() {
   )
 }
 
-/* ================= 应用设置 ================= */
+/* ================= 外观 ================= */
 
-export function AppSettings() {
-  const { theme, setTheme, cfg, connect, logout } = useAuth()
+export function AppearanceSettings() {
+  const { theme, setTheme } = useAuth()
+  return (
+    <Screen>
+      <PageHeader back title="外观" />
+
+      <GroupTitle>主题</GroupTitle>
+      <Card className="p-4">
+        <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
+          <SunMoon size={15} className="text-t2" /> 外观模式
+        </div>
+        <Segmented
+          value={theme}
+          onChange={(v) => setTheme(v as ThemeSetting)}
+          options={[
+            { value: 'auto', label: '跟随系统' },
+            { value: 'light', label: '浅色' },
+            { value: 'dark', label: '深色' },
+          ]}
+        />
+      </Card>
+
+      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
+        选择“跟随系统”时,深色模式随操作系统的外观设置自动切换。
+      </p>
+    </Screen>
+  )
+}
+
+/* ================= 服务器连接 ================= */
+
+export function ServerSettings() {
+  const { cfg, connect, logout } = useAuth()
   const nav = useNavigate()
   const [url, setUrl] = useState(cfg?.url ?? '')
   const [username, setUsername] = useState(cfg?.username ?? '')
@@ -347,61 +379,53 @@ export function AppSettings() {
 
   return (
     <Screen>
-      <PageHeader back title="应用设置" />
+      <PageHeader back title="服务器连接" />
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>外观</GroupTitle>
-          <Card className="p-4">
-            <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
-              <SunMoon size={15} className="text-t2" /> 主题
-            </div>
-            <Segmented
-              value={theme}
-              onChange={(v) => setTheme(v as ThemeSetting)}
-              options={[
-                { value: 'auto', label: '跟随系统' },
-                { value: 'light', label: '浅色' },
-                { value: 'dark', label: '深色' },
-              ]}
-            />
-          </Card>
-
-          <GroupTitle>服务器</GroupTitle>
-          <Card className="p-4">
-            <div className="flex flex-col gap-3">
-              <input className="field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.2:3000" inputMode="url" autoCapitalize="off" />
-              <div className="grid grid-cols-2 gap-3">
-                <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="用户名" autoCapitalize="off" />
-                <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密码" />
-              </div>
-              <div className="flex gap-2.5">
-                <Button className="flex-1" loading={saving} onClick={saveServer}>
-                  <Server size={15} /> 重新连接
-                </Button>
-                <Button variant="glass" className="flex-1" onClick={() => { logout(); nav('/login', { replace: true }) }}>
-                  <LogOut size={15} /> 退出登录
-                </Button>
-              </div>
-            </div>
-          </Card>
+      <GroupTitle>连接</GroupTitle>
+      <Card className="p-4">
+        <div className="flex flex-col gap-3">
+          <input className="field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.2:3000" inputMode="url" autoCapitalize="off" />
+          <div className="grid grid-cols-2 gap-3">
+            <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="用户名" autoCapitalize="off" />
+            <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密码" />
+          </div>
+          <div className="flex gap-2.5">
+            <Button className="flex-1" loading={saving} onClick={saveServer}>
+              <Server size={15} /> 重新连接
+            </Button>
+            <Button variant="glass" className="flex-1" onClick={() => { logout(); nav('/login', { replace: true }) }}>
+              <LogOut size={15} /> 退出登录
+            </Button>
+          </div>
         </div>
-        <div>
-          <GroupTitle>关于</GroupTitle>
-          <Group>
-            <Rows>
-              <Row icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Info size={17} /></IconBubble>} title={APP_NAME} value={'v' + APP_VERSION} />
-              <Row
-                icon={<IconBubble color="var(--violet)" bg="var(--violet-soft)"><Network size={17} /></IconBubble>}
-                title="兼容性"
-                subtitle="AdGuard Home v0.107.79+ 全新 API"
-                last
-              />
-            </Rows>
-          </Group>
-        </div>
-      </div>
+      </Card>
 
+      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
+        凭据仅保存在本机浏览器中,所有请求经本服务代理转发到 AdGuard Home。
+      </p>
+    </Screen>
+  )
+}
+
+/* ================= 关于 ================= */
+
+export function AboutSettings() {
+  return (
+    <Screen>
+      <PageHeader back title="关于" />
+
+      <GroupTitle>应用</GroupTitle>
+      <Group>
+        <Rows>
+          <Row icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Info size={17} /></IconBubble>} title={APP_NAME} value={'v' + APP_VERSION} />
+          <Row
+            icon={<IconBubble color="var(--violet)" bg="var(--violet-soft)"><Network size={17} /></IconBubble>}
+            title="兼容性"
+            subtitle="AdGuard Home v0.107.79+ 全新 API"
+            last
+          />
+        </Rows>
+      </Group>
     </Screen>
   )
 }
