@@ -226,7 +226,7 @@ export default function Dashboard() {
                     <div className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px]" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
                       <Globe size={15} />
                     </div>
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
+                    <span className="w-0 min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
                     <Badge kind="info">{fmtMs(avg)}</Badge>
                     <span className="w-14 flex-none text-right text-[12.5px] num text-t2">{fmtNum(count)}</span>
                   </div>
