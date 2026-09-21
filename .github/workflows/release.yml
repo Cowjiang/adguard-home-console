@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 permissions:
   contents: write
@@ -25,9 +28,35 @@ jobs:
       - name: Package
         run: tar czf agh-console.tar.gz dist server package.json
 
+      - name: Compute version tag
+        id: ver
+        run: echo "tag=v0.1.0-dev.$(date +%Y%m%d).$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release notes
+        run: |
+          {
+            echo "Build of commit ${{ github.sha }} (branch: ${{ github.ref_name }})"
+            echo ""
+            echo "### Recent commits"
+            echo '```'
+            git log --oneline -10
+            echo '```'
+          } > release-notes.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Build ${{ github.run_number }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release-notes.md
+          generate_release_notes: true
           files: agh-console.tar.gz
+
+      - name: Delete all other releases and tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[] | select(.tagName != "${{ steps.ver.outputs.tag }}") | .tagName' | while read -r tag; do
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
