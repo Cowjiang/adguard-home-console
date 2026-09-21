@@ -8,8 +8,9 @@ import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip,
+  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect,
 } from '../components/ui'
+import { isAppleMobile } from '../lib/nativePickers'
 import { IconBubble } from './Protection'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
@@ -159,8 +160,18 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
         <Rows>
           <Row
             title="过滤器更新间隔"
-            value={data ? hoursLabel(data.interval) : '…'}
-            onClick={(e) => {
+            value={isAppleMobile() ? undefined : (data ? hoursLabel(data.interval) : '…')}
+            right={isAppleMobile() ? (
+              <div className="w-28 flex-none">
+                <PickSelect
+                  className="field num !py-1.5 !pr-8 text-right"
+                  value={data?.interval}
+                  options={[1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h }))}
+                  onPick={(v) => saveInterval(v)}
+                />
+              </div>
+            ) : undefined}
+            onClick={isAppleMobile() ? undefined : (e) => {
               pick({
                 title: '过滤器更新间隔',
                 anchor: e.currentTarget,
