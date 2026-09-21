@@ -23,6 +23,25 @@ export default function Login() {
       .catch(() => {})
   }, [])
 
+  // Tauri 壳调试辅助:debug 构建下从环境变量预填连接信息(自动连接在 App 层的
+  // DebugAutoLogin 处理,避免本组件卸载后 navigate 失效);release 壳恒返回 null
+  useEffect(() => {
+    const invoke = (
+      window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__?.invoke
+    if (!invoke) return
+    invoke('get_debug_login')
+      .then((d) => {
+        const cfg = d as { url?: string; username?: string; password?: string } | null
+        if (!cfg?.url || !cfg?.username) return
+        setUrl(cfg.url)
+        setUsername(cfg.username)
+        setPassword(cfg.password || '')
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function submit(e?: FormEvent) {
     e?.preventDefault()
     if (!url.trim() || !username.trim()) return

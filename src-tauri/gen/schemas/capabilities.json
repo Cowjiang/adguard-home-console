@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"最小权限:核心默认能力 + system-components(原生玻璃 TabBar)","local":true,"windows":["main"],"permissions":["core:default","system-components:default"]}}

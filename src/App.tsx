@@ -1,6 +1,6 @@
 /** 路由与全局守卫 */
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { SheetProvider, Spinner } from './components/ui'
 import { ToastHost } from './components/ui'
@@ -38,12 +38,43 @@ function ScrollToTop() {
   return null
 }
 
+/** 调试自动登录(Tauri debug 壳):常驻组件,连接成功后跳 AGH_ROUTE 指定路由;
+ *  放在 App 层避免 Login 卸载导致 navigate 失效;release 壳/浏览器该命令返回 null */
+function DebugAutoLogin() {
+  const { cfg, connect } = useAuth()
+  const nav = useNavigate()
+  useEffect(() => {
+    if (cfg) return
+    const invoke = (
+      window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__?.invoke
+    if (!invoke) return
+    invoke('get_debug_login')
+      .then((d) => {
+        const c = d as {
+          url?: string
+          username?: string
+          password?: string
+          autoconnect?: boolean
+          route?: string | null
+        } | null
+        if (!c?.autoconnect || !c.url || !c.username) return
+        void connect({ url: c.url, username: c.username, password: c.password || '' }).then((ok) => {
+          if (ok) nav(c.route || '/', { replace: true })
+        })
+      })
+      .catch(() => {})
+  }, [cfg, connect, nav])
+  return null
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <SheetProvider>
         <BrowserRouter>
           <ScrollToTop />
+          <DebugAutoLogin />
           <Routes>
             <Route path="/login" element={<LoginRoute />} />
             <Route element={<Protected><Layout /></Protected>}>
