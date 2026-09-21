@@ -11,9 +11,10 @@ import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  useConfirm, toast, Segmented, Badge, usePick,
+  useConfirm, toast, Segmented, Badge, usePick, PickSelect,
 } from '../components/ui'
 import { IconBubble } from './Protection'
+import { isAppleMobile } from '../lib/nativePickers'
 import { hoursLabel, fmtDate } from '../lib/format'
 import { APP_NAME, APP_VERSION } from '../lib/constants'
 import type { ThemeSetting } from '../lib/auth'
@@ -78,7 +79,7 @@ export default function Settings() {
 
 export function GeneralSettings() {
   const { cfg } = useAuth()
-  const pick = usePick()
+  const pick = usePick({ menuOnMobile: true })
   const { data: ql, mutate: mQl } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
   const { data: sc, mutate: mSc } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
 
@@ -136,8 +137,18 @@ export function GeneralSettings() {
           />
           <Row
             title="日志保留时长"
-            value={ql ? hoursLabel(ql.interval / HOUR) : '…'}
-            onClick={(e) => {
+            value={isAppleMobile() ? undefined : (ql ? hoursLabel(ql.interval / HOUR) : '…')}
+            right={isAppleMobile() ? (
+              <div className="w-28 flex-none">
+                <PickSelect
+                  className="field num !py-1.5 !pr-8 text-right"
+                  value={ql?.interval}
+                  options={QL_RETENTIONS}
+                  onPick={(v) => saveQl({ interval: v })}
+                />
+              </div>
+            ) : undefined}
+            onClick={isAppleMobile() ? undefined : (e) => {
               pick({
                 title: '日志保留时长',
                 anchor: e.currentTarget,
@@ -168,8 +179,18 @@ export function GeneralSettings() {
           />
           <Row
             title="统计保留时长"
-            value={sc ? hoursLabel(sc.interval / HOUR) : '…'}
-            onClick={(e) => {
+            value={isAppleMobile() ? undefined : (sc ? hoursLabel(sc.interval / HOUR) : '…')}
+            right={isAppleMobile() ? (
+              <div className="w-28 flex-none">
+                <PickSelect
+                  className="field num !py-1.5 !pr-8 text-right"
+                  value={sc?.interval}
+                  options={STAT_RETENTIONS}
+                  onPick={(v) => saveSc({ interval: v })}
+                />
+              </div>
+            ) : undefined}
+            onClick={isAppleMobile() ? undefined : (e) => {
               pick({
                 title: '统计保留时长',
                 anchor: e.currentTarget,
