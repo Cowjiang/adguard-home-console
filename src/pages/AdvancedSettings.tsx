@@ -221,11 +221,14 @@ toast('清除失败:' + e.message, 'err')
           <Group>
             <Rows>
               <Row title="启用缓存" subtitle="在本地存储 DNS 响应" right={<Switch on={d.cache_enabled ?? d.cache_size > 0} onChange={(v) => set('cache_enabled', v)} />} />
-              <Row title="缓存大小" value={fmtBytes(d.cache_size)} onClick={() => {
-                const sizes = [4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024, 256 * 1024 * 1024]
-                const i = sizes.findIndex((s) => s >= d.cache_size)
-                set('cache_size', sizes[(i + 1) % sizes.length])
-              }} />
+              <Row title="缓存大小" subtitle="DNS 缓存大小(字节)" right={<div className="w-28 flex-none"><select className="field !py-1.5 !pr-8 text-right" value={d.cache_size} onChange={(e) => {
+                set('cache_size', Number(e.target.value))
+                selectAfterChange(e.currentTarget)
+              }}>
+                {(cacheSizes.includes(d.cache_size) ? cacheSizes : [d.cache_size, ...cacheSizes]).map((s) => (
+                  <option key={s} value={s}>{fmtBytes(s)}</option>
+                ))}
+              </select></div>} />
               <Row title="覆盖最小 TTL(秒)" subtitle="延长上游返回的 TTL 值" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.cache_ttl_min} onChange={(e) => set('cache_ttl_min', Number(e.target.value))} /></div>} />
               <Row title="覆盖最大 TTL(秒)" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.cache_ttl_max} onChange={(e) => set('cache_ttl_max', Number(e.target.value))} /></div>} />
               <Row title="乐观缓存" subtitle="条目过期后仍先用缓存响应并后台刷新" right={<Switch on={d.cache_optimistic} onChange={(v) => set('cache_optimistic', v)} />} last />
@@ -281,6 +284,8 @@ function upstreamModeHint(m: string): string {
   if (m === 'fastest_addr') return '等待所有响应并测速,返回连接最快的 IP;上游不稳定时会显著拖慢查询,请确保上游稳定且超时较短。'
   return '一次查询一台服务器,按加权随机选择失败最少、平均耗时最低的上游。'
 }
+
+const cacheSizes = [4, 16, 64, 256, 512].map((mb) => mb * 1024 * 1024)
 
 function Field({ label, value, onChange, mono, placeholder, hint }: { label: string; value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string; hint?: string }) {
   return (
