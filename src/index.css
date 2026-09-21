@@ -473,12 +473,12 @@ svg {
   }
 }
 
-/* 图表触摸区:禁止 iOS 长按呼出选择/放大镜/复制菜单 */
+/* 图表触摸区:禁止 iOS 长按呼出选择/放大镜/复制菜单;pan-y = 纵向滑动交还给页面滚动,横向拖动留给图表 scrub */
 .chart-touch {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-user-drag: none;
-  touch-action: none;
+  touch-action: pan-y;
   cursor: crosshair;
 }
