@@ -20,7 +20,7 @@ import { SERVICE_CACHE_KEY } from '../lib/constants'
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg } = useAuth()
   const sheet = useSheet()
-  const pick = usePick()
+  const pick = usePick({ menuOnMobile: true })
   const confirm = useConfirm()
   const [refreshing, setRefreshing] = useState(false)
 
