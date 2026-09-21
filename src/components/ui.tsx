@@ -119,17 +119,18 @@ export function Rows({ children }: { children: ReactNode }) {
 
 /* ---------- 开关 ---------- */
 
-export function Switch({ on, onChange, danger, disabled }: { on: boolean; onChange: (v: boolean, e: RMouseEvent<HTMLButtonElement>) => void; danger?: boolean; disabled?: boolean }) {
+export function Switch({ on, onChange, danger, disabled, loading }: { on: boolean; onChange: (v: boolean, e: RMouseEvent<HTMLButtonElement>) => void; danger?: boolean; disabled?: boolean; loading?: boolean }) {
+  const inert = disabled || loading
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
-      disabled={disabled}
+      disabled={inert}
       data-on={on}
       data-danger={danger}
       className="switch"
-      style={disabled ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+      style={inert ? { opacity: 0.55, pointerEvents: 'none' } : undefined}
       onClick={(e: any) => {
         e.stopPropagation()
         onChange(!on, e)

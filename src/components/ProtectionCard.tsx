@@ -19,8 +19,15 @@ export function ProtectionCard() {
   const { cfg, status, refreshStatus } = useAuth()
   const pick = usePick()
   const [busy, setBusy] = useState(false)
+  const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null)
 
-  const enabled = status?.protection_enabled ?? false
+  const serverEnabled = status?.protection_enabled ?? false
+  // 乐观更新：等待 API 期间立即显示目标状态，服务端确认后自动对齐
+  const enabled = pendingEnabled ?? serverEnabled
+  if (pendingEnabled !== null && pendingEnabled === serverEnabled) {
+    // 用微任务清除，避免渲染期间 setState
+    queueMicrotask(() => setPendingEnabled(null))
+  }
   const disabledUntil = (status as any)?.protection_disabled_until as string | undefined
   // 服务器以毫秒报告暂停时长(protection_disabled_duration 与请求 duration 同单位)
   const disabledDurMs = status?.protection_disabled_duration ?? 0
@@ -55,12 +62,14 @@ export function ProtectionCard() {
 
   async function setProtection(next: boolean, duration?: number) {
     if (!cfg) return
+    setPendingEnabled(next)
     setBusy(true)
     try {
       await api(cfg, '/protection', { method: 'POST', body: { enabled: next, duration: (duration ?? 0) * 1000 } })
       toast(next ? '防护已开启' : '防护已暂停')
       refreshStatus()
     } catch (e: any) {
+      setPendingEnabled(null)
       toast('操作失败:' + e.message, 'err')
     } finally {
       setBusy(false)
@@ -109,7 +118,7 @@ export function ProtectionCard() {
                 : '全网拦截广告、跟踪器与恶意域名'}
           </p>
         </div>
-        <Switch on={enabled} disabled={busy} onChange={(v, e) => (v ? setProtection(true) : openPausePicker(e))} />
+        <Switch on={enabled} loading={busy} onChange={(v) => (v ? setProtection(true) : setProtection(false))} />
       </div>
 
       <div className="mt-4 flex gap-2">
