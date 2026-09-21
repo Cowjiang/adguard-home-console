@@ -32,6 +32,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // 启动错误陷阱:WebView 内 JS 异常直接上屏(移动壳里无控制台时用于定位)
+      window.addEventListener('error', function (e) {
+        var el = document.getElementById('boot-err')
+        if (!el) { el = document.createElement('pre'); el.id = 'boot-err'; document.body.appendChild(el) }
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;margin:0;padding:10px;background:#fee2e2;color:#991b1b;font-size:12px;white-space:pre-wrap;word-break:break-all'
+        el.textContent += 'ERR: ' + (e.message || e.error || e) + '\n  at ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?') + '\n'
+      })
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -8,3 +8,13 @@ _probe
 
 .idea
 _p*.cjs
+
+# Xcode / iOS / Tauri(2026-09-21 iOS 施工追加)
+ios/DerivedData/
+ios/**/xcuserdata/
+*.xcuserstate
+*.xcresult
+src-tauri/target/
+src-tauri/gen/ios/DerivedData/
+src-tauri/gen/apple/build/
+src-tauri/gen/apple/**/*.xcarchive/

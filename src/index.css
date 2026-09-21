@@ -318,7 +318,8 @@ body {
   width: 100%;
   max-width: 560px;
   padding-top: calc(env(safe-area-inset-top, 0px) + 64px);
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 112px);
+  /* --tabbar-space:原生玻璃 TabBar 模式下由 src/lib/nativeTabbar.ts 按 getTabBarInsets 注入;默认值对齐 CSS 标签栏高度 */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-space, 112px));
 }
 @media (min-width: 1024px) {
   .page-shell {
