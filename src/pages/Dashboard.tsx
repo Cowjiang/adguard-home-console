@@ -45,7 +45,7 @@ export default function Dashboard() {
     refreshInterval: 60000,
   })
   const [range, setRange] = useState<RangeKey>('24h')
-  const pick = usePick()
+  const pick = usePick({ menuOnMobile: true })
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))

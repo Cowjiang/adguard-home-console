@@ -391,13 +391,14 @@ function MenuHost({ children }: { children: ReactNode }) {
   )
 }
 
-/** 单选选择器:桌面(≥lg)弹出锚点下拉菜单,移动端保持原底部弹窗 */
-export function usePick() {
+/** 单选选择器:桌面(≥lg)弹出锚点下拉菜单;移动端默认底部弹窗,传 menuOnMobile 则同样用锚点下拉 */
+export function usePick(opts?: { menuOnMobile?: boolean }) {
   const sheet = useSheet()
   const menu = useContext(MenuContext)
   const isDesktop = useIsDesktop()
+  const menuOnMobile = opts?.menuOnMobile ?? false
   return <T extends string | number>(req: PickReq<T>) => {
-    if (isDesktop) {
+    if (isDesktop || menuOnMobile) {
       menu.open(req)
     } else {
       sheet.open(
