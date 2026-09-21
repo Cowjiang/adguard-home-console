@@ -352,8 +352,12 @@ textarea::placeholder {
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 .field:focus {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--glass) 70%, var(--accent) 4%);
+border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+background-color: color-mix(in srgb, var(--glass) 70%, var(--accent) 4%);
+}
+.field.no-ring:focus {
+border-color: var(--glass-border);
+background-color: var(--glass);
 }
 textarea.field {
   resize: none;

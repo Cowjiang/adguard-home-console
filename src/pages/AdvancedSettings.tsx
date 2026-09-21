@@ -1,5 +1,6 @@
 /** 高级设置:DNS、访问控制、加密、DHCP */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import {
   Play, ShieldCheck, Plus, Trash2, Wifi,
@@ -17,6 +18,7 @@ import { fmtBytes, fmtDate } from '../lib/format'
 
 export function DnsSettings() {
   const { cfg } = useAuth()
+  const nav = useNavigate()
   const { data, mutate, isLoading } = useSWR<DnsInfo>(cfg ? ['dns', cfg, '/dns_info'] : null, swrFetcher)
   const [draft, setDraft] = useState<DnsInfo | null>(null)
   const [saving, setSaving] = useState(false)
@@ -45,19 +47,30 @@ export function DnsSettings() {
     }
   }
 
-  async function testUpstreams() {
-    if (!cfg || !d) return
-    try {
-      const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
-        method: 'POST',
-        body: { upstream_dns: toLines(d.upstream_dns) },
-      })
-      setTestResult(r ?? null)
-      toast(!r || Object.keys(r).length === 0 ? '全部上游测试通过 ✓' : '部分上游存在问题', !r || Object.keys(r).length === 0 ? 'ok' : 'err')
-    } catch (e: any) {
-      toast('测试失败:' + e.message, 'err')
-    }
-  }
+async function testUpstreams() {
+if (!cfg || !d) return
+try {
+const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
+method: 'POST',
+body: { upstream_dns: toLines(d.upstream_dns) },
+})
+const errs = Object.fromEntries(Object.entries(r ?? {}).filter(([, v]) => v && v.toLowerCase() !== 'ok'))
+setTestResult(errs)
+toast(Object.keys(errs).length === 0 ? '全部上游测试通过 ✓' : '部分上游存在问题', Object.keys(errs).length === 0 ? 'ok' : 'err')
+} catch (e: any) {
+toast('测试失败:' + e.message, 'err')
+}
+}
+
+async function clearCache() {
+if (!cfg) return
+try {
+await api(cfg, '/cache_clear', { method: 'POST' })
+toast('DNS 缓存已清除', 'ok')
+} catch (e: any) {
+toast('清除失败:' + e.message, 'err')
+}
+}
 
   if (isLoading || !d) return <Screen><PageHeader back title="DNS 设置" /><Loading /></Screen>
 
@@ -76,93 +89,161 @@ export function DnsSettings() {
         <div>
           <GroupTitle>上游 DNS 服务器</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
-        <Field label="上游 DNS(每行一个)" value={lines(d.upstream_dns)} onChange={(v) => set('upstream_dns', v.split('\n'))} mono
-          placeholder={'223.5.5.5\ntls://1.1.1.1\nhttps://dns.google/dns-query'} />
-        <Field label="Bootstrap DNS(解析 DoH/DoT 域名用)" value={lines(d.bootstrap_dns)} onChange={(v) => set('bootstrap_dns', v.split('\n'))} mono
-          placeholder={'223.5.5.5\n119.29.29.29'} />
-        <Field label="Fallback DNS(备用)" value={lines(d.fallback_dns)} onChange={(v) => set('fallback_dns', v.split('\n'))} mono />
+            <Field
+              label="上游 DNS(每行一个)"
+              value={lines(d.upstream_dns)}
+              onChange={(v) => set('upstream_dns', v.split('\n'))}
+              mono
+              placeholder={'223.5.5.5\ntls://1.1.1.1\nhttps://dns.google/dns-query'}
+              hint="支持 udp://、tcp://、tls://、https://、quic://、h3://、sdns:// 等形式;[/example.local/]223.5.5.5 表示仅指定域名走此上游;# 开头为注释。"
+            />
+            <div className="block">
+              <span className="mb-1 block text-[12.5px] text-t2">负载均衡模式</span>
+              <select className="field" value={d.upstream_mode || 'load_balance'} onChange={(e) => {
+              set('upstream_mode', e.target.value)
+              selectAfterChange(e.currentTarget)
+            }}>
+                <option value="load_balance">负载均衡</option>
+                <option value="parallel">并行请求</option>
+                <option value="fastest_addr">最快的 IP 地址</option>
+              </select>
+              <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">{upstreamModeHint(d.upstream_mode)}</span>
+            </div>
+            <Field
+              label="后备 DNS 服务器"
+              value={lines(d.fallback_dns)}
+              onChange={(v) => set('fallback_dns', v.split('\n'))}
+              mono
+              placeholder="上游全部无响应时使用,语法同上"
+            />
+            <Field
+              label="Bootstrap DNS"
+              value={lines(d.bootstrap_dns)}
+              onChange={(v) => set('bootstrap_dns', v.split('\n'))}
+              mono
+              placeholder={'9.9.9.10\n149.112.112.10'}
+              hint="用于解析 DoH/DoT 上游的域名,只允许 IP 地址,不允许注释。"
+            />
+            <Field
+              label="私人反向 DNS 服务器"
+              value={lines(d.local_ptr_upstreams)}
+              onChange={(v) => set('local_ptr_upstreams', v.split('\n'))}
+              mono
+              placeholder={(data?.default_local_ptr_upstreams ?? []).join('\n')}
+              hint={`用于私人 PTR/SOA/NS 请求;未设置时使用系统默认解析器${data?.default_local_ptr_upstreams?.length ? `(当前默认: ${data.default_local_ptr_upstreams.join(', ')})` : ''}。`}
+            />
+            <Group>
+              <Rows>
+                <Row
+                  title="使用私人反向 DNS 解析器"
+                  subtitle="用私有上游、DHCP、/etc/hosts 等解析私有 IP 的 PTR 请求;关闭时对这类请求回 NXDOMAIN"
+                  right={<Switch on={d.use_private_ptr_resolvers} onChange={(v) => set('use_private_ptr_resolvers', v)} />}
+                />
+                <Row
+                  title="客户端 IP 反向解析"
+                  subtitle="将客户端 IP 反向解析为主机名,查询日志中显示设备名"
+                  right={<Switch on={d.resolve_clients} onChange={(v) => set('resolve_clients', v)} />}
+                  last
+                />
+              </Rows>
+            </Group>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="block">
+                <span className="mb-1 block text-[12.5px] text-t2">上游超时(秒)</span>
+                <input className="field num" type="number" value={d.upstream_timeout} onChange={(e) => set('upstream_timeout', Number(e.target.value))} />
+              </div>
+              <div className="flex items-end">
+                <Button variant="glass" className="w-full" onClick={testUpstreams}>
+                  <Play size={14} /> 测试上游
+                </Button>
+              </div>
+            </div>
+            {testResult !== undefined && (testResult === null || Object.keys(testResult).length === 0) && (
+              <p className="rounded-xl px-3.5 py-2.5 text-[12.5px]" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}>全部上游测试通过 ✓</p>
+            )}
+            {testResult && Object.keys(testResult).length > 0 && (
+              <div className="rounded-xl px-3.5 py-3 text-[12px]" style={{ background: 'var(--danger-soft)' }}>
+                {Object.entries(testResult).map(([up, err]) => (
+                  <p key={up} className="break-all py-0.5 text-t2">
+                    <span className="font-semibold text-danger">{up}</span>: {err}
+                  </p>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+        <div>
+          <GroupTitle>DNS 服务配置</GroupTitle>
+          <Group>
+            <Rows>
+              <Row title="限速(每客户端每秒)" subtitle="0 表示不限速" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.ratelimit} onChange={(e) => set('ratelimit', Number(e.target.value))} /></div>} />
+              <Row title="IPv4 子网前缀长度" subtitle="按子网聚合限速,默认 24" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.ratelimit_subnet_len_ipv4} onChange={(e) => set('ratelimit_subnet_len_ipv4', Number(e.target.value))} /></div>} />
+              <Row title="IPv6 子网前缀长度" subtitle="按子网聚合限速,默认 56" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.ratelimit_subnet_len_ipv6} onChange={(e) => set('ratelimit_subnet_len_ipv6', Number(e.target.value))} /></div>} />
+              <div className="px-4 pb-4 pt-2">
+                <div className="text-[15.5px] font-medium text-t1">速率限制白名单</div>
+                <div className="mt-0.5 text-[12.5px] leading-snug text-t2">排除在速率限制之外的 IP 地址</div>
+                <textarea className="field mt-2" style={{ minHeight: 56 }} value={lines(d.ratelimit_whitelist)} onChange={(e) => set('ratelimit_whitelist', e.target.value.split('\n'))} spellCheck={false} placeholder="每行一个 IP 或 CIDR" />
+              </div>
+              <Row title="启用 EDNS 客户端子网" right={<Switch on={d.edns_cs_enabled} onChange={(v) => set('edns_cs_enabled', v)} />} />
+              {d.edns_cs_enabled && (
+                <Row title="为 EDNS 使用自定义 IP" right={<Switch on={d.edns_cs_use_custom} onChange={(v) => set('edns_cs_use_custom', v)} />} />
+              )}
+              {d.edns_cs_enabled && d.edns_cs_use_custom && (
+                <Row title="自定义 ECS" right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={d.edns_cs_custom_ip} onChange={(e) => set('edns_cs_custom_ip', e.target.value)} /></div>} />
+              )}
+              <Row title="DNSSEC" subtitle="设置 DNSSEC 标志并校验上游响应(需上游支持)" right={<Switch on={d.dnssec_enabled} onChange={(v) => set('dnssec_enabled', v)} />} />
+              <Row title="禁用 IPv6 解析" subtitle="丢弃 AAAA 查询并移除 HTTPS 响应中的 IPv6 信息" right={<Switch on={d.disable_ipv6} onChange={(v) => set('disable_ipv6', v)} />} />
+              <div className="px-4 pb-4 pt-2">
+                <div className="text-[15.5px] font-medium text-t1">拦截模式</div>
+                <select className="field mt-2" value={d.blocking_mode} onChange={(e) => {
+                set('blocking_mode', e.target.value as DnsInfo['blocking_mode'])
+                selectAfterChange(e.currentTarget)
+              }}>
+                  <option value="default">默认</option>
+                  <option value="refused">REFUSED</option>
+                  <option value="nxdomain">NXDOMAIN</option>
+                  <option value="null_ip">空 IP</option>
+                  <option value="custom_ip">自定义 IP</option>
+                </select>
+                <div className="mt-1.5 text-[12.5px] leading-snug text-t2">{blockingModeDesc(d.blocking_mode)}</div>
+                {d.blocking_mode === 'custom_ip' && (
+                  <div className="mt-2.5 grid grid-cols-2 gap-3">
+                    <input className="field num !py-2 !text-[13px]" value={d.blocking_ipv4} onChange={(e) => set('blocking_ipv4', e.target.value)} placeholder="自定义 IPv4" />
+                    <input className="field num !py-2 !text-[13px]" value={d.blocking_ipv6} onChange={(e) => set('blocking_ipv6', e.target.value)} placeholder="自定义 IPv6" />
+                  </div>
+                )}
+              </div>
+              <Row title="被拦截响应 TTL(秒)" subtitle="客户端缓存已过滤响应的秒数" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.blocked_response_ttl} onChange={(e) => set('blocked_response_ttl', Number(e.target.value))} /></div>} last />
+            </Rows>
+          </Group>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1 block text-[12.5px] text-t2">多上游模式</span>
-            <select className="field" value={d.upstream_mode} onChange={(e) => set('upstream_mode', e.target.value)}>
-              <option value="load_balance">负载均衡</option>
-              <option value="parallel">并行请求(最快)</option>
-              <option value="fastest_addr">最快地址</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[12.5px] text-t2">上游超时(秒)</span>
-            <input className="field num" type="number" value={d.upstream_timeout} onChange={(e) => set('upstream_timeout', Number(e.target.value))} />
-          </label>
-        </div>
+          <GroupTitle>DNS 缓存配置</GroupTitle>
+          <Group>
+            <Rows>
+              <Row title="启用缓存" subtitle="在本地存储 DNS 响应" right={<Switch on={d.cache_enabled ?? d.cache_size > 0} onChange={(v) => set('cache_enabled', v)} />} />
+              <Row title="缓存大小" value={fmtBytes(d.cache_size)} onClick={() => {
+                const sizes = [4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024, 256 * 1024 * 1024]
+                const i = sizes.findIndex((s) => s >= d.cache_size)
+                set('cache_size', sizes[(i + 1) % sizes.length])
+              }} />
+              <Row title="覆盖最小 TTL(秒)" subtitle="延长上游返回的 TTL 值" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.cache_ttl_min} onChange={(e) => set('cache_ttl_min', Number(e.target.value))} /></div>} />
+              <Row title="覆盖最大 TTL(秒)" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.cache_ttl_max} onChange={(e) => set('cache_ttl_max', Number(e.target.value))} /></div>} />
+              <Row title="乐观缓存" subtitle="条目过期后仍先用缓存响应并后台刷新" right={<Switch on={d.cache_optimistic} onChange={(v) => set('cache_optimistic', v)} />} last />
+            </Rows>
+            <div className="flex items-center justify-between gap-3 px-4 pb-4">
+              <p className="text-[12.5px] text-t2">修改过滤规则后清除缓存可立即生效</p>
+              <Button variant="danger" onClick={clearCache}>
+                <Trash2 size={14} /> 清除缓存
+              </Button>
+            </div>
+          </Group>
 
-        <Button variant="glass" onClick={testUpstreams}>
-          <Play size={14} /> 测试上游
-        </Button>
-        {testResult !== undefined && testResult !== null && Object.keys(testResult).length > 0 && (
-          <div className="rounded-xl px-3.5 py-3 text-[12px]" style={{ background: 'var(--danger-soft)' }}>
-            {Object.entries(testResult).map(([up, err]) => (
-              <p key={up} className="break-all py-0.5 text-t2">
-                <span className="font-semibold text-danger">{up}</span>: {err}
-              </p>
-            ))}
-          </div>
-        )}
-      </Card>
-        </div>
-        <div>
-          <GroupTitle>缓存</GroupTitle>
+          <GroupTitle>访问设置</GroupTitle>
           <Group>
-        <Rows>
-          <Row title="启用 DNS 缓存" right={<Switch on={d.cache_enabled ?? d.cache_size > 0} onChange={(v) => set('cache_size', v ? Math.max(4 * 1024 * 1024, d.cache_size) : 0)} />} />
-          <Row title="缓存大小" value={fmtBytes(d.cache_size)} onClick={() => {
-            const sizes = [4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024, 256 * 1024 * 1024]
-            // 循环切换缓存大小
-            const i = sizes.findIndex((s) => s >= d.cache_size)
-            set('cache_size', sizes[(i + 1) % sizes.length])
-          }} />
-          <Row title="乐观缓存" subtitle="TTL 过期后仍返回旧值并后台刷新" right={<Switch on={d.cache_optimistic} onChange={(v) => set('cache_optimistic', v)} />} />
-          <Row title="最小 TTL(秒)" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.cache_ttl_min} onChange={(e) => set('cache_ttl_min', Number(e.target.value))} />} />
-          <Row title="最大 TTL(秒)" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.cache_ttl_max} onChange={(e) => set('cache_ttl_max', Number(e.target.value))} />} last />
-        </Rows>
-      </Group>
-        </div>
-        <div>
-          <GroupTitle>安全与协议</GroupTitle>
-          <Group>
-        <Rows>
-          <Row title="DNSSEC" subtitle="验证上游响应签名" right={<Switch on={d.dnssec_enabled} onChange={(v) => set('dnssec_enabled', v)} />} />
-          <Row title="EDNS Client Subnet" right={<Switch on={d.edns_cs_enabled} onChange={(v) => set('edns_cs_enabled', v)} />} />
-          {d.edns_cs_enabled && (
-            <Row title="使用自定义 ECS IP" right={<Switch on={d.edns_cs_use_custom} onChange={(v) => set('edns_cs_use_custom', v)} />} />
-          )}
-          {d.edns_cs_enabled && d.edns_cs_use_custom && (
-            <Row title="自定义 ECS" right={<input className="field num w-36 !py-1.5 text-right" value={d.edns_cs_custom_ip} onChange={(e) => set('edns_cs_custom_ip', e.target.value)} />} />
-          )}
-          <Row title="禁用 IPv6 解析" subtitle="不返回 AAAA 记录" right={<Switch on={d.disable_ipv6} onChange={(v) => set('disable_ipv6', v)} />} last />
-        </Rows>
-      </Group>
-        </div>
-        <div>
-          <GroupTitle>拦截模式</GroupTitle>
-          <Group>
-        <Rows>
-          <Row title="被拦截域名的响应方式" value={blockingModeLabel(d.blocking_mode)} onClick={() => {
-            const modes: DnsInfo['blocking_mode'][] = ['default', 'nxdomain', 'null_ip', 'custom_ip', 'refused']
-            const i = modes.indexOf(d.blocking_mode)
-            set('blocking_mode', modes[(i + 1) % modes.length])
-          }} />
-          {d.blocking_mode === 'custom_ip' && (
-            <>
-              <Row title="自定义 IPv4" right={<input className="field num w-36 !py-1.5 text-right" value={d.blocking_ipv4} onChange={(e) => set('blocking_ipv4', e.target.value)} />} />
-              <Row title="自定义 IPv6" right={<input className="field num w-36 !py-1.5 text-right" value={d.blocking_ipv6} onChange={(e) => set('blocking_ipv6', e.target.value)} />} />
-            </>
-          )}
-          <Row title="被拦截响应 TTL(秒)" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.blocked_response_ttl} onChange={(e) => set('blocked_response_ttl', Number(e.target.value))} />} />
-          <Row title="限速(每分钟请次)" subtitle="0 表示不限速" right={<input className="field num w-20 !py-1.5 text-right" type="number" value={d.ratelimit} onChange={(e) => set('ratelimit', Number(e.target.value))} />} last />
-        </Rows>
-      </Group>
+            <Rows>
+              <Row title="允许 / 阻止的客户端与域名" subtitle="在独立的访问设置页面中配置" onClick={() => nav('/settings/access')} last />
+            </Rows>
+          </Group>
         </div>
       </div>
 
@@ -176,19 +257,34 @@ export function DnsSettings() {
   )
 }
 
-function blockingModeLabel(m: string): string {
+function blockingModeDesc(m: string): string {
   return {
-    default: '默认(A 记录返回 0.0.0.0)',
-    nxdomain: 'NXDOMAIN(域名不存在)',
-    null_ip: 'Null IP(0.0.0.0 / ::)',
-    custom_ip: '自定义 IP',
-    refused: 'REFUSED(拒绝)',
-  }[m] ?? m
+    default: '被广告拦截规则拦截时返回零 IP(A 记录 0.0.0.0;AAAA 记录 ::);被 /etc/hosts 规则拦截时返回规则中指定的 IP。',
+    refused: '以 REFUSED 码响应请求。',
+    nxdomain: '以 NXDOMAIN(域名不存在)码响应。',
+    null_ip: '以零 IP 地址响应(A 记录 0.0.0.0;AAAA 记录 ::)。',
+    custom_ip: '以手动设置的 IP 地址响应。',
+  }[m] ?? ''
 }
 
-function Field({ label, value, onChange, mono, placeholder }: { label: string; value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string }) {
+function selectAfterChange(el: HTMLSelectElement) {
+  if (window.matchMedia('(hover: hover)').matches) {
+    el.blur()
+    return
+  }
+  el.classList.add('no-ring')
+  el.addEventListener('blur', () => el.classList.remove('no-ring'), { once: true })
+}
+
+function upstreamModeHint(m: string): string {
+  if (m === 'parallel') return '同时查询所有上游服务器,取最快的响应,加快解析速度。'
+  if (m === 'fastest_addr') return '等待所有响应并测速,返回连接最快的 IP;上游不稳定时会显著拖慢查询,请确保上游稳定且超时较短。'
+  return '一次查询一台服务器,按加权随机选择失败最少、平均耗时最低的上游。'
+}
+
+function Field({ label, value, onChange, mono, placeholder, hint }: { label: string; value: string; onChange: (v: string) => void; mono?: boolean; placeholder?: string; hint?: string }) {
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1 block text-[12.5px] text-t2">{label}</span>
       <textarea
         className="field"
@@ -198,7 +294,8 @@ function Field({ label, value, onChange, mono, placeholder }: { label: string; v
         placeholder={placeholder}
         spellCheck={false}
       />
-    </label>
+      {hint && <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">{hint}</span>}
+    </div>
   )
 }
 
@@ -393,33 +490,33 @@ export function EncryptionSettings() {
         <div>
           <GroupTitle>服务器名称与证书</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
-        <label className="block">
+        <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">服务器名称(SNI)</span>
           <input className="field !py-2.5 !text-[14px]" value={d.server_name ?? ''} onChange={(e) => set('server_name', e.target.value)} placeholder="dns.example.com" autoCapitalize="off" spellCheck={false} />
           <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">须与证书中的一个 DNS 名称匹配;设置后 AGH 会检测客户端标识号、响应 DDR 查询,未设置则该功能禁用</span>
-        </label>
-        <label className="block">
+        </div>
+        <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">证书文件路径</span>
           <input className="field num !py-2.5 !text-[13px]" value={d.certificate_path ?? ''} onChange={(e) => set('certificate_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/cert.pem" autoCapitalize="off" spellCheck={false} />
           <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">状态:证书链{data.valid_chain ? '有效' : '无效'} · 证书{data.valid_cert ? '有效' : '无效'}</span>
-        </label>
-        <label className="block">
+        </div>
+        <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">证书内容(PEM,可选)</span>
           <textarea className="field" style={{ minHeight: 72 }} value={d.certificate_chain ?? ''} onChange={(e) => set('certificate_chain', e.target.value)} spellCheck={false} placeholder={'留空则使用上方路径或服务器已加载的证书\n-----BEGIN CERTIFICATE-----…'} />
-        </label>
+        </div>
       </Card>
 
           <GroupTitle>私钥</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
-        <label className="block">
+        <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">私钥文件路径</span>
           <input className="field num !py-2.5 !text-[13px]" value={d.private_key_path ?? ''} onChange={(e) => set('private_key_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/key.pem" autoCapitalize="off" spellCheck={false} />
           <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">状态:{data.key_type ? `该 ${data.key_type} 私钥` : '私钥'}{data.valid_key ? '有效' : '无效'}{data.private_key_saved ? ' · 已保存在服务器' : ''}</span>
-        </label>
-        <label className="block">
+        </div>
+        <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">私钥内容(PEM,可选)</span>
           <textarea className="field" style={{ minHeight: 72 }} value={d.private_key ?? ''} onChange={(e) => set('private_key', e.target.value)} spellCheck={false} placeholder={'留空则使用上方路径或服务器已加载的私钥\n-----BEGIN PRIVATE KEY-----…'} />
-        </label>
+        </div>
         <p className="text-[11.5px] leading-relaxed text-t3">使用加密需为域名提供有效 SSL 证书链,可从 letsencrypt.org 免费获取或向受信任 CA 购买;PEM 内容与路径二选一,内容优先。</p>
       </Card>
         </div>
@@ -585,11 +682,11 @@ export function DhcpSettings() {
             <GroupTitle>IPv4 范围</GroupTitle>
             <Group>
             <Rows>
-              <Row title="网关" right={<input className="field num w-36 !py-1.5 text-right" value={cur.v4.gateway_ip} onChange={(e) => setD({ v4: { ...cur.v4, gateway_ip: e.target.value } })} />} />
-              <Row title="子网掩码" right={<input className="field num w-36 !py-1.5 text-right" value={cur.v4.subnet_mask} onChange={(e) => setD({ v4: { ...cur.v4, subnet_mask: e.target.value } })} />} />
-              <Row title="起始 IP" right={<input className="field num w-36 !py-1.5 text-right" value={cur.v4.range_start} onChange={(e) => setD({ v4: { ...cur.v4, range_start: e.target.value } })} />} />
-              <Row title="结束 IP" right={<input className="field num w-36 !py-1.5 text-right" value={cur.v4.range_end} onChange={(e) => setD({ v4: { ...cur.v4, range_end: e.target.value } })} />} />
-              <Row title="租约时长(秒)" right={<input className="field num w-24 !py-1.5 text-right" type="number" value={cur.v4.lease_duration} onChange={(e) => setD({ v4: { ...cur.v4, lease_duration: Number(e.target.value) } })} />} last />
+              <Row title="网关" right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.gateway_ip} onChange={(e) => setD({ v4: { ...cur.v4, gateway_ip: e.target.value } })} /></div>} />
+              <Row title="子网掩码" right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.subnet_mask} onChange={(e) => setD({ v4: { ...cur.v4, subnet_mask: e.target.value } })} /></div>} />
+              <Row title="起始 IP" right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_start} onChange={(e) => setD({ v4: { ...cur.v4, range_start: e.target.value } })} /></div>} />
+              <Row title="结束 IP" right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_end} onChange={(e) => setD({ v4: { ...cur.v4, range_end: e.target.value } })} /></div>} />
+              <Row title="租约时长(秒)" right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={cur.v4.lease_duration} onChange={(e) => setD({ v4: { ...cur.v4, lease_duration: Number(e.target.value) } })} /></div>} last />
             </Rows>
             </Group>
           </div>
