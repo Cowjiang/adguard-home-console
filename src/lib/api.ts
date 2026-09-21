@@ -173,6 +173,7 @@ export interface DnsInfo {
   use_private_ptr_resolvers: boolean
   resolve_clients: boolean
   local_ptr_upstreams: string[]
+  default_local_ptr_upstreams?: string[]
 }
 
 export interface TlsStatus {

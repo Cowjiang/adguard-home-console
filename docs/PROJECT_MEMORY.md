@@ -74,6 +74,8 @@
 10. **ProtectionCard 开关采用乐观更新**(用户要求,勿回退):点击瞬间 `pendingEnabled` 立即设为目标值,knob 通过 CSS `transition: transform 0.28s` 丝滑滑动 + 整体 `opacity:0.55` 表 loading;API 成功后服务端状态对齐自动清除 pending(当前实现是渲染期 `queueMicrotask` 清,能跑但若重构优先改 useEffect);失败则 `setPendingEnabled(null)` 回退到服务端真实状态。关闭开关时**不弹出时间选择器**(直接关),定时暂停只走下面“定时暂停”按钮。
 11. **Switch 的 knob 动画只能用 CSS transition,勿加 animation/keyframes 控 transform**——animation 会抢占 transform 属性导致 transition 滑动失效(knob 卡住不滑)。loading 态仅通过按钮整体 opacity 表达。
 12. **`preserveAspectRatio="none"` 会把 SVG `<circle>` 拉成椭圆**(纵向 1:1、横向被拉伸),`vectorEffect` 只救描边不救形状——hover 数据点一律用 HTML 绝对定位圆点叠加(横向百分比定位 + 纵向像素定位,纵向缩放恒为 1);竖直 `<line>` 形状不受拉伸影响但仍需补 `vectorEffect="non-scaling-stroke"` 防止宽屏下被拉粗。
+13. **触屏设备 `<select>` 的焦点样式会残留**(iOS 从原生选择器选完不自动 blur,`:focus` 绿框一直挂着);**不能在 change 里同步 blur()**——与 iOS 自身的焦点恢复竞态,会导致下一次快速打开菜单被闪关。标准方案:触屏(`hover: none`)给元素加 `.no-ring` 类压掉 `:focus` 样式、真实 blur 时移除,桌面(`hover: hover`)选完直接 `blur()`;统一走 AdvancedSettings.tsx 的 `selectAfterChange()`。配套:`.field:focus` 只准用 `background-color`,**禁用 `background` 简写**——简写会重置 background-image/position,select 的小三角形(背景图绘制)每次焦点切换都会"瞬移"。
+14. **设置页表单控件不要用 `<label>` 包裹**——label 被点击时会聚焦关联输入框(点标题也触发),用户要求只有点击控件本身才聚焦;标题用 `div + span` 结构。Login 登录表单例外(点击文字聚焦账号/密码是标准登录体验)。
 
 ## 8. 动效现状(用户口味:克制优雅,勿夸张)
 
