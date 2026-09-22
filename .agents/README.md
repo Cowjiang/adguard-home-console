@@ -14,7 +14,7 @@
 ```
 .agents/
 ├── skills/          Agent Skills 规范（<name>/SKILL.md）
-├── workflows/       预留：后续工作流（约定待定，见下）
+├── pipelines/       提案生命周期：当前决策面
 ├── logs/            施工日志与会话存档
 ├── reviews/         报告 / 验收 / 验证任务书（一次性快照）
 └── evidence/        取证截图，按来源分 web | native | tauri | acceptance
@@ -57,10 +57,21 @@ description: <做什么 + 什么时候用。agent 只凭这一句决定是否加
 - **`description` 决定命中率**。要同时说清「做什么」和「什么场景下用」，agent 平时只看到这一句。
 - **渐进披露**：未命中时只有 `name` + `description` 进入上下文，命中后才加载正文——所以正文可以写长，`description` 要精炼。
 - 随技能分发的脚本/资料放在同目录下，正文里用相对路径引用（相对 `SKILL.md` 所在目录）。
+- **可复用的多步流程**（发布、上游同步这类反复要走的步骤）也做成技能放这里，不另设目录：`description` 写清触发场景，正文写步骤。
 
-## workflows/
+## pipelines/
 
-预留给后续工作流。**目前尚无约定**——第一个工作流落地时在此定稿，并同步更新本节与根 `AGENTS.md`。
+提案生命周期，本仓的**当前决策面**：轨道分 Direct / Noted，Noted 轨的变更先登记提案再动手。
+
+- 轨道规则、提案模板、生命周期与边界：`pipelines/WORKFLOW.md`
+- 封闭分类集与目录归属：`pipelines/CLASSIFICATION.md`
+- 当前提案一览：`pipelines/README.md`
+
+改动提案的路径、分类或状态后运行：
+
+```bash
+node scripts/verify-proposals.mjs
+```
 
 ## logs/ reviews/ evidence/
 
@@ -70,5 +81,5 @@ description: <做什么 + 什么时候用。agent 只凭这一句决定是否加
 
 ## 维护
 
-- 新增技能或工作流后，同步根 `AGENTS.md` 的「必读文档」，让 agent 知道去哪儿找。
+- 新增技能或提案后，同步根 `AGENTS.md` 的「必读文档」，让 agent 知道去哪儿找。
 - 本目录随仓库分发：**勿放机器专属配置、路径、凭据或密钥**，也别写某台机器上的工具与装载细节（签名值走 `.env.signing`，见 `docs/PROJECT_MEMORY.md` §12）。
