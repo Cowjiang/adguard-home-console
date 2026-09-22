@@ -64,8 +64,8 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - `docs/PROJECT_MEMORY.md` — **先读这个**：API 差异表(§3)、17 条踩坑清单(§7)、设计系统(§4)、Git 工作流、用户偏好(§10)
 - `docs/PC_ADAPTATION.md` — 桌面适配与移动端交互定稿（选择器、图表触摸、表单行为）
 - `docs/RUST_PLAN.md` / `docs/IOS_NATIVE_PLAN.md` — 两条原生线的施工蓝图与验收标准
-- `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，本机当前不存在**；单位与字段约定以 `PROJECT_MEMORY.md` §3 为准，勿假设该目录可用。
+- `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，不随仓库分发**；单位与字段约定以 `PROJECT_MEMORY.md` §3 为准，勿假设该目录可用。
 - `.agents/` — agent 的能力与产物目录，完整约定见 `.agents/README.md`：
-  - `skills/` / `workflows/` — 可复用能力与工作流（Agent Skills 规范，跨工具可移植）。**本机 Mavis 不会自动扫描项目内技能**。
+  - `skills/` / `workflows/` — 可复用能力与工作流（Agent Skills 规范，跨工具可移植）。
   - `logs/` / `reviews/` — 施工日志与会话存档 / 报告与验收。命名 `kebab-case`，快照类前置 `YYYY-MM-DD-`，流水类不写日期。
-  - `evidence/` — 取证截图。**截图一律不提交**：该目录已被 `.gitignore` 忽略，只在本机留存；随应用分发的图标资源（`Assets.xcassets`、`src-tauri/icons/`）属 App 内容，不在此列。
+  - `evidence/` — 取证截图。**截图一律不提交**：该目录已被 `.gitignore` 忽略，只在本地留存；随应用分发的图标资源（`Assets.xcassets`、`src-tauri/icons/`）属 App 内容，不在此列。
