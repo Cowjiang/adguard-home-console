@@ -28,7 +28,7 @@ export default function Protection() {
   const nav = useNavigate()
   const { cfg } = useAuth()
   const sheet = useSheet()
-  const pick = usePick({ menuOnMobile: true })
+  const pick = usePick()
   const [refreshing, setRefreshing] = useState(false)
   const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
