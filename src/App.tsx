@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import StatsPage from './pages/StatsPage'
 import TopListPage from './pages/TopListPage'
 import QueryLog from './pages/QueryLog'
+import LogDetailPage from './pages/LogDetailPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
 import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, AboutSettings } from './pages/Settings'
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/top/:kind" element={<TopListPage />} />
               <Route path="/log" element={<QueryLog />} />
+              <Route path="/log/detail" element={<LogDetailPage />} />
               <Route path="/protection" element={<Protection />} />
               <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
               <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />
