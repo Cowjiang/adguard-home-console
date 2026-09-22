@@ -49,8 +49,9 @@ export function useNativeTabBar(): boolean {
           `${Math.ceil(insets.bottom + 24)}px`
         )
         const listener = await p.onTabSelected(({ id }) => {
+          // tab 切换一律 replace,层级下钻才 push:侧滑返回只走业务层级,不跨 tab
           const tab = TABS.find((t) => t.id === id)
-          if (tab) navigate(tab.to)
+          if (tab) navigate(tab.to, { replace: true })
         })
         if (disposed) {
           void listener.unregister()
