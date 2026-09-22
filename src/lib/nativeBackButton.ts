@@ -109,15 +109,16 @@ export function useNativeBackButton(enabled: boolean) {
             kind: 'button',
             // 不传 glass:true:glass 会外包一层胶囊(固定 14/10pt 内边距,按钮变大椭圆)。
             // iOS 26 上 UIButton.Configuration.glass() 本身就是原生液态玻璃圆形按钮,
-            // width/height 约束生效(见插件 ComponentsOverlay.swift)。尺寸对齐 CSS 胶囊 h-9 w-9
-            props: { sfSymbol: 'chevron.left', width: 36, height: 36 },
+            // width/height 约束生效(见插件 ComponentsOverlay.swift)。尺寸对齐 CSS 胶囊 h-11 w-11
+            // (iOS 26 HIG 最小可点面积 44×44pt,系统圆形玻璃按钮即 44pt 视觉)
+            props: { sfSymbol: 'chevron.left', width: 44, height: 44, appearAnimation: true },
             // 插件按 safeAreaLayoutGuide + (margin=16)+dx/dy 约束定位
             // (ComponentsOverlay.activateAnchorConstraints,margin 同付两轴):
             // left = 16+dx,top = safe-area-top + 16+dy。CSS 胶囊在
-            // left 16 / top safe-area+12(浮动条 h-12 内居中 h-9)→ dx=0, dy=-4
+            // left 16 / top safe-area+8(浮动条 safe+6 起 h-12 内居中 h-11)→ dx=0, dy=-8
             anchor: 'topLeading',
             dx: 0,
-            dy: -4,
+            dy: -8,
           })
           .then(() => {
             if (!cancelled) setShown(true)

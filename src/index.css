@@ -268,7 +268,13 @@ body {
 .rt-page-bg::before {
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* 限制为视口高:真实 .ambient 是 fixed(视口锚定),复制品若随页面内容
+     拉伸,渐变锚点(98% 102% 等)会落到折叠线以下,转场结束摘除换真身时
+     出现底色明暗跳变;页面顶部对齐视口顶,转场结束(滚动位仍为 0)逐像素一致 */
+  height: 100dvh;
   pointer-events: none;
   background:
     radial-gradient(46vmax 46vmax at 12% -4%, var(--ambient-1), transparent 68%),
