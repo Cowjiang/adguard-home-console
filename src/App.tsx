@@ -1,6 +1,6 @@
 /** 路由与全局守卫 */
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { SheetProvider, Spinner } from './components/ui'
 import { ToastHost } from './components/ui'
@@ -29,16 +29,6 @@ function LoginRoute() {
   const { cfg } = useAuth()
   if (cfg) return <Navigate to="/" replace />
   return <Login />
-}
-
-/** 前进/跳转导航时回到页面顶部;浏览器返回(POP)保留原滚动位置 */
-function ScrollToTop() {
-  const { pathname } = useLocation()
-  const navType = useNavigationType()
-  useEffect(() => {
-    if (navType !== 'POP') window.scrollTo(0, 0)
-  }, [pathname, navType])
-  return null
 }
 
 /** 调试自动登录(Tauri debug 壳):常驻组件,连接成功后跳 AGH_ROUTE 指定路由;
@@ -76,7 +66,6 @@ export default function App() {
     <AuthProvider>
       <SheetProvider>
         <BrowserRouter>
-          <ScrollToTop />
           <DebugAutoLogin />
           <Routes>
             <Route path="/login" element={<LoginRoute />} />

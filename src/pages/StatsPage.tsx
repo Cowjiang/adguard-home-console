@@ -6,7 +6,7 @@ import { ShieldAlert, Globe, Users, Database, Timer, PieChart } from 'lucide-rea
 import { useAuth } from '../lib/auth'
 import { swrFetcher, type Stats, type ClientsData } from '../lib/api'
 import { AreaChart, Donut, RankTable, StatTile } from '../components/charts'
-import { Card, Loading, EmptyState, Button } from '../components/ui'
+import { usePageInClass, Card, Loading, EmptyState, Button } from '../components/ui'
 import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
 
 /** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
@@ -24,6 +24,7 @@ function topN(obj: unknown, n: number): [string, number][] {
 }
 
 export default function StatsPage() {
+  const pageIn = usePageInClass()
   const { cfg } = useAuth()
   const nav = useNavigate()
   const { data: stats, error } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
@@ -70,7 +71,7 @@ export default function StatsPage() {
   const peakLabel = trend.labels[trend.queries.indexOf(peak)] ?? '—'
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className="mb-4 flex items-end justify-between">
         <h1 className="text-[26px] font-bold leading-tight tracking-tight text-t1">统计分析</h1>
       </div>
