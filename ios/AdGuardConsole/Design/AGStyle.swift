@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-// MARK: - 设计 token(对照 src/index.css;收敛自 docs/IOS_UI_GAP_REPORT.md Top1/Top2)
+// MARK: - 设计 token(对照 src/index.css;收敛自 .agents/reviews/2026-09-21-ios-ui-gap.md Top1/Top2)
 
 extension Color {
     /// 深浅双值动态色(SwiftUI 无内置 init,经 UIColor trait 解析)
