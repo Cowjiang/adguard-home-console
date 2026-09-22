@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect,
+  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect, TabContent,
 } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
 import { IconBubble } from './Protection'
@@ -21,7 +21,7 @@ import { SERVICE_CACHE_KEY } from '../lib/constants'
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg } = useAuth()
   const sheet = useSheet()
-  const pick = usePick({ menuOnMobile: true })
+  const pick = usePick()
   const confirm = useConfirm()
   const [refreshing, setRefreshing] = useState(false)
 
@@ -393,7 +393,8 @@ export function ServicesPage() {
       </div>
 
       {!catalog && <Loading />}
-      {sections.map(({ group: g, items }) => (
+      <TabContent value={group}>
+        {sections.map(({ group: g, items }) => (
         <div key={g.id} className="mb-3">
           <div className="mb-1.5 mt-3 flex items-baseline gap-2 px-1">
             <span className="text-[13px] font-semibold uppercase tracking-wide text-t3">{g.label}</span>
@@ -403,8 +404,9 @@ export function ServicesPage() {
             {items.map(renderTile)}
           </div>
         </div>
-      ))}
-      {catalog && !sections.length && <EmptyState icon={<Search size={28} className="text-t3" />} title="没有匹配的服务" />}
+        ))}
+        {catalog && !sections.length && <EmptyState icon={<Search size={28} className="text-t3" />} title="没有匹配的服务" />}
+      </TabContent>
     </Screen>
   )
 }
