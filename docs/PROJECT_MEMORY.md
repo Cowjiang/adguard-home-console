@@ -44,8 +44,8 @@
 
 - **深色**(`[data-theme='dark']`):纯黑底 `--bg:#060608`;卡片**纯实色** `--glass:#121419`+细边框;`--glass-inset` 归零;深色下 `.specular::after` 关闭(nav 除外);环境光晕极淡
 - **浅色**:未动,白色玻璃 + specular 保留
-- `--glass-strong:#15171d`(弹层实色);`--glass-nav: rgba(40,42,50,0.45)` + blur(16) saturate(1.6) + brightness(1.08)(玻璃=透出内容,模糊大了就是磨砂;iOS Safari 无折射滤镜,blur 是上限)
-- 模糊只存在于:标签栏、顶栏、弹层/Toast(**性能红线**:iOS 大面积 backdrop-filter+背景动画会发烫,已把卡片全部改实色,勿回退)
+- `--glass-strong:#15171d`(实色升层面,现仅剩概览防护卡渐变与 `Card strong` 在用);**`--glass-pop`=浮层专用底色**:深色 `rgba(21,23,29,0.72)`、浅色 `rgba(255,255,255,0.85)`,`.glass-strong`(下拉选择器/Sheet/Toast/图表 tooltip/登录卡)取它 → 深色下浮层也能透出背后内容;`--glass-nav: rgba(40,42,50,0.45)` + blur(16) saturate(1.6) + brightness(1.08)(玻璃=透出内容,模糊大了就是磨砂;iOS Safari 无折射滤镜,blur 是上限)
+- **模糊边界(2026-09-23 用户澄清,勿再读成"全面禁用 backdrop-filter")**:禁的是**滥用**——**大面积**模糊(整排卡片、整页)叠加背景动画会让 iOS 发烫,故卡片一律实色、勿回退;**允许且应当保留玻璃**的是:标签栏、顶栏、**浮层(下拉选择器/Sheet 弹窗/Toast/图表 tooltip/登录卡)**、tab 透镜(`.tab-lens` blur 14)——这些地方不许为"优化性能"把模糊去掉。浮层底色与升层实色已拆成 `--glass-pop` / `--glass-strong` 两个变量,改浮层透明度时勿连带改到防护卡。**源码里 `backdrop-filter` 只写不带前缀的一条**(手写 `-webkit-` 那条会被构建去重掉,导致 Chromium/Firefox 上玻璃失效,见坑 19)
 - **浮层红线(2026-09-23 用户定稿)**:**任何弹窗/浮层一律屏幕居中出现,严禁从底部上升**——iOS 原生 tabbar 会挡住底部浮层。全部弹窗(确认框/表单/详情等)统一走 `ui.tsx` 的 `SheetProvider`,其容器已固定 `items-center`;新增弹层组件必须居中,勿引入 `items-end`/`translateY(60px)` 类底部入场。单选不弹层:**苹果设备用页面里真实渲染的 `<select>` 覆盖层**(`ui.tsx` 的 `PickSelect`;`showPicker()` 在 WebKit 不存在,见坑 18)、其余自绘锚定下拉。另:弹窗动画靠**双 rAF** 驱动(单 rAF 初始态与首帧合并会闪现无动画),改 SheetProvider 时勿退回单层
 - 长按菜单:**全局禁用**(body user-select:none + -webkit-touch-callout:none,input/textarea 恢复可编辑),复制一律走显式复制按钮
 - `.chart-touch`(图表专用叠加):`touch-action: pan-y`——纵向滑动交还页面滚动(修复移动端图表卡住滚动),横向拖动留给 scrub;触摸端**长按 350ms 唤出数据预览**(震动反馈,移动超 8px 取消判定让位给滚动/scrub);桌面鼠标 hover 不受影响
@@ -82,6 +82,7 @@
 16. **`express.static` 会拦截 `/index.html`**:SPA 回退中间件拿不到该路径,`maxAge` 会把 index.html 缓存 1 小时导致 iOS 端测试一直跑旧 bundle——须在 static 之前显式路由 `/index.html` 并以 `no-cache` 下发(SPA 回退 `/` 同理)。
 17. **判定"苹果设备"不能只看 UA**:PC 浏览器设备模拟会伪装 UA 成 iPhone/iPad,`showPicker()` 又在桌面 Chrome 上可用,结果原生选择器弹在隐藏 select(左下角 1px)上,弹层错乱。`isAppleMobile()` 必须双重判定:UA 含 iPhone/iPad(或 Macintosh+多点触控)**且** `navigator.vendor === 'Apple Computer, Inc.'`(模拟不伪装 vendor;iOS 上所有浏览器都是 WebKit,vendor 恒为 Apple)。非苹果/模拟环境一律回自绘锚定下拉。
 18. **`<select>` 的 `showPicker()` 在 WebKit/iOS 上不存在**(2026-09-23 查 MDN browser-compat-data 确认:Safari/safari_ios 为 `preview` 且置于开关后;只有 Chrome 121+/Firefox 122+ 有)。所以**苹果端的原生选择器必须是页面里真实渲染的 `<select>` 覆盖层**(`ui.tsx` 的 `PickSelect`:胶囊 + `absolute inset-0` 透明 select + 免交互图标层),**不能靠 JS 唤起**。`pickViaNativeSelect` 已删除(它在 iOS 上恒返回 false,等于死代码);`usePick` 现在永远走自绘锚定菜单——**新增任何单选项,苹果分支必须自己写 `isAppleMobile() ? <PickSelect/> : usePick`**,漏写就退化成自绘下拉(客户端排序按钮即此坑)。另:同行控件高度别写死(搜索框 15px 字号 × 1.45 行高 + `py-2.5` = 43.75px,曾把排序按钮写 `h-[42px]` 导致上下各差 0.88px),用 `self-stretch` 跟随行高。
+19. **`backdrop-filter` 在源码里只写不带前缀的一条**(2026-09-23 实测):手写 `-webkit-backdrop-filter` 紧跟在标准属性后会**被构建链(Lightning CSS)当同一属性去重、只留前缀那条**;而现代 Chromium(实测 Chrome 153)已移除该别名(`CSS.supports('-webkit-backdrop-filter', …)` 为 false、设置后计算值仍是 `none`)——于是 Chrome / WebView2(Tauri Windows)/ Firefox 上标签栏、tab 透镜、下拉浮层的玻璃全部退化成"半透明无模糊",只有 WebKit 正常(所以 iPhone 上一直看不出问题)。只写 `backdrop-filter`,构建产物会自动补出 `-webkit-backdrop-filter` + `backdrop-filter` 两条。**排查手法**:直接读 `dist/assets/*.css` 看该属性是否只剩前缀版。
 
 ## Git 工作流(2026-09-21 定稿)
 
