@@ -185,3 +185,29 @@
 ### 测试方法备注
 
 - Device Hub 窗口(进程名 "Device Hub",Xcode 27 无独立 Simulator.app)会漂移/变焦,全局坐标点击易落空——本次用 CGWindowList 实时取窗口原点 + 窗口相对坐标点击,配合 `simctl io recordVideo` + AVAssetImageGenerator 逐帧核对,未发现"弹层闪现即逝"的证据(方案 A 无 UI 是 API 缺失,非渲染问题)。
+
+## 10. 原生 TabBar 再点当前项回顶部(2026-09-22)
+
+> iOS 惯例手势:再点当前选中 tab → 内容滚回顶部(类似"回根")。前端 `src/lib/scrollToTop.ts` + `nativeTabbar.ts` 桥接实现,CSS 标签栏的同一手势在 dev 分支(Layout.tsx)。
+
+### 结论速览
+
+| 项 | 结果 |
+| --- | --- |
+| 插件重复点击事件 | ✓ `UITabBarDelegate.tabBar(_:didSelect:)` 对重复选中项同样回调(TabBarOverlay.swift:341 无条件 `onSelect`),`onTabSelected` 原样送达 |
+| 概览页深处回点 | ✓ 平滑滚回顶部(`rt1-scrolled.png` → `rt2-backtotop.png`) |
+| 过滤器页深处回点 | ✓ 同样回顶(`rt3-protection-retap.png`) |
+| 跨 tab 导航 | 不受影响,照旧 navigate |
+
+### 实现
+
+1. `scrollToTop.ts`(dev 分支共享):滚 `document.scrollingElement` 到 0,`behavior: 'smooth'`;已在顶部跳过;`prefers-reduced-motion` 退化瞬时。
+2. `nativeTabbar.ts`:`onTabSelected` handler 用 `pathnameRef`(ref,避免监听只注册一次导致闭包 pathname 陈旧)判断 `routeToId(current) === id`:命中则 navigate 回父级路由(子页如 `/protection/filters` → `/protection`,对齐 iOS 回根)+ `scrollToTop()`;未命中照旧 navigate。
+
+### 测试方法备注
+
+- CGEvent 合成触摸复用 §9.1 思路,固化成 `scripts/simtap.swift`(`tap <x> <y>` / `scroll <x> <y> <dy>`,设备逻辑点):
+  - Device Hub(Xcode 27,/Applications/Xcode.app/Contents/Applications/DeviceHub.app)窗口需先打开;按窗口名含 "iPhone" 实时取原点防漂移;
+  - 屏幕原点/缩放需按截图地标标定(本次:窗口内偏移 (520,74)、scale 0.762,Zoom 或窗口尺寸变化后需重标);
+  - 模拟器屏幕 402×874pt;原生 tab bar 四项中心 y≈820,x≈73/156/238/321。
+- 构建前清掉了 `gen/apple/build.old.*` 残留(869M,磁盘当时仅剩 4.5G)。
