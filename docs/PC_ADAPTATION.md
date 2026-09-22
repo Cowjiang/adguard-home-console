@@ -67,6 +67,7 @@
 - **点击表单标题聚焦输入框**(用户反馈):设置页曾用 `<label>` 包裹控件,点标题/说明文字也会聚焦;全部改为 `div + span`(仅 Login 登录表单保留 label)。排查过全部设置页:DNS(DnsSettings)、加密(EncryptionSettings)已清零,Login 按用户预期保留。
 - **测试上游误报失败**(用户反馈):`/test_upstream_dns` 成功时返回 `{"223.5.5.5":"ok"}` 形式映射,旧逻辑"对象非空即失败"导致全 ok 仍显示红色;改为过滤值为 `ok`/空的条目,全部通过显示绿色成功条,红色块只列真正出错的上游。
 - **移动端下拉最终定稿(用户定稿,2026-09-21)**:苹果移动设备(iPhone/iPad,含 iPadOS 伪装 Mac)上选择器一律走**原生 WebKit `<select>`**(与 DNS 设置页原生下拉同款,输入附件层不被任何元素遮挡);**非苹果设备**走自绘锚定下拉菜单(MenuHost,已做视口夹紧防溢出)。适用入口:概览时间范围、过滤器更新间隔、防护页更新间隔、查询日志/统计保留时长;**防护卡"定时暂停"例外——始终用自绘锚定菜单**(用户要求,原生 select 冷却期点击无响应体验差)。Tauri 插件 presentSheet(方案 B)与 isTauriShell 判定已废弃删除,实现见 `lib/nativePickers.ts`(冷却期回退逻辑同文件)。
+- **PC 浏览器设备模拟误判成苹果设备(用户反馈,2026-09-22)**:PC Chrome 开发者工具的设备模拟会把 UA 伪装成 iPhone/iPad,`isAppleMobile()` 原先只看 UA,模拟环境下判真 → 走 `pickViaNativeSelect()`,而桌面 Chrome 支持 `showPicker()`,结果在锚定于左下角的隐藏 1px `<select>` 上弹出桌面式原生下拉——弹层位置错乱、观感异常。修复:判定加第二道门 `navigator.vendor === 'Apple Computer, Inc.'`——设备模拟只改 UA 不改 vendor(Chrome 系为 `Google Inc.` 等),真苹果 WebKit(含 iOS 上的 Chrome/Edge/Firefox 等第三方浏览器)恒为 Apple vendor;模拟环境及一切非苹果设备统一回自绘锚定下拉(用户要求:除苹果设备外一律自定义下拉组件)。顺带清理:删除调试用 `__FORCE_APPLE__` 全局开关。
 
 ## 图表触摸交互重构(2026-09-21)
 
