@@ -17,7 +17,7 @@ const PAUSE_OPTIONS = [
 
 export function ProtectionCard() {
   const { cfg, status, refreshStatus } = useAuth()
-  const pick = usePick({ menuOnMobile: true })
+  const pick = usePick()
   const [busy, setBusy] = useState(false)
   const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null)
 
