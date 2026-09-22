@@ -27,9 +27,9 @@
 
 | 文件 | 处理 |
 | --- | --- |
-| `src/proxy.rs` | 保留实现;修一处测试 bug(迷你服务器 `Content-Length: 13`,body 实为 14 字节,截断断言失败);`redirect_origin` 三处断言按 URL origin 序列化语义(无尾斜杠,与 `new URL().origin` 一致)修正;`Deserialize`/`error_body` 死代码清理 |
-| `src/lib.rs` | 新增:`mod proxy` + `#[cfg_attr(mobile, tauri::mobile_entry_point)] run()`,注册 `agh_fetch` 与 `get_debug_login`(debug 自动登录,读 `AGH_URL/AGH_USERNAME/AGH_PASSWORD` 环境变量,release 恒 None,不落日志) |
-| `src/main.rs` | 新增:桌面入口,调 `adguard_home_console_lib::run()` |
+| `src-tauri/src/proxy.rs` | 保留实现;修一处测试 bug(迷你服务器 `Content-Length: 13`,body 实为 14 字节,截断断言失败);`redirect_origin` 三处断言按 URL origin 序列化语义(无尾斜杠,与 `new URL().origin` 一致)修正;`Deserialize`/`error_body` 死代码清理 |
+| `src-tauri/src/lib.rs` | 新增:`mod proxy` + `#[cfg_attr(mobile, tauri::mobile_entry_point)] run()`,注册 `agh_fetch` 与 `get_debug_login`(debug 自动登录,读 `AGH_URL/AGH_USERNAME/AGH_PASSWORD` 环境变量,release 恒 None,不落日志) |
+| `src-tauri/src/main.rs` | 新增:桌面入口,调 `adguard_home_console_lib::run()` |
 | `Cargo.toml` | tokio features 补 `net/io-util/time`(单测自起 TCP 服务器需要) |
 | `.cargo/config.toml` | **新增项目级覆盖**:用户 `~/.cargo/config` 的 ustc 索引是 `git://`(9418,常被墙),本项目改 sparse 协议 `sparse+https://mirrors.ustc.edu.cn/crates.io-index/`,实测直连 0.13s,未动用户全局配置 |
 | `icons/` | `npx tauri icon` 全套生成(源图为 Node 手写 PNG 编码器产出的 1024×1024 占位图:深色圆角方块 + 绿蓝渐变 + 白盾,无设计投入,后续可换正式源图重跑) |
