@@ -68,6 +68,17 @@ const TransitionCtx = createContext<TransitionInfo>({ dir: null, exiting: false 
 /** 页面内部组件(如 PageHeader、Screen)读取当前转场态 */
 export const useRouteTransition = () => useContext(TransitionCtx)
 
+/** 本组件实例挂载时正处于滑动转场 → 跳过入场动画,闩一次性(与 usePageInClass
+ *  同语义,供 page-in 之外的入场动画复用:tab-in / content-in 等)。
+ *  背景:WKWebView 手势转场期间 CSS 动画可能被挂起,fill-mode both 的入场
+ *  动画首帧 opacity:0 = 落地页整页空白,转场结束才忽然出现。 */
+export function useEnterSkip(): boolean {
+  const t = useRouteTransition()
+  const skip = useRef(false)
+  if (t.dir) skip.current = true
+  return skip.current
+}
+
 const DURATION_MS = 340
 
 /** 各历史条目(idx)的滚动位置记忆;scrollRestoration=manual 后由我们恢复 */

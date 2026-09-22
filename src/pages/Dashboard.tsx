@@ -9,6 +9,7 @@ import { AreaChart, BarList, Donut, StatTile } from '../components/charts'
 import { usePageInClass, Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect, TabContent } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
 import { useTabJump } from '../lib/navMeta'
+import { useEnterSkip } from '../lib/routeTransition'
 import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
 
@@ -37,6 +38,8 @@ const RANGE_PICK_OPTS: { label: string; value: RangeKey }[] = RANGE_OPTS.map((o)
 
 export default function Dashboard() {
   const pageIn = usePageInClass()
+  // 滑动转场中挂载(如手势返回落地)→ 跳过 content-in 入场,防手势期间动画挂起整页空白
+  const enterSkip = useEnterSkip()
   const { cfg, status } = useAuth()
   const nav = useNavigate()
   // 跨 tab 跳转(tab 根页 → 另一个 tab 根页):replace 不进历史栈(侧滑不可
@@ -115,8 +118,8 @@ export default function Dashboard() {
   const blockedPct = fmtPct(stats.num_blocked_filtering, stats.num_dns_queries)
 
   return (
-    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
-      <div className="content-in">
+      <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
+      <div className={enterSkip ? '' : 'content-in'}>
         {/* 防护主卡 + 统计块:桌面并排 */}
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
@@ -282,8 +285,9 @@ export default function Dashboard() {
 /** 首次加载骨架:复刻首屏结构,根容器保持挂载,数据到达后仅替换内容、不重播页面动画 */
 function DashSkeleton() {
   const block = 'glass specular rounded-3xl animate-pulse'
+  const enterSkip = useEnterSkip()
   return (
-    <div className="content-in">
+    <div className={enterSkip ? '' : 'content-in'}>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className={`${block} h-[168px] lg:h-full`} />
         <div className="grid grid-cols-2 gap-3">

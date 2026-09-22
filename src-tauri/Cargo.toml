@@ -38,3 +38,6 @@ opt-level = 0
 # 这里 patch 到社区回迁分支(= 0.35.3 + #1245 五行修复,Argos-Dynamics 已在 iOS 26/27 验证)。
 [patch.crates-io]
 tao = { git = "https://github.com/Argos-Dynamics/tao", branch = "argos/0.35.3-scene-config-autorelease" }
+# 本地 vendor 版:新增 appearAnimation(原生控件入场动画,返回按钮用)。
+# 上游 0.1.8 无此能力,而原生控件悬浮于 WebView 之上,出现特效只能由原生侧做。
+tauri-plugin-system-components = { path = "plugins/tauri-plugin-system-components" }

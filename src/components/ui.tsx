@@ -10,7 +10,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
 import { TOP_LEVEL_ROUTES } from '../lib/routes'
-import { useRouteTransition } from '../lib/routeTransition'
+import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
 import { markBackTap } from '../lib/backNav'
 import { copyText } from '../lib/clipboard'
@@ -104,10 +104,10 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
             data-back-btn
             onClick={goBack}
             style={nativeBack ? { visibility: 'hidden' } : undefined}
-            className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
+            className="press glass specular pointer-events-auto flex h-11 w-11 flex-none items-center justify-center rounded-full text-t2"
             aria-label="返回"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={22} />
           </button>
           <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
             {title}
@@ -330,12 +330,25 @@ export function Segmented<T extends string>({
 
 /* ---------- Tab 切换内容动画 ---------- */
 
-/** 包一层 tab-in 动画:value 变化时重挂载子节点,重播切换动画(配合 Segmented / Chip 使用) */
+/** 包一层 tab-in 动画:value 变化时重挂载子节点,重播切换动画(配合 Segmented / Chip 使用)。
+ *  挂载于滑动转场中则跳过本次入场(手势期间动画挂起 → fill both 首帧透明 = 整页空白);
+ *  闩只影响挂载那次,之后由用户触发的 value 切换照常播。 */
 export function TabContent<T extends string | number>({
   value, children, className = '',
 }: { value: T; children: ReactNode; className?: string }) {
+  const skip = useEnterSkip()
+  const first = useRef(true)
+  const lastValue = useRef<T>(value)
+  let animate: boolean
+  if (first.current) {
+    animate = !skip
+    first.current = false
+  } else {
+    animate = value !== lastValue.current
+  }
+  lastValue.current = value
   return (
-    <div key={String(value)} className={`tab-in ${className}`}>
+    <div key={String(value)} className={`${animate ? 'tab-in ' : ''}${className}`}>
       {children}
     </div>
   )
