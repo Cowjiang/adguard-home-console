@@ -1,6 +1,6 @@
 name: adguard-home-console
 options:
-  bundleIdPrefix: com.adguardhome.console
+  bundleIdPrefix: ${AGH_BUNDLE_ID}
   deploymentTarget:
     iOS: 15.0
 fileGroups: [../../src]
@@ -11,8 +11,8 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: AGH Console
-      PRODUCT_BUNDLE_IDENTIFIER: com.adguardhome.console
-      DEVELOPMENT_TEAM: KU579XJW4J
+      PRODUCT_BUNDLE_IDENTIFIER: ${AGH_BUNDLE_ID}
+      DEVELOPMENT_TEAM: ${AGH_APPLE_TEAM}
       CODE_SIGN_STYLE: Automatic
 targetTemplates:
   app:
