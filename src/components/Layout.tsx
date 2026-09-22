@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth'
+import { scrollToTop } from '../lib/scrollToTop'
 import { useNativeTabBar } from '../lib/nativeTabbar'
 import { APP_NAME } from '../lib/constants'
 
@@ -107,26 +108,33 @@ function TabBar() {
         >
           <div ref={lensRef} className="tab-lens h-full w-full" style={{ transformOrigin: '50% 55%' }} />
         </div>
-        {TABS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            onClick={playBounce}
-            className={({ isActive }) =>
-              `relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-1.5 transition-colors duration-300 ${
-                isActive ? 'text-accent' : 'text-t1'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
-                <span className="text-[10.5px] font-semibold tracking-wide">{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+        {TABS.map(({ to, label, icon: Icon }) => {
+          const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to)
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              onClick={() => {
+                playBounce()
+                // iOS 手感:再点当前 tab 滚回顶部(跨 tab 导航不干预)
+                if (isActive) scrollToTop()
+              }}
+              className={({ isActive }) =>
+                `relative z-10 flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-1.5 transition-colors duration-300 ${
+                  isActive ? 'text-accent' : 'text-t1'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
+                  <span className="text-[10.5px] font-semibold tracking-wide">{label}</span>
+                </>
+              )}
+            </NavLink>
+          )
+        })}
       </div>
     </nav>
   )
