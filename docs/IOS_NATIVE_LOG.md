@@ -7,6 +7,7 @@
 
 - 环境盘点:macOS 27.0 arm64,Xcode 27.0 (27A266a),iOS 27.0 SDK;模拟器「iPhone 17」(Tauri 线占用 iPhone 18 Pro,互不干扰)。
 - **brew 在 macOS 27.0 上不可用**(`unknown or unsupported macOS version: "27.0"`,Homebrew 未收录 macOS 27);xcodegen 改用 GitHub release 预编译二进制(/tmp/xcodegen)。
+  - **2026-09-23 更正(已作废)**:本机 brew 现已可用,`tauri ios init` 会直接 `brew install xcodegen`(得 2.46.0 于 `/opt/homebrew/bin/xcodegen`),无需再手工下载预编译二进制;`/tmp/xcodegen` 已随临时目录清理,勿再引用。
 - 工程生成:`ios/project.yml`(xcodegen)→ AdGuardConsole.xcodeproj:
   - target:AdGuardConsole(app)+ AdGuardConsoleTests(unit test,TEST_HOST 指向 app)
   - bundle id `com.adguardhome.console`,部署目标 iOS 26.0,Swift 6 语言模式 + `SWIFT_STRICT_CONCURRENCY=complete`,仅 iPhone(TARGETED_DEVICE_FAMILY=1)
