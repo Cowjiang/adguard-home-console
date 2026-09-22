@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, qs, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
-import { usePageInClass, SearchBar, Chip, Badge, Card, EmptyState, Spinner, useSheet, toast } from '../components/ui'
+import { usePageInClass, SearchBar, Chip, Badge, Card, EmptyState, Spinner, useSheet, toast, TabContent } from '../components/ui'
 import { LogDetail, reasonMeta } from '../components/LogDetail'
 import { LOG_FILTERS, qtypeColor } from '../lib/constants'
 import { fmtTime, fmtMs } from '../lib/format'
@@ -22,9 +22,10 @@ export default function QueryLog() {
   const isDesktop = useIsDesktop()
   const nav = useNavigate()
 
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
   const [searchParams] = useSearchParams()
+  // ?q= 预填搜索(客户端详情页"查看查询记录"跳入)
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
   const urlFilter = searchParams.get('filter') ?? 'all'
   const [filterKey, setFilterKey] = useState(LOG_FILTERS.some((f) => f.key === urlFilter) ? urlFilter : 'all')
   const [live, setLive] = useState(true)
@@ -185,7 +186,8 @@ export default function QueryLog() {
         </div>
       </div>
 
-      <div className="mt-2 flex flex-col gap-2">
+      <TabContent value={filterKey}>
+        <div className="mt-2 flex flex-col gap-2">
         {loading && items.length === 0 && (
           <div className="flex justify-center py-10">
             <Spinner />
@@ -213,7 +215,8 @@ export default function QueryLog() {
         {items.length > 0 && exhausted && (
           <p className="py-3 text-center text-[12px] text-t3">已到最早记录</p>
         )}
-      </div>
+        </div>
+      </TabContent>
     </div>
   )
 }

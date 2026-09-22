@@ -46,6 +46,7 @@
 - **浅色**:未动,白色玻璃 + specular 保留
 - `--glass-strong:#15171d`(弹层实色);`--glass-nav: rgba(40,42,50,0.45)` + blur(16) saturate(1.6) + brightness(1.08)(玻璃=透出内容,模糊大了就是磨砂;iOS Safari 无折射滤镜,blur 是上限)
 - 模糊只存在于:标签栏、顶栏、弹层/Toast(**性能红线**:iOS 大面积 backdrop-filter+背景动画会发烫,已把卡片全部改实色,勿回退)
+- **浮层红线(2026-09-23 用户定稿)**:**任何弹窗/浮层一律屏幕居中出现,严禁从底部上升**——iOS 原生 tabbar 会挡住底部浮层。全部弹窗(确认框/表单/详情等)统一走 `ui.tsx` 的 `SheetProvider`,其容器已固定 `items-center`;新增弹层组件必须居中,勿引入 `items-end`/`translateY(60px)` 类底部入场。单选不弹层:苹果设备原生 select、其余自绘锚定下拉。另:弹窗动画靠**双 rAF** 驱动(单 rAF 初始态与首帧合并会闪现无动画),改 SheetProvider 时勿退回单层
 - 长按菜单:**全局禁用**(body user-select:none + -webkit-touch-callout:none,input/textarea 恢复可编辑),复制一律走显式复制按钮
 - `.chart-touch`(图表专用叠加):`touch-action: pan-y`——纵向滑动交还页面滚动(修复移动端图表卡住滚动),横向拖动留给 scrub;触摸端**长按 350ms 唤出数据预览**(震动反馈,移动超 8px 取消判定让位给滚动/scrub);桌面鼠标 hover 不受影响
 
@@ -55,7 +56,7 @@
 - 栏体:胶囊(`rounded-full px-1.5 py-1.5`),`--glass-nav` 中灰磨砂
 - 透镜=两层:外层 `.tab-lens-track`(inline translateX 滑动,**transition 必须挂这层**)+ 内层 `.tab-lens`(白色玻璃药丸,WAAPI 拉伸形变);未选中文字 `text-t1`(深色白字/浅色黑字),选中 `text-accent`
 - 点击动效(WAAPI,当前幅度=用户认可的上一版):bar `scale(1.014,0.99)`,lens `scale(1.07,0.97)` @35%,380/440ms;**用户嫌 1.05/1.35 太夸张,勿加大**
-- 再点当前 tab = 平滑回顶部(定稿 2026-09-22):CSS 栏在 Layout.tsx onClick 判 isActive;原生栏(Tauri iOS)在 nativeTabbar.ts 用 pathnameRef 判 `routeToId`,子页回点还会 navigate 回父级(对齐 iOS 回根);工具 `src/lib/scrollToTop.ts`(reduced-motion 退化瞬时)。验证记录在 feat/ios-build 的 docs/TAURI_IOS_LOG.md §10
+- 再点当前 tab = 平滑回顶部(定稿 2026-09-22):CSS 栏在 Layout.tsx onClick 判 isActive;原生栏(Tauri iOS)在 nativeTabbar.ts 用 pathnameRef 判 `routeToId`,子页回点还会 navigate 回父级(对齐 iOS 回根);工具 `src/lib/scrollToTop.ts`(reduced-motion 退化瞬时)。验证记录见 `.agents/logs/tauri-ios.md` §10(随 `feat/ios-build` 合入)
 
 ## 6. 页面/路由
 
@@ -121,3 +122,18 @@
   - error 但已有 stats(SWR keepPreviousData)仍渲染内容,不闪错误页。
 - **教训**:条件渲染早返回时,**各分支根节点结构必须一致**,否则动画重播;带副作用的派生计算(依赖 `stats` 的常量)必须放在类型窄化完成之后,否则 tsc 报 possibly-undefined——这也是为什么没用 JSX 内三元包全部内容。
 - 新增 CSS:`index.css` 的 `content-in`(0.28s 纯 opacity 淡入),与 page-in 分工:page-in 只在路由挂载时播,content-in 负责加载态/内容切换。
+
+## 12. iOS 签名走本地 env(2026-09-23)
+
+- **问题**:两条 iOS 线(`src-tauri/gen/apple`、`ios/`)的 `DEVELOPMENT_TEAM` / `PRODUCT_BUNDLE_IDENTIFIER` 原先直接改在**已入库的生成产物**(`*.xcodeproj/project.pbxproj`)上——个人值入库,且随时会被重新生成覆盖。`ios/` 线更隐蔽:xcodegen 的源 `ios/project.yml` 里根本没有签名,改生成产物等于跑一次 xcodegen 就丢。
+- **机制(实测)**:`tauri ios init` 写 `gen/apple/project.yml` 是**存在即字节级保留、缺失才生成**,且每次都调 XcodeGen 从 `project.yml` 重建 `.xcodeproj`;XcodeGen 支持 `${VAR}` 环境变量替换。故签名以占位符形式写进 `project.yml`,值由本地 env 提供;`tauri.conf.json` 的 `identifier` 恢复上游中立值(iOS 签名的实际来源是 XcodeGen 产出的 `PRODUCT_BUNDLE_IDENTIFIER`)。
+- **坑**:XcodeGen 对**未解析**的 `${VAR}` **不报错**(exit 0),会把字面量原样写进工程,直到构建才以难懂的方式失败。故必须先校验变量再执行——这是 `scripts/ios-signing.sh` 存在的唯一理由。
+- **另**:`TAURI_CONFIG` 环境变量对 `identifier` **无效**(实测未生效),要覆盖得用 `--config`。
+- **约定**:
+  - 签名值只放 `.env.signing`(已被 `.gitignore` 的 `.env.*` 覆盖,勿提交):`AGH_APPLE_TEAM` 团队 ID、`AGH_BUNDLE_ID` Bundle ID(不能含下划线)。
+  - 生成与构建统一走 `scripts/ios-signing.sh`:`generate tauri` / `generate ios` / `tauri <参数...>`。
+  - 生成产物 `*.xcodeproj` **不入库**(`.gitignore` 已忽略),克隆后先跑 `generate` 再打开 Xcode。理由:XcodeGen 每次生成都会换一个随机 `TEMP_<UUID>` 组节点,入库必然产生无意义冲突(实测:重新生成与已提交版本仅差该行加签名行);上游 XcodeGen README 也明确建议 `.xcodeproj` 不进 git。
+  - **勿扩大忽略范围**:`gen/apple` 的 `project.yml` / `Podfile` / `LaunchScreen.storyboard` / `ExportOptions.plist` / `Sources/**` / `Info.plist` / `entitlements` / `Assets.xcassets`,以及 `ios/` 的全部 Swift 源码与 `Tests/Fixtures` 都是人维护内容,必须入库。
+  - `ios/AdGuardConsole.xcodeproj` 在忽略前是**生成后又手改过**的(committed spec 里没有 `DEVELOPMENT_TEAM`,产物里却有),故谁跑一次 xcodegen 谁的签名就丢——现签名已收进 `project.yml`,该隐患随忽略一并消除。
+  - 每位开发者需自备 `.env.signing`(含仓库所有者),否则会被脚本拦下——这是刻意的,好过静默生成坏工程。
+  - `tauri ios init` 会自动 `brew install xcodegen`(本机 2026-09-23 因此装上 2.46.0)。

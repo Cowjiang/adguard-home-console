@@ -3,7 +3,9 @@ import {
   createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-react'
+import {
+  Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, X,
+} from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
@@ -11,6 +13,7 @@ import { TOP_LEVEL_ROUTES } from '../lib/routes'
 import { useRouteTransition } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
 import { markBackTap } from '../lib/backNav'
+import { copyText } from '../lib/clipboard'
 
 /* ---------- 页面容器与标题 ---------- */
 
@@ -278,22 +281,62 @@ export function Segmented<T extends string>({
   /** true = 收缩为内容宽度(用于卡片内局部选择器);默认通栏 */
   fit?: boolean
 }) {
-  const id = useId()
+  const refs = useRef(new Map<T, HTMLButtonElement | null>())
+  // 滑动指示块:像 tabbar 一样在激活项之间左右平移,而非每项各自闪现
+  const [ind, setInd] = useState<{ left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    const measure = () => {
+      const el = refs.current.get(value)
+      if (el) setInd({ left: el.offsetLeft, width: el.offsetWidth })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [value, options.length])
+
   return (
-    <div className={`glass flex rounded-full p-1 ${fit ? 'w-fit' : ''} ${size === 'sm' ? 'text-[12px]' : 'text-[13.5px]'}`}>
+    <div className={`glass relative flex rounded-full p-1 ${fit ? 'w-fit' : ''} ${size === 'sm' ? 'text-[12px]' : 'text-[13.5px]'}`}>
+      {ind && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-1 top-1 rounded-full transition-[left,width] duration-300"
+          style={{
+            left: ind.left,
+            width: ind.width,
+            background: 'var(--accent-soft)',
+            boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent)',
+            transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        />
+      )}
       {options.map((o) => {
         const active = o.value === value
         return (
           <button
-            key={id + o.value}
+            key={o.value}
+            ref={(el) => { refs.current.set(o.value, el) }}
             onClick={() => onChange(o.value)}
-            className={`press ${fit ? '' : 'flex-1'} whitespace-nowrap rounded-full px-3 py-1.5 font-semibold transition-all ${active ? 'shadow-md' : 'text-t2'}`}
-            style={active ? { background: 'var(--accent-soft)', color: 'var(--accent)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent)' } : undefined}
+            className={`press relative z-10 ${fit ? '' : 'flex-1'} whitespace-nowrap rounded-full px-3 py-1.5 font-semibold transition-colors ${active ? '' : 'text-t2'}`}
+            style={active ? { color: 'var(--accent)' } : undefined}
           >
             {o.label}
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/* ---------- Tab 切换内容动画 ---------- */
+
+/** 包一层 tab-in 动画:value 变化时重挂载子节点,重播切换动画(配合 Segmented / Chip 使用) */
+export function TabContent<T extends string | number>({
+  value, children, className = '',
+}: { value: T; children: ReactNode; className?: string }) {
+  return (
+    <div key={String(value)} className={`tab-in ${className}`}>
+      {children}
     </div>
   )
 }
@@ -311,12 +354,13 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   const [node, setNode] = useState<ReactNode | null>(null)
   const [title, setTitle] = useState<string | undefined>()
   const [visible, setVisible] = useState(false)
-  const isDesktop = useIsDesktop()
 
   const open = (n: ReactNode, opts?: { title?: string }) => {
     setTitle(opts?.title)
     setNode(n)
-    requestAnimationFrame(() => setVisible(true))
+    // 双 rAF:必须让浏览器先把初始态(透明+缩放)绘制出来再切 visible,
+    // transition 才会播放;单层 rAF 会与首帧合并导致弹窗"闪现无动画"
+    requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
   }
   const close = () => {
     setVisible(false)
@@ -335,25 +379,23 @@ export function SheetProvider({ children }: { children: ReactNode }) {
       <MenuHost>{children}</MenuHost>
       {node &&
         createPortal(
-          <div
-            className={`fixed inset-0 z-50 flex justify-center ${isDesktop ? 'items-center' : 'items-end'}`}
-            style={isDesktop ? undefined : { paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-          >
+          // 项目红线(2026-09-23 用户定稿):任何弹窗一律屏幕居中出现,禁止从底部上升——
+          // iOS 原生 tabbar 会挡住底部浮层。确认框/表单/详情全走此处,天然统一。
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div
               onClick={close}
               className="absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-250"
               style={{ opacity: visible ? 1 : 0 }}
             />
             <div
-              className="glass-strong specular relative m-3 w-full max-w-[536px] rounded-[28px] p-5 transition-all duration-300"
+              className="glass-strong specular relative m-3 w-full max-w-[536px] rounded-[28px] p-5 transition-all duration-250"
               style={{
-                transform: visible ? 'translateY(0)' : isDesktop ? 'translateY(8px) scale(0.97)' : 'translateY(60px)',
+                transform: visible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.95)',
                 opacity: visible ? 1 : 0,
                 transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
-              {!isDesktop && <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-white/20" />}
-              {title && <h3 className="mb-3 mt-1 text-center text-[16px] font-bold text-t1">{title}</h3>}
+              {title && <h3 className="mb-3 text-center text-[16px] font-bold text-t1">{title}</h3>}
               {node}
             </div>
           </div>,
@@ -363,13 +405,13 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/* ---------- 桌面下拉选择器(锚点定位;移动端回退底部弹窗) ---------- */
+/* ---------- 单选下拉菜单(锚点定位:苹果设备原生 select,其余自绘锚定下拉) ---------- */
 
 interface PickReq<T extends string | number> {
   options: { label: ReactNode; value: T }[]
   value?: T
   onPick: (value: T) => void
-  /** 弹层标题(仅移动端底部弹窗显示) */
+  /** 弹层标题(锚定下拉菜单目前不展示,保留字段兼容) */
   title?: string
   /** 触发元素,桌面下拉以其矩形定位 */
   anchor: HTMLElement
@@ -493,40 +535,15 @@ function MenuHost({ children }: { children: ReactNode }) {
 }
 
 /**
- * 单选选择器:桌面(≥lg)弹出锚点下拉菜单;Tauri iOS 壳内优先试 WebKit 原生
- * <select>(showPicker,方案 A 实验,见 lib/nativePickers.ts),失败回退 CSS
- * 底部弹窗;普通移动浏览器默认底部弹窗,传 menuOnMobile 则同样用锚点下拉。
+ * 单选选择器:苹果设备优先 WebKit 原生 <select>(showPicker,见 lib/nativePickers.ts);
+ * 其余一切设备(含移动端)一律自绘锚定下拉菜单。
+ * 2026-09-23 用户定稿:废弃底部上滑(sheet)回退,除苹果外统一自定义下拉组件。
  */
-export function usePick(opts?: { menuOnMobile?: boolean }) {
-  const sheet = useSheet()
+export function usePick() {
   const menu = useContext(MenuContext)
-  const isDesktop = useIsDesktop()
-  const menuOnMobile = opts?.menuOnMobile ?? false
   return <T extends string | number>(req: PickReq<T>) => {
     if (isAppleMobile() && pickViaNativeSelect(req)) return
-    if (isDesktop || menuOnMobile) {
-      menu.open(req)
-      return
-    }
-    sheet.open(
-      <div className="flex flex-col gap-2">
-        {req.options.map((o) => (
-          <Button
-            key={o.value}
-            variant="glass"
-            size="lg"
-            onClick={() => {
-              sheet.close()
-              req.onPick(o.value)
-            }}
-          >
-            <span className={o.value === req.value ? 'text-accent' : ''}>{o.label}</span>
-            {o.value === req.value && <Check size={16} className="text-accent" />}
-          </Button>
-        ))}
-      </div>,
-      { title: req.title }
-    )
+    menu.open(req)
   }
 }
 
@@ -588,6 +605,28 @@ export function Badge({ children, kind = 'ok' }: { children: ReactNode; kind?: '
   )
 }
 
+/* ---------- 源徽标(客户端来源,不同来源不同色) ---------- */
+
+const SOURCE_STYLE: Record<string, { c: string; bg: string }> = {
+  ARP: { c: 'var(--accent-2)', bg: 'color-mix(in srgb, var(--accent-2) 14%, transparent)' },
+  DHCP: { c: 'var(--violet)', bg: 'var(--violet-soft)' },
+  rDNS: { c: 'var(--warn)', bg: 'var(--warn-soft)' },
+  WHOIS: { c: 'var(--ok)', bg: 'var(--ok-soft)' },
+  'etc/hosts': { c: 'var(--t2)', bg: 'var(--glass)' },
+}
+
+export function SourceBadge({ source }: { source: string }) {
+  const st = SOURCE_STYLE[source] ?? { c: 'var(--t2)', bg: 'var(--glass)' }
+  return (
+    <span
+      className="inline-flex flex-none items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ color: st.c, background: st.bg }}
+    >
+      {source}
+    </span>
+  )
+}
+
 export function Chip({ active, children, onClick }: { active?: boolean; children: ReactNode; onClick?: () => void }) {
   return (
     <button
@@ -602,15 +641,15 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
 
 /* ---------- 搜索框 ---------- */
 
-export function SearchBar({ value, onChange, placeholder = '搜索' }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+export function SearchBar({ value, onChange, placeholder = '搜索', className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
-    <div className="glass flex items-center gap-2 rounded-full px-4 py-2.5">
+    <div className={`glass flex items-center gap-2 rounded-full px-4 py-2.5 ${className}`}>
       <Search size={16} className="flex-none text-t3" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-transparent text-[15px] text-t1 outline-none"
+        className="w-full min-w-0 bg-transparent text-[15px] text-t1 outline-none"
         autoCapitalize="none"
         autoCorrect="off"
         enterKeyHint="search"
@@ -618,6 +657,98 @@ export function SearchBar({ value, onChange, placeholder = '搜索' }: { value: 
       {value && (
         <button onClick={() => onChange('')} className="press flex-none text-t3" aria-label="清空">
           <X size={16} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ---------- 复制按钮 ---------- */
+
+/** 图标复制按钮:点击复制文本,成功后短暂变对勾;用于详情页 IP/WHOIS 等行尾 */
+export function CopyIconButton({ text, label = '', className = '' }: { text?: string; label?: string; className?: string }) {
+  const [done, setDone] = useState(false)
+  if (!text) return null
+  return (
+    <button
+      onClick={async (e: any) => {
+        e.stopPropagation()
+        const ok = await copyText(text)
+        if (ok) {
+          setDone(true)
+          toast('已复制' + (label || '内容'))
+          setTimeout(() => setDone(false), 1500)
+        } else {
+          toast('复制失败', 'err')
+        }
+      }}
+      className={`press flex-none text-t3 transition-colors hover:text-accent ${className}`}
+      aria-label={'复制' + (label || '内容')}
+      title={'复制' + (label || '内容')}
+    >
+      {done ? <Check size={14} style={{ color: 'var(--ok)' }} /> : <Copy size={14} />}
+    </button>
+  )
+}
+
+/* ---------- 分页器 ---------- */
+
+/**
+ * 轻量分页:双端通用的上一页/下一页 + 页码;桌面端额外显示总条数与每页条数选择。
+ * 仅一页时不渲染(mobile);桌面端传 total 时仍显示汇总行。
+ */
+export function Pagination({
+  page, pages, onChange, total, pageSize, onPageSize,
+}: {
+  page: number
+  pages: number
+  onChange: (p: number) => void
+  total?: number
+  pageSize?: number
+  onPageSize?: (n: number) => void
+}) {
+  const pick = usePick()
+  const pagesSafe = Math.max(1, pages)
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-2 lg:justify-between">
+      <p className="hidden text-[12px] text-t3 lg:block">
+        共 {total ?? 0} 条{pagesSafe > 1 ? ` · 第 ${page} / ${pagesSafe} 页` : ''}
+      </p>
+      {pagesSafe > 1 && (
+        <div className="glass flex items-center gap-0.5 rounded-full p-1">
+          <button
+            onClick={() => onChange(Math.max(1, page - 1))}
+            disabled={page <= 1}
+            className="press flex h-7 w-7 items-center justify-center rounded-full text-t2 disabled:opacity-30"
+            aria-label="上一页"
+          >
+            <ChevronLeft size={15} />
+          </button>
+          <span className="num px-1.5 text-[12.5px] text-t2">{page} / {pagesSafe}</span>
+          <button
+            onClick={() => onChange(Math.min(pagesSafe, page + 1))}
+            disabled={page >= pagesSafe}
+            className="press flex h-7 w-7 items-center justify-center rounded-full text-t2 disabled:opacity-30"
+            aria-label="下一页"
+          >
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      )}
+      {onPageSize && pageSize != null && (
+        <button
+          onClick={(e: any) =>
+            pick({
+              options: [20, 50, 100].map((n) => ({ value: n, label: `每页 ${n} 条` })),
+              value: pageSize,
+              title: '每页条数',
+              anchor: e.currentTarget,
+              onPick: onPageSize,
+            })
+          }
+          className="press glass hidden items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-medium text-t2 lg:inline-flex"
+        >
+          每页 {pageSize} 条 <ChevronDown size={13} />
         </button>
       )}
     </div>
