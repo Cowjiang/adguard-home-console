@@ -258,6 +258,12 @@ pub struct ComponentProps {
     /// Fade + scale-in the view on creation (native appear affordance; used by
     /// the back button, which pops in mid-screen after a push transition).
     pub appear_animation: Option<bool>,
+    /// Slide the view in from this horizontal offset (points) on creation,
+    /// using the caller's transition duration/curve. Lets a native control
+    /// ride the page transition instead of appearing at its final position.
+    pub appear_offset_x: Option<f64>,
+    /// Duration of the slide-in animation in seconds (default 0.34).
+    pub appear_duration: Option<f64>,
 
     // ── `tabBar` ─────────────────────────────────────────────────────────
     /// The tabs, when `kind == tabBar`.

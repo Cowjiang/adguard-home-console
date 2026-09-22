@@ -44,10 +44,13 @@ fn get_debug_login() -> Option<DebugLogin> {
     debug_login()
 }
 
-/// 开启 WKWebView 系统侧滑返回(含悬停快照),驱动对象是 pushState 历史栈,
-/// 因此前端路由约定:tab 切换一律 replace,层级下钻才 push(见 docs/IOS_SWIPE_BACK_RESEARCH.md)。
+/// WKWebView 系统侧滑返回**关闭**,改由前端自绘边缘手势接管。
+/// 原因:同文档(pushState)侧滑时 WebKit 的下层是空渲染 —— 手势进行中只有空白底,
+/// commit 之后才轮到前端渲染,观感是"原页空白 → 内容忽然出现"(逐帧实测见
+/// .agents/logs/tauri-ios.md)。前端 src/lib/routeTransition.tsx 的 useEdgeSwipe
+/// 用真实下层快照自绘同款转场,故必须关掉原生手势以避免双重触发。
 #[cfg(target_os = "ios")]
-fn enable_back_forward_gestures(app: &tauri::AppHandle) {
+fn disable_back_forward_gestures(app: &tauri::AppHandle) {
     use objc2::runtime::AnyObject;
     use tauri::Manager;
     let Some(win) = app.get_webview_window("main") else {
@@ -60,8 +63,8 @@ fn enable_back_forward_gestures(app: &tauri::AppHandle) {
             eprintln!("[SWIPE-BACK] WKWebView inner() = null");
             return;
         }
-        let _: () = objc2::msg_send![&*wk, setAllowsBackForwardNavigationGestures: true];
-        eprintln!("[SWIPE-BACK] allowsBackForwardNavigationGestures = true (OK)");
+        let _: () = objc2::msg_send![&*wk, setAllowsBackForwardNavigationGestures: false];
+        eprintln!("[SWIPE-BACK] allowsBackForwardNavigationGestures = false (custom edge swipe)");
     });
     if let Err(e) = result {
         eprintln!("[SWIPE-BACK] with_webview failed: {e:?}");
@@ -75,7 +78,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![proxy::agh_fetch, get_debug_login])
         .setup(|_app| {
             #[cfg(target_os = "ios")]
-            enable_back_forward_gestures(_app.handle());
+            disable_back_forward_gestures(_app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

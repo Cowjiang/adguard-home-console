@@ -76,7 +76,23 @@ final class ComponentsOverlayController: UIViewController {
             // Native appear affordance: native apps fade + scale glass controls
             // in when they join the hierarchy; without it a mid-screen control
             // (back button after a push) pops in with no transition at all.
-            if props?.appearAnimation ?? false {
+            if let offsetX = props?.appearOffsetX {
+                // Ride the page transition: the control is created while the page
+                // is still sliding and animates with the same curve, so a control
+                // that belongs to the incoming page never shows up detached from
+                // its own nav bar.
+                container.transform = CGAffineTransform(translationX: CGFloat(offsetX), y: 0)
+                let timing = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1)
+                CATransaction.begin()
+                CATransaction.setAnimationTimingFunction(timing)
+                UIView.animate(
+                    withDuration: props?.appearDuration ?? 0.34, delay: 0,
+                    options: [.beginFromCurrentState, .allowUserInteraction]
+                ) {
+                    container.transform = .identity
+                }
+                CATransaction.commit()
+            } else if props?.appearAnimation ?? false {
                 container.alpha = 0
                 container.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
                 UIView.animate(

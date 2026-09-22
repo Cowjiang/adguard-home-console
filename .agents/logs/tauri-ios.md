@@ -246,3 +246,57 @@
 - 原生入口:**§9.1 方案 A 的结论在此收尾**——`showPicker()` 在 WebKit 不存在(MDN BCD 亦记 Safari 为 preview + 开关),`isAppleMobile()` 为真时 `pickViaNativeSelect()` 恒返回 false,故任何"只调 usePick"的新入口在 iPhone 上必然退化成自绘下拉(排序按钮即此)。修复:排序入口补上与其他 5 处一致的 `isAppleMobile() ? <PickSelect/> : usePick` 分支;`nativePickers.ts` 只留 `isAppleMobile()`,`pickViaNativeSelect`/冷却期删除(§9.1 铺开建议里的"方案 A 代码建议删除"至此执行)。
 - 验证(Windows,playwright + Chrome 390×844,dist/8787 + mock 3990):苹果环境伪造 UA+vendor 后——真实 `select[aria-label="排序方式"]` 5 项、文字透明、`elementFromPoint` 命中该 select、无冗余 button;`name-asc`/`name-desc` 排序列与 `localeCompare('zh-Hans-CN')` 正/逆序一致且**全程未出自绘菜单**。非苹果环境——不渲染 select,点击弹自绘锚定下拉、选中生效后关闭。双端高度偏差 0。
 
+
+## 13. 侧滑返回空白复现的真相 + 自研边缘侧滑(2026-09-23,fix/ios-back-button)
+
+用户报:"一个页面往下滑到任意地方 → 进子页 → 手势滑回原页,原页空白,然后内容忽然出现",且是"先前修好的问题又复现"。结论:**两个独立原因叠在一起** —— 模拟器上跑的是旧包,而旧包即使修好也治不了 WebKit 的同文档手势。
+
+### 13.1 先纠正前提:模拟器上装的 app 是 04:04 的旧包
+
+- 现象:app 内有个绿色调试 HUD(`no-pop` / `pop#2@748766`),但源码与所有提交里都搜不到;`dist/` 与 `src/` 也搜不到。注入 CSS `body::after{content:"MARKER-7f3a"}` 并重启 app —— **marker 不出现**,说明页面根本不来自仓库源码。
+- 定位:WebKit 的 origin 是 `tauri://localhost`(从 `Library/WebKit/.../WebsiteData/Default/<hash>/origin` 读到),而 app bundle 的 `assets/` 目录是**空的** → 前端是 cargo 编译期内嵌进 `libapp.a` 的(带压缩,`strings` 搜不到文案)。比对时间:二进制 mtime 04:04,修复提交 080d3a4 是 04:19 → **旧包必然复现旧行为**。
+- 重建流程(必须):`rm -rf src-tauri/gen/apple/build` + `touch src-tauri/src/lib.rs`(tauri-build 不监听 dist)+ `./scripts/ios-signing.sh tauri build --debug --target aarch64-sim`,产物 `build/arm64-sim/AGH Console.app`,`xcrun simctl install`。已写入 PROJECT_MEMORY §7 坑 19。
+
+### 13.2 真正的原因:WKWebView 同文档侧滑的下层是空的
+
+新包(含 080d3a4 的 useEnterSkip 闩)复现,逐帧取证(`simctl io recordVideo` + AVAssetImageGenerator 抽帧 + 内容量 "ink" 指标):
+
+| 时刻 | ink | 画面 |
+| --- | --- | --- |
+| 拖拽中(t=5.5) | 0.0022 | 子页右移,左侧露出一片**纯 #E3E5EC 空白**,无任何内容(原生返回按钮悬浮其上) |
+| 松手后(t=6.4~6.7) | 0.0000 | 整屏纯白(WebKit commit 空白底) |
+| t=6.8 | 0.0375 | 内容"忽然"出现 |
+
+- 对空白区采样 #E3E5EC = 略暗于页面底色的均匀色;而真实页面同点是卡片/图标/文字 → **不是滚动错位,是下层没有渲染内容**。
+- 结论:同文档(pushState)手势的下层由 WebKit 自己渲染,我们无法写入;松手后才 commit(React 才有机会渲染)→ 空窗无法用动画/闩修掉。**故关闭 `allowsBackForwardNavigationGestures`,侧滑改自研**。
+
+### 13.3 实现(自研边缘侧滑)
+
+- `routeTransition.tsx`:`underlays`(按历史 idx 存"来路页面"HTML 克隆,每次 push 落地时写入;POP/REPLACE 时修剪)+ `useEdgeSwipe`(左缘 24pt 起手、横移 >10pt 接管、斜向/纵向让位滚动;拖拽只写内联 transform,层用 `.rt-page-bg` 不透明;松手按位移 ≥50% 或速度 >0.5pt/ms 提交)。
+  - 提交:`consumeGestureCommit` 序号通知转场层与原生按钮,一次把真实路由换上,不播关键帧;下层快照与真实页同像素 + POP 的滚动恢复 → 切换不可见;下层快照在同一布局效应里摘除(否则会从后续页面透明区透出)。
+  - 取消:不动历史、不重挂载,transform 收回去。
+  - 只对 iOS 壳生效;`useTabJump`(replace)落地条目无快照 → 不接管(不误跨 tab 返回)。
+- `nativeBackButton.ts` + 插件:`appearOffsetX`(前进 +100vw / 返回 -28vw / 0.34s / 同 rt-* 曲线)让原生按钮**跟着导航条一起滑入**,不再等转场结束再创建 —— 这是"CSS 胶囊先到、原生按钮后到"二次出现的根因;侧滑期间按钮整体让位给 CSS 胶囊。
+- `lib.rs`:手势开关置 false。
+
+### 13.4 验收(新包,iPhone 18 Pro / iOS 27)
+
+| 项 | 结果 |
+| --- | --- |
+| 滚动后进子页 → 侧滑返回 | ✓ 拖拽全程有真实内容(t=4.8→5.1 ink 0.0077→0.0356 单调上升,无空白帧);抽帧可见下层是原页(自定义过滤规则/拦截服务/… 实拍) |
+| 落地滚动位置 | ✓ 与进子页前逐点一致(diff 0.001) |
+| 取消(拖 25% 松手) | ✓ 回弹留在子页,无重挂载(diff 0.204) |
+| 提交(拖 300pt) | ✓ 返回原页(diff 12.3 与子页相比) |
+| 边缘区纵向拖动 | ✓ 正常滚动(diff 15.7,与中间起手 14.3 同量级) |
+| 返回按钮点击 | ✓ 返回并恢复滚动(diff vs 进子页前 0.057) |
+| 按钮交接 | ✓ 前进转场抽帧:只有一个按钮、与页面左缘同步位移(子页左缘 42pt 时按钮左 54pt ≈ 16+42) |
+| 无残留下层 | ✓ 侧滑返回后再进同一子页,画面与基线一致(0.263 = 环境光晕 1/255 级差异),空隙处采样均为 #EEF1F7 |
+| `cargo test` | ✓ 11/11(mock 3990 在跑) |
+| `npx tsc --noEmit` / `npm run build` | ✓ |
+
+### 13.5 测试工具备注(下次省事)
+
+- **合成事件要先激活 Device Hub 窗口**(`NSRunningApplication.activate`),否则点击落到 ZCode 窗口上、全部无效;`CGWindowListCopyWindowInfo` 的窗口名与 Screen Recording 权限无关地为 nil,按 owner=Device Hub + 最大 onscreen 窗口取。
+- 标定:窗口 1100×800 → 屏幕原点窗口内偏移 (522,82)、缩放 0.732(device pt → 窗口 px);`simctl io screenshot` 是 **1206×2622 px = 3.0 px/pt**(用 2.24 去量会把尺寸算大 34%,本次踩过 —— 44pt 按钮量成 60pt,导致多次点空)。
+- 左缘手势起手点要 ≥5pt 进屏(3pt 偶发落在 bezel 上不触发)。
+- 组件(`/tmp/agtap|ggest|gswipe|vframes|analyze|idiff|crop|sample`)是本机临时工具,未入库。
