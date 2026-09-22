@@ -221,6 +221,7 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   const [node, setNode] = useState<ReactNode | null>(null)
   const [title, setTitle] = useState<string | undefined>()
   const [visible, setVisible] = useState(false)
+  const isDesktop = useIsDesktop()
 
   const open = (n: ReactNode, opts?: { title?: string }) => {
     setTitle(opts?.title)
@@ -244,7 +245,10 @@ export function SheetProvider({ children }: { children: ReactNode }) {
       <MenuHost>{children}</MenuHost>
       {node &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div
+            className={`fixed inset-0 z-50 flex justify-center ${isDesktop ? 'items-center' : 'items-end'}`}
+            style={isDesktop ? undefined : { paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          >
             <div
               onClick={close}
               className="absolute inset-0 bg-black/45 backdrop-blur-[2px] transition-opacity duration-250"
@@ -253,12 +257,12 @@ export function SheetProvider({ children }: { children: ReactNode }) {
             <div
               className="glass-strong specular relative m-3 w-full max-w-[536px] rounded-[28px] p-5 transition-all duration-300"
               style={{
-                transform: visible ? 'translateY(0)' : 'translateY(60px)',
+                transform: visible ? 'translateY(0)' : isDesktop ? 'translateY(8px) scale(0.97)' : 'translateY(60px)',
                 opacity: visible ? 1 : 0,
                 transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
-              <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-white/20" />
+              {!isDesktop && <div className="absolute left-1/2 top-2.5 h-1 w-10 -translate-x-1/2 rounded-full bg-white/20" />}
               {title && <h3 className="mb-3 mt-1 text-center text-[16px] font-bold text-t1">{title}</h3>}
               {node}
             </div>
