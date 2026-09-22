@@ -55,19 +55,19 @@
   - 第 1 轮"失败":前次被取消的运行已真实执行过"暂停 30 秒"(mock 状态被改),测试不幂等 → 改为状态自适应 + 跑前重置 mock。**反证:防护 Menu→POST /protection→状态翻转链路早已打通**。
   - 第 2/3 轮修掉三个真问题:① segmented Picker 的段在 XCUITest 里是 button 不是 staticText;② 暂停用例选 30s 会在用例执行期内到期造成竞态 → 改"暂停 3 小时";③ 日志页下滑后 tabBarMinimizeBehavior 收起 tab bar,需先滚回顶部再点 tab。
   - **测试立功:发现产品 bug**——ProtectionCard Toggle 绑定漏了"打开"分支(Web 版 `v ? setProtection(true) : openPausePicker` 的正向分支),直接点开关无法恢复防护,已修复。
-- 导出截图(docs/shots-native/):01-login / 02-overview / 03-log / 04-filters / 05-settings / 06-dark / 07-overview-bottom / 08-protection-paused / 09-log-scrolled。
+- 导出截图(.agents/evidence/native/):01-login / 02-overview / 03-log / 04-filters / 05-settings / 06-dark / 07-overview-bottom / 08-protection-paused / 09-log-scrolled。
 - 深色模式(`simctl ui appearance dark`):主题跟随系统生效,卡片/图表/tab bar 玻璃材质正常,防护状态显示恢复后的"已开启"。
 - 已核对:07 图中 Top 榜单占比条、上游延迟徽标(31ms/18ms/9.2ms/44ms)与 mock 数据一致;08 图倒计时"将于 07:59:44 恢复 · 剩 2 小时 59 分钟"与 3h 暂停换算一致。
 
-## 6. UI 收敛第一轮(对照 docs/IOS_UI_GAP_REPORT.md Top5)
+## 6. UI 收敛第一轮(对照 .agents/reviews/2026-09-21-ios-ui-gap.md Top5)
 
 - 新增 `Design/AGStyle.swift`:语义色 token(翡翠/玫红/天蓝/琥珀/紫/放行绿,深浅双值经 UIColor trait)、agCard 修饰器(实色 #121419 + 1pt 边框 + continuous 圆角)、agBg 页面底色(#060608)、qtype 色表、AGSegmented 胶囊分段(matchedGeometryEffect 滑块 + 无障碍 isSelected)。
 - 落点:概览全部卡片 agCard 化;统计数值 22pt rounded + monospacedDigit + contentTransition(numericText) 且语义着色(今日查询=翡翠、已拦截=玫红、耗时/客户端=天蓝);趋势图改**数据驱动多 series**(查询=翡翠面积+描线、拦截=天蓝线,4h 轴密度);Top 榜单/日志筛选/主题三处换胶囊分段;日志行卡片流(qtype 色条+彩色小标+耗时+缓存标+token 徽标);过滤器页加统计块+图标气泡;登录页渐变图标块+agCard 表单+翡翠→天蓝渐变按钮;AccentColor 资产同步翡翠。
 - 修过的坑(记录给后续):① `Color(light:dark:)` iOS API **不存在**(对比报告断言有误)→ UIColor trait 实现;② `AxisGridLine(style:)`/`.lineStyle` 在 iOS 27 SDK 不可用 → 普通网格线;③ **SwiftUI Charts 多 ForEach 同类型 mark 会合并成一条 series 产生跨图飞线**(查询线变成首尾斜直线、拦截线被吞)→ 改 `Chart(seriesData)` 外层按 series 分组的数据驱动模式解决;④ xcodegen 非同步组模式,新增文件后必须重新 generate。
 - 回归:解码测试 10/10、UI 测试 2/2(walkthrough 需新增 tapTab 兜底:tabBarMinimizeBehavior 收起态下其余 tab 按钮不暴露,下滑展开再点)。
-- 截图已全部重拍(docs/shots-native/01–09):深色概览与 Web 版(docs/shots-web/02-overview.png)对照,配色/卡片质感/图表/统计排版已对齐;差异余量:顶部状态胶囊(G4)、请求构成环形图(G5)——待正式视觉验收 agent 定夺。
+- 截图已全部重拍(.agents/evidence/native/01–09):深色概览与 Web 版(.agents/evidence/web/02-overview.png)对照,配色/卡片质感/图表/统计排版已对齐;差异余量:顶部状态胶囊(G4)、请求构成环形图(G5)——待正式视觉验收 agent 定夺。
 
-## 7. UI 收敛第二轮(对照 docs/IOS_VISUAL_ACCEPTANCE.md R1–R10)
+## 7. UI 收敛第二轮(对照 .agents/reviews/2026-09-21-ios-visual-acceptance.md R1–R10)
 
 视觉验收结论:Tauri 版 96 分(通过);原生版第一轮 78 分(概览 85/日志 85/登录 88/过滤器 65/设置 62),token 层已对齐,缺口在结构项。第二轮全部落地:
 
@@ -82,7 +82,7 @@
 - **R9 概览**:Top 榜单底部"查看更多/收起"按钮(top10↔25 展开收起);上游行 URL layoutPriority 防过度截断、数值列压缩到 40pt。
 - 共用组件:`IconBubbleRow`(图标气泡行)+ `FeaturePlaceholderView`(占位页)进 `Design/AGStyle.swift`,过滤器/设置页共用。
 
-- **回归**:解码测试 10/10、UI 测试 2/2(设置页加长后"退出登录"滚出 List 可见区,XCUITest 懒加载查不到 → 测试先上滑再断言)。截图已重拍:06-dark 状态胶囊+渐变卡+轴"11:00"式均已呈现;与 Web 基准(docs/shots-web/)对照,第二轮清单项全部消除。
+- **回归**:解码测试 10/10、UI 测试 2/2(设置页加长后"退出登录"滚出 List 可见区,XCUITest 懒加载查不到 → 测试先上滑再断言)。截图已重拍:06-dark 状态胶囊+渐变卡+轴"11:00"式均已呈现;与 Web 基准(.agents/evidence/web/)对照,第二轮清单项全部消除。
 - **无法复刻项**(正式报备,8 条详见报告 §3):CSS 透镜拉伸动效(原生系统玻璃已更好)、玻璃折射参数、大面积背板模糊(性能红线)、悬浮玻璃顶栏(用内联状态胶囊替代)、WAAPI 弹跳动效等。
 - 深色模式:`xcrun simctl ui "iPhone 17" appearance dark` 拍摄(app 主题=跟随系统)。
 

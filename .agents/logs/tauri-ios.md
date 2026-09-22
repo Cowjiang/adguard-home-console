@@ -98,7 +98,7 @@
 | WebView Insets | ✓ 页面按 getTabBarInsets 预留,内容滚动不被 bar 遮挡 |
 | cargo test / clippy | ✓ 11/11 通过、无告警(patch tao 后回归亦绿) |
 
-截图:`docs/shots-tauri/01-login.png`(预填登录)、`02-overview.png`(概览+玻璃 bar 折射)、`03-log.png`(日志页,"日志"选中)、`04-tabbar.png`(过滤器页,"过滤器"选中)。
+截图:`.agents/evidence/tauri/01-login.png`(预填登录)、`02-overview.png`(概览+玻璃 bar 折射)、`03-log.png`(日志页,"日志"选中)、`04-tabbar.png`(过滤器页,"过滤器"选中)。
 
 **遗留**:
 1. 原生 tab 点击 → JS 路由的方向未做自动化点按验证(无 tap 注入工具;`onTabSelected` 监听已就位,人工走查待用户)。
@@ -149,7 +149,7 @@
 
 ## 9.1 验证结果(macOS 侧,2026-09-22)
 
-> 环境:iPhone 18 Pro 模拟器(iOS 27.0,UDID `1243721C-…-393B706`),debug 构建(前端 dist 23:47 随 `tauri ios build` 刷新),mock `http://127.0.0.1:3990`。点击经 Device Hub 交互屏幕 + CGEvent 合成触摸注入;录像/连拍逐帧核对。截图存 `docs/shots-tauri/verify/`。
+> 环境:iPhone 18 Pro 模拟器(iOS 27.0,UDID `1243721C-…-393B706`),debug 构建(前端 dist 23:47 随 `tauri ios build` 刷新),mock `http://127.0.0.1:3990`。点击经 Device Hub 交互屏幕 + CGEvent 合成触摸注入;录像/连拍逐帧核对。截图存 `.agents/evidence/tauri/verify/`。
 
 ### 结论速览
 

@@ -1,13 +1,13 @@
 # 原生选择器 spike 验证任务书(交给 macOS 侧施工 agent)
 
 > 2026-09-21。Windows 侧已完成编码并 commit(`6123492`),本文是该 commit 的验证任务书。
-> 技术细节见 `TAURI_IOS_LOG.md` §9;背景:原生玻璃 TabBar 叠在 WebView 之上会遮住 Web 版
+> 技术细节见 `.agents/logs/tauri-ios.md` §9;背景:原生玻璃 TabBar 叠在 WebView 之上会遮住 Web 版
 > CSS 底部弹窗,本次两条替代路线各接入一个入口,代码内失败均**自动回退 CSS 弹窗,不会白屏**。
 
 ## 0. 同步与构建
 
 1. `git pull origin feat/ios-build`,确认拿到 commit `6123492`:新增 `src/lib/nativePickers.ts`,改动 `src/components/ui.tsx`(usePick)、`src/components/ProtectionCard.tsx`(openPausePicker)及两份 docs。
-2. 构建照旧:`rm -rf src-tauri/gen/apple/build` 后 `npx tauri ios build --debug --target aarch64-sim`;若前端变更未生效,`touch src-tauri/src/lib.rs` 强制重编(TAURI_IOS_LOG §7 坑 7)。
+2. 构建照旧:`rm -rf src-tauri/gen/apple/build` 后 `npx tauri ios build --debug --target aarch64-sim`;若前端变更未生效,`touch src-tauri/src/lib.rs` 强制重编(`.agents/logs/tauri-ios.md` §7 坑 7)。
 
 ## 1. 改动内容速览
 
@@ -33,4 +33,4 @@
 
 ## 4. 记录要求
 
-把结果(含截图,存 `docs/shots-tauri/`)追加到 `TAURI_IOS_LOG.md` §9 末尾(新建小节"§9.1 验证结果"),并更新 `docs/RUST_PLAN.md` §7 进度表中"未真机验证"字样。若验证失败需回退,`git revert 6123492` 即可,改动仅 5 个文件。
+把结果(含截图,存 `.agents/evidence/tauri/`)追加到 `.agents/logs/tauri-ios.md` §9 末尾(新建小节"§9.1 验证结果"),并更新 `docs/RUST_PLAN.md` §7 进度表中"未真机验证"字样。若验证失败需回退,`git revert 6123492` 即可,改动仅 5 个文件。
