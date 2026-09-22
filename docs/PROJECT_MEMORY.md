@@ -79,6 +79,7 @@
 14. **设置页表单控件不要用 `<label>` 包裹**——label 被点击时会聚焦关联输入框(点标题也触发),用户要求只有点击控件本身才聚焦;标题用 `div + span` 结构。Login 登录表单例外(点击文字聚焦账号/密码是标准登录体验)。
 15. **iOS 上连续弹出系统选择器有冷却**:WebKit 对关闭后约 300ms 内的再次 `showPicker()` 会静默吞掉(不报错不弹出),点击事件也不会到达页面。方案:`nativePickers.ts` 记录 `lastDismissAt`,冷却期内 `pickViaNativeSelect` 返回 false 回退自绘锚定菜单。苹果设备上的原生选择器入口用"胶囊 + 透明 select 铺满(`absolute inset-0`)+ 免交互图标/文字/箭头"结构——select 只负责弹出,显示全靠免交互层;select 会按最宽 option 撑宽,必须限制宽度否则胶囊变形。
 16. **`express.static` 会拦截 `/index.html`**:SPA 回退中间件拿不到该路径,`maxAge` 会把 index.html 缓存 1 小时导致 iOS 端测试一直跑旧 bundle——须在 static 之前显式路由 `/index.html` 并以 `no-cache` 下发(SPA 回退 `/` 同理)。
+17. **判定"苹果设备"不能只看 UA**:PC 浏览器设备模拟会伪装 UA 成 iPhone/iPad,`showPicker()` 又在桌面 Chrome 上可用,结果原生选择器弹在隐藏 select(左下角 1px)上,弹层错乱。`isAppleMobile()` 必须双重判定:UA 含 iPhone/iPad(或 Macintosh+多点触控)**且** `navigator.vendor === 'Apple Computer, Inc.'`(模拟不伪装 vendor;iOS 上所有浏览器都是 WebKit,vendor 恒为 Apple)。非苹果/模拟环境一律回自绘锚定下拉。
 
 ## Git 工作流(2026-09-21 定稿)
 
