@@ -238,3 +238,11 @@
 - `AGH_ROUTE` 落点偶发被 Login 自动连接的 `nav('/')` 竞态覆盖(既有问题,与本次改动无关,待后续排查)。
 - 同一开关会启用右缘"前滑",与历史栈 forward 条目配合,目前无可前滑场景,无影响。
 - simtap 标定随 Device Hub 窗口尺寸/缩放变化需重标(本次:窗口内偏移 (522,82)、scale 0.732)。
+
+## 12. 客户端排序按钮:高度对齐 + 苹果端补原生 select 分支(2026-09-23)
+
+- 触发:用户反馈客户端页排序按钮与同行搜索框不等高,且 iOS 上点开的是自绘下拉。细节与决策见 `docs/PC_ADAPTATION.md` 同名小节。
+- 高度:实测 `SearchBar` 43.75px(`py-2.5` + 15px×1.45)vs 按钮写死 `h-[42px]` → 上下各差 0.88px;改 `self-stretch` 跟随行高,复测偏差 0。
+- 原生入口:**§9.1 方案 A 的结论在此收尾**——`showPicker()` 在 WebKit 不存在(MDN BCD 亦记 Safari 为 preview + 开关),`isAppleMobile()` 为真时 `pickViaNativeSelect()` 恒返回 false,故任何"只调 usePick"的新入口在 iPhone 上必然退化成自绘下拉(排序按钮即此)。修复:排序入口补上与其他 5 处一致的 `isAppleMobile() ? <PickSelect/> : usePick` 分支;`nativePickers.ts` 只留 `isAppleMobile()`,`pickViaNativeSelect`/冷却期删除(§9.1 铺开建议里的"方案 A 代码建议删除"至此执行)。
+- 验证(Windows,playwright + Chrome 390×844,dist/8787 + mock 3990):苹果环境伪造 UA+vendor 后——真实 `select[aria-label="排序方式"]` 5 项、文字透明、`elementFromPoint` 命中该 select、无冗余 button;`name-asc`/`name-desc` 排序列与 `localeCompare('zh-Hans-CN')` 正/逆序一致且**全程未出自绘菜单**。非苹果环境——不渲染 select,点击弹自绘锚定下拉、选中生效后关闭。双端高度偏差 0。
+
