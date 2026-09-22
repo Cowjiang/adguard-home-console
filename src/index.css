@@ -236,6 +236,15 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* 骨架屏 → 正式内容切换:仅轻微淡入,不重播整页动画 */
+@keyframes content-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.content-in {
+  animation: content-in 0.28s ease-out both;
+}
+
 /* ---------- 桌面下拉菜单项 ---------- */
 .menu-item {
   transition: background 0.12s ease;
