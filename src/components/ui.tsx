@@ -7,15 +7,24 @@ import { Check, ChevronLeft, ChevronRight, Loader2, Search, X } from 'lucide-rea
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
+import { TOP_LEVEL_ROUTES } from '../lib/routes'
+import { useRouteTransition } from '../lib/routeTransition'
+import { useNativeBackShown } from '../lib/nativeBackButton'
+import { markBackTap } from '../lib/backNav'
 
 /* ---------- 页面容器与标题 ---------- */
 
-/** 顶级路由(侧边栏/TabBar 直达);二级页面才有返回语义,供 PageHeader 与状态条显隐共用 */
-export const TOP_LEVEL_ROUTES = ['/', '/stats', '/protection', '/log', '/clients', '/settings']
+/** 顶级路由定义在 lib/routes.ts,此处 re-export 供旧引用方兼容 */
+export { TOP_LEVEL_ROUTES }
 
 export function Screen({ children, pad = true }: { children: ReactNode; pad?: boolean }) {
+  // 滑动转场进行中跳过 page-in 淡入,避免与平移叠加;闩住一次性,
+  // 防止转场结束后 dir 归零时 page-in 类重新补挂导致动画重播
+  const t = useRouteTransition()
+  const noAnim = useRef(false)
+  if (t.dir) noAnim.current = true
   return (
-    <div className={`page-in page-shell mx-auto w-full ${pad ? 'px-4' : ''}`}>
+    <div className={`page-shell mx-auto w-full ${pad ? 'px-4' : ''} ${noAnim.current ? '' : 'page-in'}`}>
       {children}
     </div>
   )
@@ -40,6 +49,9 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   const nav = useNavigate()
   const { pathname } = useLocation()
   const isDesktop = useIsDesktop()
+  // iOS 壳内原生液态玻璃返回按钮接管时,CSS 胶囊让位(避免双按钮)
+  const nativeBack = useNativeBackShown()
+  const transition = useRouteTransition()
   // 顶级页面(侧边栏/TabBar 直达)在桌面端不需要返回按钮,返回只属于二级页面
   const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname)
   const showBack = back && !(isDesktop && isTopLevel)
@@ -47,32 +59,48 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   const floating = showBack && !isDesktop
 
   const goBack = () => {
-    // 历史栈为空(AGH_ROUTE 直落二级页)时回退到父级路由
+    // 历史栈为空(AGH_ROUTE 直落二级页)时回退到父级路由;
+    // replace 语义,避免把父级重新压入历史栈
     const idx = (window.history.state as { idx?: number } | null)?.idx
     if (idx !== undefined && idx <= 0) {
       const seg = pathname.split('/').filter(Boolean)
-      nav(seg.length > 1 ? `/${seg[0]}` : '/')
+      nav(seg.length > 1 ? `/${seg[0]}` : '/', { replace: true })
       return
     }
+    // 标记程序化返回,转场层据此区分“点按钮”与“侧滑手势”(后者由原生快照动画接管)
+    markBackTap()
     nav(-1)
   }
 
   if (floating) {
+    // 固定导航条与页面层做同步平移(push/pop),转场时随页面滑动
+    const barAnim = transition.dir
+      ? transition.exiting
+        ? transition.dir === 'push'
+          ? 'rt-push-out'
+          : 'rt-pop-out'
+        : transition.dir === 'push'
+          ? 'rt-push-in'
+          : 'rt-pop-in'
+      : ''
     return createPortal(
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-40 lg:hidden"
+        data-floating-nav
+        className={`pointer-events-none fixed inset-x-0 top-0 z-40 lg:hidden ${barAnim}`}
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 6px)' }}
       >
         {/* 滚动边缘渐变遮罩:见 NavScrim 注释 */}
         <NavScrim />
         <div className="relative flex h-12 items-center px-4">
-          <button
-            onClick={goBack}
-            className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
-            aria-label="返回"
-          >
-            <ChevronLeft size={20} />
-          </button>
+          {!nativeBack && (
+            <button
+              onClick={goBack}
+              className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
+              aria-label="返回"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )}
           <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
             {title}
           </div>
