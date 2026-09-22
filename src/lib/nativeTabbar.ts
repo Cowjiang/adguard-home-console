@@ -2,8 +2,9 @@
  * iOS 原生液态玻璃 TabBar(tauri-plugin-system-components)与 React 路由的双向桥接。
  * 仅在 Tauri 壳内生效;配置失败(非 iOS/macOS、插件缺失)时回退 Web 版 CSS 标签栏。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { scrollToTop } from './scrollToTop'
 
 type TabId = 'home' | 'protection' | 'log' | 'settings'
 
@@ -28,6 +29,12 @@ export function useNativeTabBar(): boolean {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [active, setActive] = useState(false)
+  // onTabSelected 监听仅注册一次,闭包里的 pathname 会陈旧;用 ref 供 handler 读最新路由
+  const pathnameRef = useRef(pathname)
+
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
 
   useEffect(() => {
     if (!isTauriShell()) return
@@ -50,7 +57,15 @@ export function useNativeTabBar(): boolean {
         )
         const listener = await p.onTabSelected(({ id }) => {
           const tab = TABS.find((t) => t.id === id)
-          if (tab) navigate(tab.to)
+          if (!tab) return
+          // 再点当前 tab:回父级路由(子页如 /protection/filters → /protection,对齐 iOS 回根)+ 平滑滚回顶部。
+          // UIKit 对重复选中项同样回调 didSelect,这是原生 scroll-to-top 的标准钩子。
+          if (routeToId(pathnameRef.current) === id) {
+            if (pathnameRef.current !== tab.to) navigate(tab.to)
+            scrollToTop()
+            return
+          }
+          navigate(tab.to)
         })
         if (disposed) {
           void listener.unregister()
