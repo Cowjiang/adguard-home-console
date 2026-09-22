@@ -91,9 +91,58 @@
 4. IAB tab 的 `tabs.list().find(url)` → `tabs.get(id)` 每个新 kernel 都要重做(绑定不跨调用)。
 5. `useIsDesktop` 放 `src/lib/useIsDesktop.ts`,页面在顶部调用(勿放条件 return 之后,坑 4)。
 
-## 日志详情改版与全局弹窗形态统一(2026-09-22,用户提出)
+## 客户端详情页(2026-09-23,用户提出)
+
+- **客户端列表点入详情,双端形态对齐日志详情模式**:移动端进独立子页 `/clients/detail`(location.state 携带客户端信息,直达/刷新无 state 显示"客户端不存在"空态,PageHeader back 返回);桌面端弹**居中弹窗**(`sheet.open`,SheetProvider 弹窗桌面端本就居中)。信息面对齐官方后台:IP/标识、来源(WHOIS/ARP/rDNS/etc/hosts)、WHOIS(国家/城市/组织,如 "CN · UNICOM-GD")、近期查询数(取 `/stats` 的 `top_clients`,键兼容 `name`/`IP`/`name|IP` 双形态,无记录显示 –)、持久客户端的防护设置(过滤/安全防护/家长控制/忽略日志统计);未配置客户端底部给"添加为持久客户端"预填 IP,已配置给"编辑/删除"。共享视图 `components/ClientDetail.tsx`,编辑表单 `ClientForm`/`emptyClient` 已从 Clients.tsx 导出复用。
+- **坑:SheetProvider 在 `<BrowserRouter>` 之外**(App.tsx 结构如此),桌面弹窗内容不在 Router 上下文——弹窗内组件**不能直接用 `useNavigate`/`useLocation`**,会抛 "useNavigate() may be used only in the context of a <Router>"。回调(如跳日志的 `onOpenLog`)一律由调用方注入,与 LogDetail 的 onSaveRule 同款做法。
+- **查询日志支持 `?q=` 预填搜索**:客户端详情"查看查询记录"跳 `/log?q=<名称或IP>`,QueryLog 初始 search/debounced 读 URL 参数;`?filter=` 既有逻辑不变。
+- WHOIS 行内展示(上一任务)与详情页共用格式:`[country, city, orgname].filter(Boolean).join(' ')`,列表副标题用空格连(官方同款 "CN UNICOM-GD"),详情页用 " · " 连。
+
+## 客户端列表改版:badge 布局 / 桌面表格 / 排序分页 / 复制按钮(2026-09-23,用户提出;同日按反馈二次修订见下节)
+
+- **移动端自动识别行改版(用户定稿)**:行内右侧"添加"按钮**移除**(添加走详情页的"添加为持久客户端",页头 + 号保留供手动添加);右侧改为**上下两个 badge**——彩色源 badge(ARP 蓝/DHCP 紫/rDNS 琥珀/WHOIS 绿/etc hosts 中性灰,未知来源回退中性)+ 请求数 badge(中性 glass 底,num 字体,"N 次" / 无记录 "–");左侧第二栏不再展示源与请求数,展示 IP(与标题不同名时)+ WHOIS "CN CHINANET-GD"(`[country, orgname]` 空格连,官方同款)。
+- **桌面端表格视图**:`isDesktop` 分支渲染 `ClientTable`,列:客户端(设备图标+名)/ IP 标识 / 源 badge / WHOIS / 请求数(num,fmtNum 千分位)/ 状态(已配置绿/未配置橙),grid-cols `[minmax(0,1.25fr)_minmax(0,1fr)_104px_minmax(0,1.1fr)_88px_92px]`、minWidth 880 + overflow-x-auto;行点击开同一详情弹窗。
+- **排序(双端)**:排序键 requests/name/source,默认请求数降序;桌面直接点表头切换(同键翻转方向,换键默认:requests 降序、其余升序,激活列 accent + 箭头);移动端排序按钮与搜索框**同行**(SearchBar 加 className 支持外部 flex-1,排序按钮图标式 `lg:hidden`,桌面用表头排序)。
+- **分页(双端)**:客户端本地分页(数据本就一次性拉全),`ui.tsx` 新增通用 `Pagination` 组件——居中 上一页/页码 x / y/下一页 玻璃胶囊;桌面两端对齐加"共 N 条"与"每页 20/50/100"选择器(usePick 锚定下拉);仅一页时移动端不渲染胶囊。搜索/排序/换每页条数自动回第 1 页,页码 clamp 防越界。原"仅显示前 30 个"上限移除。
+- **请求数来源**:Clients 页 `useSWR(['stats', cfg, '/stats'])` 与 ClientDetail 同 key 共享缓存,`kvCount`(已从 ClientDetail.tsx **export**)按候选键 [name, ip, ...ids] 匹配 top_clients 双形态键。
+- **复制按钮(用户要求)**:`ui.tsx` 新增 `CopyIconButton`(Copy 图标,成功后变绿对勾 1.5s + toast,stopPropagation 不触发行点击,非安全上下文走 execCommand 降级);ClientDetail 挂在头部 IP 行、IP/标识行、WHOIS 行(有内容才显示)。
+
+## 客户端改版二次修订:选择器统一 / 内联编辑 / 双端结构调整(2026-09-23 用户反馈,6 点全落实)
+
+1. **排序按钮与搜索框同行不换行**:SearchBar 加 `className` 透传,移动端布局 `flex items-center gap-2` + SearchBar flex-1 + 图标式排序按钮(`lg:hidden`,桌面用表头排序)。
+2. **选择器统一(全局,用户定稿)**:`ui.tsx` 的 `usePick` **删除底部上滑(sheet)回退分支**——苹果设备仍走 `pickViaNativeSelect()` 系统选择器,其余一切设备(含移动端浏览器)一律自绘锚定下拉菜单(`MenuContext`,portal 到 body,自动上/下翻转定位)。`menuOnMobile` 参数删除,6 处调用方(ProtectionCard/Dashboard/FiltersPages/Protection/Settings/AdvancedSettings)同步更新;全局不再有任何"单选用上滑弹窗"的场景。
+3. **详情页内联编辑(参考 DNS 设置页)**:ClientDetail 去掉 `onEdit`/编辑按钮——名称、IP/标识两行改为 `EditableTextRow`(点行进入编辑,input + 保存/取消,Enter 提交 Esc 取消),防护设置区"使用全局设置/过滤/安全防护/家长控制"全部 Switch 即时保存(`/clients/update`,乐观更新失败回滚,保存后 mutate 列表缓存);全局设置开启时防护三行退化为只读 OnOff 徽标。坑:桌面弹窗内容是 open 时捕获的静态 ReactNode,列表 mutate 不会重渲弹窗 → ClientDetail 内部用 `draft` useState 镜像配置自持状态(标题/图标也跟随 draft,新增 `displayName`)。
+4. **列表页持久卡片**:删除按钮移除(删除只保留在详情页);右侧与自动识别行一致显示源 + 次数 badge。
+5. **添加/编辑客户端独立页面**:新路由 `/clients/form`(`src/pages/ClientFormPage.tsx`),移动端点 + / "添加为持久客户端"均 `nav('/clients/form', { state: { initial, isNew, prefillIp } })` 进页(带 prefillIp 预填 IP;直达无 state 回空表单);桌面端保留居中弹窗(非上滑)。ClientForm 加 `showTitle` 开关,页面形态关掉内置标题避免与 PageHeader 重复;保存成功 mutate 列表缓存并 replace 回 /clients。
+6. **桌面端双表格**:持久客户端与自动识别客户端**分两张表**(各自 GroupTitle + ClientTable + Pagination),排序键/方向共用,分页各自独立(pagePersist/pageAuto 两个页码状态),各自的"共 N 条"汇总。
+
+- **二次修订验证**:tsc + build 通过;mock + Vite + paw 实测:移动端排序按钮同行、排序锚定下拉(截图确认非上滑)、持久卡片无删除带次数 badge、详情改名即时保存("已保存" toast + 行内更新)、关闭全局设置后防护开关即时保存(独立设置 badge 出现)、/clients/form 独立页正常;桌面双表 2 个表头、"共 1 条"/"共 30 条 · 第 1 / 2 页"两个独立分页。
+- **坑(浏览器验证)**:paw 面板实际 CSS 宽 ~755px,`viewport` 设 1440 后非 fullPage 截图只裁左半幅(桌面表格右侧列看不到,需靠 evaluate 查 DOM);`screenshot fullPage` 会把视口重置回面板宽度导致布局瞬间变移动端——桌面验证以 DOM evaluate 为准。paw 单条 action 偶发 "Socket closed by daemon",重试即可;evaluate 脚本里避免正则反斜杠(易与 JSON 转义冲突)。
+
+## 浮层红线:弹窗一律居中 + 动画修复(2026-09-23,用户定稿为项目红线)
+
+- **红线**:**任何弹窗/浮层严禁从底部上升,一律屏幕居中出现**——iOS 原生 tabbar 会挡住底部浮层。已写入 `docs/PROJECT_MEMORY.md` §4。
+- **落点**:`ui.tsx` 的 `SheetProvider` 是全应用唯一弹窗载体(useConfirm/useSheet 的所有弹层:删除确认、ClientForm、ClientDetail、LogDetail、FiltersPages、Protection、AdvancedSettings 等),容器从移动端 `items-end` 改为固定 `items-center`,底部拖拽指示条与 safe-area padding 一并移除。排查确认代码库无其他 `items-end`/底部入场浮层(Layout 的 `bottom-0` 是 tabbar 本体,Toast 在顶部,均不受影响)。
+- **动画修复**:弹窗原先"闪现无动画"的根因是 `open()` 单层 `requestAnimationFrame`——初始态(透明+位移)与显示态被合并进同一帧绘制,transition 被吞。改为**双 rAF**(先绘制初始态再切 visible),入场 `translateY(16px) scale(0.95) → 0/1` + 250ms cubic-bezier(0.22,1,0.36,1),遮罩同步淡入。改 SheetProvider 时勿退回单层 rAF。
+- **验证**:paw 实测移动端点删除,确认弹窗垂直居中、立即截图捕捉到缩放淡入中间态(动画确实在播)。
+
+
 
 - **移动端日志详情改为独立页面**:点日志卡片/表格行不再弹底部浮层,改为 `nav('/log/detail', { state: { item } })` 进入子页 `src/pages/LogDetailPage.tsx`(记录经 location.state 传递,直达/刷新无 state 时显示"记录不存在"空态并带返回按钮)。页面按返回按钮规则用 `PageHeader back`(标题"请求详情");保存拦截/白名单规则成功后 toast 并 `nav(-1)` 返回 /log(POP 保留列表滚动位置)。`/log/detail` 天然命中 CSS TabBar(`startsWith('/log')`)与原生 TabBar `routeToId` 的 log 高亮,子页回点 tab 回 /log 的既有逻辑自动生效。
 - **LogDetail 抽为共享组件** `src/components/LogDetail.tsx`(含 reasonMeta),桌面弹窗与移动端详情页共用同一份渲染;QueryLog.tsx 瘦身。
-- **桌面端 SheetProvider 改居中弹窗**:`ui.tsx` 的 SheetProvider 按 `useIsDesktop` 分形态——桌面 `items-center` + 打开动画改 `translateY(8px) scale(0.97)`,去掉拖拽指示条与安全区 padding;移动端保持底部上滑 + 指示条不变。此改动是全局的:日志详情、useConfirm 确认框、usePick 移动回退、客户端表单、添加过滤器/重写/租约、安全搜索等所有走 sheet 的场景,桌面端一律居中弹窗。
-- **底部浮层排查结论(移动端)**:剩余 sheet 场景——①客户端表单(Clients)、②添加过滤器/重写(FiltersPages)、③添加静态租约(AdvancedSettings)、④安全搜索(Protection)、⑤useConfirm 确认框、⑥usePick 非苹果移动设备的单选回退——均为"表单输入/确认/选择"类,iOS 底部弹层是原生惯例且键盘遮挡友好,**保留不动**;唯一"浏览信息"型浮层就是日志详情,已改页。
+ - **桌面端 SheetProvider 改居中弹窗**:`ui.tsx` 的 SheetProvider 按 `useIsDesktop` 分形态——桌面 `items-center` + 打开动画改 `translateY(8px) scale(0.97)`,去掉拖拽指示条与安全区 padding;移动端保持底部上滑 + 指示条不变。此改动是全局的:日志详情、useConfirm 确认框、usePick 移动回退、客户端表单、添加过滤器/重写/租约、安全搜索等所有走 sheet 的场景,桌面端一律居中弹窗。**(已被上方 2026-09-23 浮层红线取代:移动端也一律居中,底部上滑全面废除)**
+ - **底部浮层排查结论(移动端)**:剩余 sheet 场景——①客户端表单(Clients)、②添加过滤器/重写(FiltersPages)、③添加静态租约(AdvancedSettings)、④安全搜索(Protection)、⑤useConfirm 确认框、⑥usePick 非苹果移动设备的单选回退——均为"表单输入/确认/选择"类,iOS 底部弹层是原生惯例且键盘遮挡友好,**保留不动**;唯一"浏览信息"型浮层就是日志详情,已改页。**(已被浮层红线取代:上滑组件已全面废除——③②④仍走 sheet 但居中弹出,⑥改锚定下拉,①已在 /clients/form 独立子页)**
+
+## Tab/筛选切换动画(2026-09-23,用户要求全项目统一)
+
+- **通用方案**:`index.css` 新增 `tab-in` 关键帧(淡入 + 6px 上浮 + 0.995 缩放,0.24s cubic-bezier(0.22,1,0.36,1)——比 page-in 快,不抢页面转场的戏);`ui.tsx` 新增通用 `TabContent` 组件(`value` 变化时重挂载子节点触发动画,配合 Segmented / Chip 使用)。
+- **落点(全项目 3 处切换点)**:① Dashboard Top 榜单 `topTab`(Segmented 三个 tab,内容区包 TabContent);② QueryLog 筛选 `filterKey`(Chips,列表区包 TabContent——key 只绑 filterKey,实时追加/加载更早不会重播动画);③ 拦截服务分组 `group`(Chips,分组区块与空状态包 TabContent——key 不含 search,搜索逐字过滤不重播动画)。
+- **顺带**:Dashboard "活跃客户端" tab 补上与热门域名/拦截域名一致的"查看更多"按钮,跳转 /clients。
+- **验证**:tsc + build 通过;paw 实测三处切换均重挂载 `.tab-in` 节点且 `getComputedStyle().animationName === 'tab-in'`。
+- **约定**:今后新增任何 tab/筛选切换内容区,一律用 `TabContent` 包裹;key 只绑"切换键"本身,勿把搜索词等高频变化值并入。
+
+### 补充修正(同日二次反馈)
+
+- **Segmented 本体滑动动画**:用户澄清"tab 动画"指 tab 本体像 tabbar 一样左右平移——Segmented 重构为**滑动指示块**方案:容器 `relative`,激活视觉(accent-soft 底 + inset accent 描边)移到绝对定位 `<span>` 指示块上,按激活按钮的 `offsetLeft/offsetWidth` 定位,`transition-[left,width] 0.3s cubic-bezier(0.22,1,0.36,1)` 平移;按钮文字颜色 `transition-colors` 跟随,监听 window resize 重测量。外观设置页的主题 Segmented 同步受益。
+- **间距修复**:上轮把 Dashboard Top 榜单内容区的 `<div className="mt-4">` 换成 TabContent 时丢了与 Segmented 的间距——TabContent 加 `className` 透传,Dashboard 传 `mt-4` 恢复。
+- **注意**:改 Segmented 时勿把指示块改回"每项各自高亮"(会退回无平移动画);TabContent 包裹时检查是否吞掉了原有 margin。
