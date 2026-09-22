@@ -1,11 +1,15 @@
 /** 全局布局:环境背景 + 移动端浮动玻璃标签栏 / 桌面端固定侧边栏(≥lg) */
 import { useRef } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { scrollToTop } from '../lib/scrollToTop'
 import { useNativeTabBar } from '../lib/nativeTabbar'
+import { useNativeBackButton } from '../lib/nativeBackButton'
+import { TransitionArea } from '../lib/routeTransition'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
+import { TOP_LEVEL_ROUTES, NavScrim } from './ui'
 
 type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
 
@@ -33,16 +37,19 @@ export function Ambient() {
   return <div className="ambient" />
 }
 
-/** 顶部悬浮状态条 */
+/** 顶部悬浮状态条(仅顶级页面:二级页顶部由固定导航栏接管,见 docs/IOS_NAV_BAR_GLASS_PLAN.md) */
 function TopBar() {
   const { status } = useAuth()
+  const { pathname } = useLocation()
   const protected_ = status?.protection_enabled
+  if (!TOP_LEVEL_ROUTES.includes(pathname)) return null
   return (
     <header
       className="pointer-events-none fixed left-0 right-0 top-0 z-40 flex justify-center px-4 lg:hidden"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 6px)' }}
     >
-      <div className="glass-nav flex items-center gap-2 rounded-full px-3.5 py-1.5">
+      <NavScrim />
+      <div className="glass-nav relative flex items-center gap-2 rounded-full px-3.5 py-1.5">
         <span
           className={`h-2 w-2 rounded-full ${protected_ ? 'pulse-dot' : ''}`}
           style={{ background: protected_ ? 'var(--ok)' : 'var(--danger)' }}
@@ -115,6 +122,7 @@ function TabBar() {
               key={to}
               to={to}
               end={to === '/'}
+              replace
               onClick={() => {
                 playBounce()
                 // iOS 手感:再点当前 tab 滚回顶部(跨 tab 导航不干预)
@@ -201,13 +209,16 @@ function Sidebar() {
 export default function Layout() {
   // iOS Tauri 壳:原生液态玻璃 UITabBar 接管导航,CSS 标签栏让位
   const nativeBar = useNativeTabBar()
+  // 移动布局且原生 TabBar 可用时:左上角返回按钮交给原生玻璃胶囊(createComponent glass)
+  const isDesktop = useIsDesktop()
+  useNativeBackButton(nativeBar && !isDesktop)
   return (
     <div className="min-h-dvh lg:pl-60">
       <Ambient />
       <Sidebar />
       <TopBar />
       <main>
-        <Outlet />
+        <TransitionArea />
       </main>
       {!nativeBar && <TabBar />}
     </div>

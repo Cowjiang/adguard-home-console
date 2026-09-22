@@ -61,11 +61,12 @@ export function useNativeTabBar(): boolean {
           // 再点当前 tab:回父级路由(子页如 /protection/filters → /protection,对齐 iOS 回根)+ 平滑滚回顶部。
           // UIKit 对重复选中项同样回调 didSelect,这是原生 scroll-to-top 的标准钩子。
           if (routeToId(pathnameRef.current) === id) {
-            if (pathnameRef.current !== tab.to) navigate(tab.to)
+            if (pathnameRef.current !== tab.to) navigate(tab.to, { replace: true })
             scrollToTop()
             return
           }
-          navigate(tab.to)
+          // tab 切换不进历史栈(replace),层级下钻才 push——侧滑返回只走业务层级,见 docs/IOS_SWIPE_BACK_RESEARCH.md
+          navigate(tab.to, { replace: true })
         })
         if (disposed) {
           void listener.unregister()
