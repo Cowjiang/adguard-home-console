@@ -135,12 +135,15 @@ export default function Clients() {
             <Rows>
               {filteredAutos.slice(0, 30).map((a: AutoClient) => {
                 const known = persistMatch.has(a.ip)
+                // WHOIS 信息与官方一致:国家/城市 + 运营商(如 "CN UNICOM-GD")
+                const w = a.whois_info ?? {}
+                const whoisText = [w.country, w.city, w.orgname].filter(Boolean).join(' ')
                 return (
                   <Row
                     key={a.ip}
                     icon={<IconB><UserRound size={16} /></IconB>}
                     title={a.name || a.ip}
-                    subtitle={`${a.ip}${a.source ? ' · ' + a.source : ''}${known ? ' · 已配置' : ''}`}
+                    subtitle={`${a.ip}${a.source ? ' · ' + a.source : ''}${whoisText ? ' · ' + whoisText : ''}${known ? ' · 已配置' : ''}`}
                     right={known ? <Badge kind="ok">已配置</Badge> : (
                       <button
                         onClick={(e: any) => { e.stopPropagation?.(); openForm(null, a.ip) }}
