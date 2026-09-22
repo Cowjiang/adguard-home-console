@@ -18,7 +18,7 @@
 ├── logs/            施工日志与会话存档
 ├── reviews/         报告 / 验收 / 验证任务书（一次性快照）
 └── evidence/        取证截图，按来源分 web | native | tauri | acceptance
-                     ⚠️ 不入库（.gitignore 已忽略），仅本机留存
+                     ⚠️ 不入库（.gitignore 已忽略），仅本地留存
 ```
 
 ## 命名规则
@@ -58,12 +58,6 @@ description: <做什么 + 什么时候用。agent 只凭这一句决定是否加
 - **渐进披露**：未命中时只有 `name` + `description` 进入上下文，命中后才加载正文——所以正文可以写长，`description` 要精炼。
 - 随技能分发的脚本/资料放在同目录下，正文里用相对路径引用（相对 `SKILL.md` 所在目录）。
 
-### 本机注意（Mavis 运行时）
-
-Mavis 目前只从 `~/.minimax/skills/`（全局）与 `~/.minimax/agents/<agent>/skills/`（agent 私有）装载技能，**不会扫描项目内的 `.agents/skills/`**。
-
-所以放在这里的目的有两个：**随仓库分发**、**跨工具可移植**。要让本机的 Mavis 实际用上某个技能，需另行安装到上述目录之一。
-
 ## workflows/
 
 预留给后续工作流。**目前尚无约定**——第一个工作流落地时在此定稿，并同步更新本节与根 `AGENTS.md`。
@@ -72,9 +66,9 @@ Mavis 目前只从 `~/.minimax/skills/`（全局）与 `~/.minimax/agents/<agent
 
 - `logs/` — 按线或按会话一份：`tauri-ios.md`（Tauri 壳线）、`ios-native.md`（SwiftUI 原生线）、`orchestration.md`（跨线编排）、`transcript-<日期>.md`（会话存档）。
 - `reviews/` — 报告与验收结论。**结论落地后，仍然有效的规范要回写 `docs/`**——`reviews/` 是当时的判据，不是现状。
-- `evidence/` — 取证截图。**整个目录不入库**（`.gitignore` 忽略）：仓库里不放二进制截图，截图一律只在本机留存。因此报告里的 `evidence/...` 路径是**取证位置约定**，克隆后并不存在，要复核得按报告里写的方法重拍。新素材用带来源与用途的文件名（`<端>-<序号>-<页面>-<状态>.png`），避免再出现"文件名与内容对不上"。例外是**随应用分发的图标资源**（`Assets.xcassets`、`src-tauri/icons/`）——那是 App 内容，照旧入库。
+- `evidence/` — 取证截图。**整个目录不入库**（`.gitignore` 忽略）：仓库里不放二进制截图，截图一律只在本地留存。因此报告里的 `evidence/...` 路径是**取证位置约定**，克隆后并不存在，要复核得按报告里写的方法重拍。新素材用带来源与用途的文件名（`<端>-<序号>-<页面>-<状态>.png`），避免再出现"文件名与内容对不上"。例外是**随应用分发的图标资源**（`Assets.xcassets`、`src-tauri/icons/`）——那是 App 内容，照旧入库。
 
 ## 维护
 
 - 新增技能或工作流后，同步根 `AGENTS.md` 的「必读文档」，让 agent 知道去哪儿找。
-- 本目录随仓库分发：**勿放机器专属配置、凭据或密钥**（签名值走 `.env.signing`，见 `PROJECT_MEMORY.md` §12）。
+- 本目录随仓库分发：**勿放机器专属配置、路径、凭据或密钥**，也别写某台机器上的工具与装载细节（签名值走 `.env.signing`，见 `docs/PROJECT_MEMORY.md` §12）。
