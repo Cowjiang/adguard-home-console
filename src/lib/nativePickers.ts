@@ -12,10 +12,17 @@ export interface NativePickReq<T extends string | number> {
   title?: string
 }
 
-/** 苹果移动设备(iPhone/iPad/iPod,含 iPadOS 13+ 伪装成 Mac 的情况) */
+/**
+ * 苹果移动设备(iPhone/iPad/iPod,含 iPadOS 13+ 伪装成 Mac 的情况)。
+ * PC 浏览器的设备模拟会把 UA 伪装成 iPhone/iPad,但 navigator.vendor 不跟随伪装
+ * (Chrome 系为 "Google Inc." 等),真苹果 WebKit(含 iOS 上的第三方浏览器)恒为
+ * "Apple Computer, Inc."——以此把模拟环境排除回自绘下拉,避免 showPicker 在
+ * 桌面浏览器里弹出锚在左下角隐藏 select 上的原生下拉(异常弹层)。
+ */
 export function isAppleMobile(): boolean {
   const ua = navigator.userAgent
-  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  if (!(/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1))) return false
+  return navigator.vendor === 'Apple Computer, Inc.'
 }
 
 /** WebKit 对连续两次弹出系统选择器有约 300ms 的内部冷却,冷却期内 showPicker 被静默吞掉 */
