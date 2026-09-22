@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type FilteringStatus, type RewriteEntry } from '../lib/api'
-import { Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
+import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
 
@@ -24,6 +24,7 @@ const SAFE_ENGINES = [
 ] as const
 
 export default function Protection() {
+  const pageIn = usePageInClass()
   const nav = useNavigate()
   const { cfg } = useAuth()
   const sheet = useSheet()
@@ -134,7 +135,7 @@ export default function Protection() {
   }
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <h1 className="mb-4 text-[26px] font-bold tracking-tight text-t1">过滤器</h1>
 
       {/* 过滤器状态:移动端两个独立小方块(尺寸与概览页 StatTile 一致,圆形按钮在右侧居中);桌面端长条卡 */}

@@ -222,6 +222,67 @@ body {
 .page-in {
   animation: page-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ---------- 路由滑动转场(push/pop,见 lib/routeTransition.tsx) ----------
+   push=下钻:新页自右滑入,旧页向左让位;iOS 原生曲线。
+   pop=返回:旧页滑出右侧,新页自左浅层归位。
+   侧滑手势触发的 POP 不加这些类,由 WKWebView 原生快照动画接管,避免双重动画;
+   桌面端(≥lg)禁用,瞬时切换。 */
+@keyframes rt-push-in {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes rt-push-out {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-28%, 0, 0); }
+}
+@keyframes rt-pop-in {
+  from { transform: translate3d(-28%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes rt-pop-out {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+.rt-push-in,
+.rt-push-out,
+.rt-pop-in,
+.rt-pop-out {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.rt-push-in { animation-name: rt-push-in; }
+.rt-push-out { animation-name: rt-push-out; }
+.rt-pop-in { animation-name: rt-pop-in; }
+.rt-pop-out { animation-name: rt-pop-out; }
+
+/* 转场层页面底:滑动的两层(新页容器/旧页快照)自身必须不透明,否则对方的
+   页面内容会从透明区域整个透出(双重曝光鬼影)。这里复制 body 底色 +
+   .ambient 光晕;转场结束摘除后恢复真实背景,径向光晕弥散,滑动中的微小
+   错位不可感知 */
+.rt-page-bg {
+  background: var(--bg);
+}
+.rt-page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46vmax 46vmax at 12% -4%, var(--ambient-1), transparent 68%),
+    radial-gradient(42vmax 42vmax at 98% 102%, var(--ambient-2), transparent 68%),
+    radial-gradient(34vmax 34vmax at 72% 36%, var(--ambient-3), transparent 70%);
+}
+@media (min-width: 1024px) {
+  .rt-push-in,
+  .rt-push-out,
+  .rt-pop-in,
+  .rt-pop-out {
+    animation: none;
+  }
+}
 @keyframes rise-in {
   from {
     opacity: 0;
