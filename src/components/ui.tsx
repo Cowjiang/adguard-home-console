@@ -10,6 +10,9 @@ import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
 
 /* ---------- 页面容器与标题 ---------- */
 
+/** 顶级路由(侧边栏/TabBar 直达);二级页面才有返回语义,供 PageHeader 与状态条显隐共用 */
+export const TOP_LEVEL_ROUTES = ['/', '/stats', '/protection', '/log', '/clients', '/settings']
+
 export function Screen({ children, pad = true }: { children: ReactNode; pad?: boolean }) {
   return (
     <div className={`page-in page-shell mx-auto w-full ${pad ? 'px-4' : ''}`}>
@@ -18,20 +21,74 @@ export function Screen({ children, pad = true }: { children: ReactNode; pad?: bo
   )
 }
 
+/** 顶部滚动边缘渐变遮罩:内容滚入状态栏/导航栏区时淡出,纯渐变不用 backdrop-filter(避开 iOS 发烫红线) */
+export function NavScrim({ className = '' }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute inset-x-0 top-0 ${className}`}
+      style={{
+        // Tailwind 任意值类名带空格不会生成,高度用 inline style
+        height: 'calc(env(safe-area-inset-top, 0px) + 72px)',
+        background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 98%, transparent) 58%, transparent)',
+      }}
+    />
+  )
+}
+
 export function PageHeader({ title, subtitle, back, right }: { title: string; subtitle?: string; back?: boolean; right?: ReactNode }) {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const isDesktop = useIsDesktop()
   // 顶级页面(侧边栏/TabBar 直达)在桌面端不需要返回按钮,返回只属于二级页面
-  const TOP_LEVEL = ['/', '/stats', '/protection', '/log', '/clients', '/settings']
-  const isTopLevel = TOP_LEVEL.includes(pathname)
+  const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname)
   const showBack = back && !(isDesktop && isTopLevel)
+  // 移动端二级页:返回胶囊 + 居中标题固定在左上角,内容从下方滚过(对齐 iOS 26 液态玻璃导航栏)
+  const floating = showBack && !isDesktop
+
+  const goBack = () => {
+    // 历史栈为空(AGH_ROUTE 直落二级页)时回退到父级路由
+    const idx = (window.history.state as { idx?: number } | null)?.idx
+    if (idx !== undefined && idx <= 0) {
+      const seg = pathname.split('/').filter(Boolean)
+      nav(seg.length > 1 ? `/${seg[0]}` : '/')
+      return
+    }
+    nav(-1)
+  }
+
+  if (floating) {
+    return createPortal(
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-40 lg:hidden"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 6px)' }}
+      >
+        {/* 滚动边缘渐变遮罩:见 NavScrim 注释 */}
+        <NavScrim />
+        <div className="relative flex h-12 items-center px-4">
+          <button
+            onClick={goBack}
+            className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
+            aria-label="返回"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
+            {title}
+          </div>
+          {right && <div className="pointer-events-auto ml-auto flex flex-none items-center gap-2">{right}</div>}
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
       <div className="flex min-w-0 items-center gap-1.5">
         {showBack && (
           <button
-            onClick={() => nav(-1)}
+            onClick={goBack}
             className="press glass flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
             aria-label="返回"
           >

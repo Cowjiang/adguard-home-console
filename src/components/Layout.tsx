@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth'
 import { scrollToTop } from '../lib/scrollToTop'
 import { useNativeTabBar } from '../lib/nativeTabbar'
 import { APP_NAME } from '../lib/constants'
+import { TOP_LEVEL_ROUTES, NavScrim } from './ui'
 
 type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
 
@@ -33,16 +34,19 @@ export function Ambient() {
   return <div className="ambient" />
 }
 
-/** 顶部悬浮状态条 */
+/** 顶部悬浮状态条(仅顶级页面:二级页顶部由固定导航栏接管,见 docs/IOS_NAV_BAR_GLASS_PLAN.md) */
 function TopBar() {
   const { status } = useAuth()
+  const { pathname } = useLocation()
   const protected_ = status?.protection_enabled
+  if (!TOP_LEVEL_ROUTES.includes(pathname)) return null
   return (
     <header
       className="pointer-events-none fixed left-0 right-0 top-0 z-40 flex justify-center px-4 lg:hidden"
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 6px)' }}
     >
-      <div className="glass-nav flex items-center gap-2 rounded-full px-3.5 py-1.5">
+      <NavScrim />
+      <div className="glass-nav relative flex items-center gap-2 rounded-full px-3.5 py-1.5">
         <span
           className={`h-2 w-2 rounded-full ${protected_ ? 'pulse-dot' : ''}`}
           style={{ background: protected_ ? 'var(--ok)' : 'var(--danger)' }}
