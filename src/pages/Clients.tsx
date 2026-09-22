@@ -12,10 +12,11 @@ import { api, swrFetcher, type ClientsData, type AghClient, type AutoClient, typ
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { ClientDetail, kvCount, type ClientDetailData } from '../components/ClientDetail'
 import { fmtNum } from '../lib/format'
+import { isAppleMobile } from '../lib/nativePickers'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
   Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge,
-  SourceBadge, Pagination, usePick,
+  SourceBadge, Pagination, usePick, PickSelect,
 } from '../components/ui'
 
 
@@ -221,19 +222,50 @@ export default function Clients() {
   useEffect(() => { setPageAuto(1); setPagePersist(1) }, [search, sortKey, sortAsc, pageSize])
 
   const sortValue = `${sortKey}-${sortAsc ? 'asc' : 'desc'}`
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === sortValue)?.label ?? ''
+
+  function applySort(v: string) {
+    const [k, d] = v.split('-')
+    setSortKey(k as SortKey)
+    setSortAsc(d === 'asc')
+  }
+
   function pickSort(e: any) {
     pick({
       options: SORT_OPTIONS.map((o) => ({ ...o })),
       value: sortValue,
       title: '排序方式',
       anchor: e.currentTarget,
-      onPick: (v: string) => {
-        const [k, d] = v.split('-')
-        setSortKey(k as SortKey)
-        setSortAsc(d === 'asc')
-      },
+      onPick: applySort,
     })
   }
+
+  const sortButton = isAppleMobile() ? (
+    <span
+      className="press glass relative flex flex-none items-center justify-center gap-1 self-stretch rounded-full px-3 text-t2 lg:hidden"
+      title={`排序:${sortLabel}`}
+    >
+      <ArrowDownUp size={15} className="pointer-events-none" />
+      <ChevronDown size={13} className="pointer-events-none" />
+      <PickSelect
+        ariaLabel="排序方式"
+        className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-transparent"
+        value={sortValue}
+        options={SORT_OPTIONS}
+        onPick={applySort}
+      />
+    </span>
+  ) : (
+    <button
+      onClick={pickSort}
+      className="press glass flex flex-none items-center gap-1 self-stretch rounded-full px-3 text-t2 lg:hidden"
+      aria-label="排序方式"
+      title={`排序:${sortLabel}`}
+    >
+      <ArrowDownUp size={15} />
+      <ChevronDown size={13} />
+    </button>
+  )
 
   function onSort(k: SortKey) {
     if (k === sortKey) {
@@ -243,18 +275,6 @@ export default function Clients() {
       setSortAsc(k !== 'requests')
     }
   }
-
-  const sortButton = (
-    <button
-      onClick={pickSort}
-      className="press glass flex h-[42px] flex-none items-center gap-1 rounded-full px-3 text-t2 lg:hidden"
-      aria-label="排序方式"
-      title={`排序:${SORT_OPTIONS.find((o) => o.value === sortValue)?.label ?? ''}`}
-    >
-      <ArrowDownUp size={15} />
-      <ChevronDown size={13} />
-    </button>
-  )
 
   return (
     <Screen>
