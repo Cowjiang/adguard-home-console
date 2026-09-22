@@ -222,6 +222,49 @@ body {
 .page-in {
   animation: page-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ---------- 路由滑动转场(push/pop,见 lib/routeTransition.tsx) ----------
+   push=下钻:新页自右滑入,旧页向左让位;iOS 原生曲线。
+   pop=返回:旧页滑出右侧,新页自左浅层归位。
+   侧滑手势触发的 POP 不加这些类,由 WKWebView 原生快照动画接管,避免双重动画;
+   桌面端(≥lg)禁用,瞬时切换。 */
+@keyframes rt-push-in {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes rt-push-out {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-28%, 0, 0); }
+}
+@keyframes rt-pop-in {
+  from { transform: translate3d(-28%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes rt-pop-out {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+.rt-push-in,
+.rt-push-out,
+.rt-pop-in,
+.rt-pop-out {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.rt-push-in { animation-name: rt-push-in; }
+.rt-push-out { animation-name: rt-push-out; }
+.rt-pop-in { animation-name: rt-pop-in; }
+.rt-pop-out { animation-name: rt-pop-out; }
+@media (min-width: 1024px) {
+  .rt-push-in,
+  .rt-push-out,
+  .rt-pop-in,
+  .rt-pop-out {
+    animation: none;
+  }
+}
 @keyframes rise-in {
   from {
     opacity: 0;
