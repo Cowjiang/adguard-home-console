@@ -18,3 +18,7 @@ src-tauri/target/
 src-tauri/gen/ios/DerivedData/
 src-tauri/gen/apple/build/
 src-tauri/gen/apple/**/*.xcarchive/
+
+# XcodeGen 生成产物不入库(改 project.yml 后跑 scripts/ios-signing.sh generate)
+ios/AdGuardConsole.xcodeproj/
+src-tauri/gen/apple/adguard-home-console.xcodeproj/
