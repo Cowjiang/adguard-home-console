@@ -4,10 +4,11 @@ import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { api, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { PageHeader, EmptyState, toast } from '../components/ui'
+import { usePageInClass, PageHeader, EmptyState, toast } from '../components/ui'
 import { LogDetail } from '../components/LogDetail'
 
 export default function LogDetailPage() {
+  const pageIn = usePageInClass()
   const { cfg } = useAuth()
   const nav = useNavigate()
   const { state } = useLocation() as { state?: { item?: QueryLogItem } }
@@ -20,7 +21,7 @@ export default function LogDetailPage() {
 
   if (!item) {
     return (
-      <div className="page-in mx-auto w-full page-shell px-4">
+      <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
         <PageHeader title="请求详情" back />
         <EmptyState icon={<Globe size={30} className="text-t3" />} title="记录不存在" subtitle="请从查询日志列表重新进入" />
       </div>
@@ -43,7 +44,7 @@ export default function LogDetailPage() {
   }
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <PageHeader title="请求详情" back />
       <div className="mt-2">
         <LogDetail item={current} filtering={filtering} onSaveRule={saveRule} />

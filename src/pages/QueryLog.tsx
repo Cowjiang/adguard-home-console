@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, qs, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
-import { SearchBar, Chip, Badge, Card, EmptyState, Spinner, useSheet, toast } from '../components/ui'
+import { usePageInClass, SearchBar, Chip, Badge, Card, EmptyState, Spinner, useSheet, toast } from '../components/ui'
 import { LogDetail, reasonMeta } from '../components/LogDetail'
 import { LOG_FILTERS, qtypeColor } from '../lib/constants'
 import { fmtTime, fmtMs } from '../lib/format'
@@ -16,6 +16,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 const keyOf = (i: QueryLogItem) => `${i.time}|${i.question.name}|${i.client}|${i.question.type}`
 
 export default function QueryLog() {
+  const pageIn = usePageInClass()
   const { cfg } = useAuth()
   const sheet = useSheet()
   const isDesktop = useIsDesktop()
@@ -150,7 +151,7 @@ export default function QueryLog() {
   }
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className="mb-3 flex items-center justify-between">
         <h1 className="text-[26px] font-bold tracking-tight text-t1">查询日志</h1>
         <button
