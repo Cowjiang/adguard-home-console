@@ -15,6 +15,8 @@
 | 日期 | Class | 提案 | 状态 |
 | --- | --- | --- | --- |
 | 2026-09-23 | process | [提案流水线与轨道规则](proposals/process/2026-09-23-proposal-pipeline.md) | implemented |
+| 2026-09-23 | bug-fix | [修正客户端排序控件的原生选择器与等高](proposals/bug-fix/2026-09-23-clients-sort-native-select.md) | implemented |
+| 2026-09-23 | bug-fix | [让深色浮层显示玻璃并修复 backdrop-filter 前缀失效](proposals/bug-fix/2026-09-23-glass-popover-blur.md) | implemented |
 
 ## 与 docs/ 的分工
 

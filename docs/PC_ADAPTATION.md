@@ -159,3 +159,10 @@
   - 非苹果环境(Android UA):不渲染 select,点击弹出自绘锚定下拉(5 项)、选中后排序列一致、菜单关闭。
   - 双端高度:搜索框 43.75 = 排序控件 43.75,上下偏差 0。
 
+## 深色浮层玻璃:浮层变量拆分 + backdrop-filter 前缀 bug(2026-09-23,用户澄清)
+
+- **用户澄清**:"不要用 backdrop-filter"的本意是**不要滥用**——大面积模糊(整排卡片)叠加背景动画才发烫;**标签栏、下拉选择器、Sheet/Toast 这类浮层是允许并期望显示玻璃的**。原 §4 措辞易被读成全面禁用,已改写(见 PROJECT_MEMORY §4「模糊边界」)。
+- **变量拆分**:深色下 `--glass-strong:#15171d` 完全不透明 → `.glass-strong`(下拉/Sheet/Toast/图表 tooltip/登录卡)虽然带 blur(24) 也**看不出玻璃**。现拆成两个变量:新增 **`--glass-pop`**(深色 `rgba(21,23,29,0.72)`、浅色 `rgba(255,255,255,0.85)`)供 `.glass-strong` 使用;`--glass-strong` 保持实色,继续供概览防护卡渐变与 `Card strong` 用——**否则大号防护卡会跟着变半透明,正好撞上"大面积"红线**。浅色外观零变化。
+- **顺带挖出真 bug(影响不止浮层)**:`src/index.css` 里三处模糊都手写了 `-webkit-backdrop-filter` 紧跟在标准属性后,构建链(Lightning CSS)把它们当同一属性**去重、只留前缀那条**;而现代 Chromium 已移除该别名(实测本机 Chrome 153:`CSS.supports('-webkit-backdrop-filter',…)` = false,设置后计算值仍 `none`)→ **Chrome / Firefox / WebView2(Tauri Windows)上标签栏、tab 透镜、浮层的模糊一直是失效的**(只有 WebKit 正常,所以 iPhone 上从未暴露)。修法:源码只留 `backdrop-filter`,构建会自动产出 `-webkit-backdrop-filter` + `backdrop-filter` 两条(已核对 dist)。**若只做半透明而不修这条,Chromium 下浮层会露出未模糊的清晰内容,比改之前更糟**。
+- **验证**(playwright + Chrome 390×844 / 1440×900,dist/8787 + mock 3990,13 项断言全绿):深色下拉 `rgba(21,23,29,0.72)` + `blur(24px) saturate(1.6)`;深色标签栏 `blur(16px) saturate(1.6) brightness(1.08)`;浅色下拉维持 `rgba(255,255,255,0.85)` + blur;深色桌面详情弹窗同为半透明 + blur;防护卡渐变仍为实色 `rgb(21,23,29)` 且无 backdrop-filter;排序按钮双端等高与原生/自绘两条路径回归通过。
+
