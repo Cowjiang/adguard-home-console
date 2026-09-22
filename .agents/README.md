@@ -17,7 +17,8 @@
 ├── workflows/       预留：后续工作流（约定待定，见下）
 ├── logs/            施工日志与会话存档
 ├── reviews/         报告 / 验收 / 验证任务书（一次性快照）
-└── evidence/        取证素材（截图等），按来源分 web | native | tauri | acceptance
+└── evidence/        取证截图，按来源分 web | native | tauri | acceptance
+                     ⚠️ 不入库（.gitignore 已忽略），仅本机留存
 ```
 
 ## 命名规则
@@ -71,7 +72,7 @@ Mavis 目前只从 `~/.minimax/skills/`（全局）与 `~/.minimax/agents/<agent
 
 - `logs/` — 按线或按会话一份：`tauri-ios.md`（Tauri 壳线）、`ios-native.md`（SwiftUI 原生线）、`orchestration.md`（跨线编排）、`transcript-<日期>.md`（会话存档）。
 - `reviews/` — 报告与验收结论。**结论落地后，仍然有效的规范要回写 `docs/`**——`reviews/` 是当时的判据，不是现状。
-- `evidence/` — 报告引用的原始素材，按来源分目录。新素材用**带来源与用途**的文件名（如 `<端>-<序号>-<页面>-<状态>.png`），避免再次出现"文件名与内容对不上"的情况。
+- `evidence/` — 取证截图。**整个目录不入库**（`.gitignore` 忽略）：仓库里不放二进制截图，截图一律只在本机留存。因此报告里的 `evidence/...` 路径是**取证位置约定**，克隆后并不存在，要复核得按报告里写的方法重拍。新素材用带来源与用途的文件名（`<端>-<序号>-<页面>-<状态>.png`），避免再出现"文件名与内容对不上"。例外是**随应用分发的图标资源**（`Assets.xcassets`、`src-tauri/icons/`）——那是 App 内容，照旧入库。
 
 ## 维护
 

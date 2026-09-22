@@ -67,4 +67,5 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，本机当前不存在**；单位与字段约定以 `PROJECT_MEMORY.md` §3 为准，勿假设该目录可用。
 - `.agents/` — agent 的能力与产物目录，完整约定见 `.agents/README.md`：
   - `skills/` / `workflows/` — 可复用能力与工作流（Agent Skills 规范，跨工具可移植）。**本机 Mavis 不会自动扫描项目内技能**。
-  - `logs/` / `reviews/` / `evidence/` — 施工日志与会话存档 / 报告与验收 / 取证截图。命名 `kebab-case`，快照类前置 `YYYY-MM-DD-`，流水类不写日期。
+  - `logs/` / `reviews/` — 施工日志与会话存档 / 报告与验收。命名 `kebab-case`，快照类前置 `YYYY-MM-DD-`，流水类不写日期。
+  - `evidence/` — 取证截图。**截图一律不提交**：该目录已被 `.gitignore` 忽略，只在本机留存；随应用分发的图标资源（`Assets.xcassets`、`src-tauri/icons/`）属 App 内容，不在此列。
