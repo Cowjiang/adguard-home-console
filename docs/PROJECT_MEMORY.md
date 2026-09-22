@@ -1,6 +1,6 @@
 # AdGuard Home Console — 项目记忆(供后续会话快速恢复上下文)
 
-> 用途:新会话先读此文件,避免重新探查。最后更新:2026-09-21
+> 用途:新会话先读此文件,避免重新探查。最后更新:2026-09-23
 
 ## 1. 项目概况
 
@@ -46,7 +46,7 @@
 - **浅色**:未动,白色玻璃 + specular 保留
 - `--glass-strong:#15171d`(弹层实色);`--glass-nav: rgba(40,42,50,0.45)` + blur(16) saturate(1.6) + brightness(1.08)(玻璃=透出内容,模糊大了就是磨砂;iOS Safari 无折射滤镜,blur 是上限)
 - 模糊只存在于:标签栏、顶栏、弹层/Toast(**性能红线**:iOS 大面积 backdrop-filter+背景动画会发烫,已把卡片全部改实色,勿回退)
-- **浮层红线(2026-09-23 用户定稿)**:**任何弹窗/浮层一律屏幕居中出现,严禁从底部上升**——iOS 原生 tabbar 会挡住底部浮层。全部弹窗(确认框/表单/详情等)统一走 `ui.tsx` 的 `SheetProvider`,其容器已固定 `items-center`;新增弹层组件必须居中,勿引入 `items-end`/`translateY(60px)` 类底部入场。单选不弹层:苹果设备原生 select、其余自绘锚定下拉。另:弹窗动画靠**双 rAF** 驱动(单 rAF 初始态与首帧合并会闪现无动画),改 SheetProvider 时勿退回单层
+- **浮层红线(2026-09-23 用户定稿)**:**任何弹窗/浮层一律屏幕居中出现,严禁从底部上升**——iOS 原生 tabbar 会挡住底部浮层。全部弹窗(确认框/表单/详情等)统一走 `ui.tsx` 的 `SheetProvider`,其容器已固定 `items-center`;新增弹层组件必须居中,勿引入 `items-end`/`translateY(60px)` 类底部入场。单选不弹层:**苹果设备用页面里真实渲染的 `<select>` 覆盖层**(`ui.tsx` 的 `PickSelect`;`showPicker()` 在 WebKit 不存在,见坑 18)、其余自绘锚定下拉。另:弹窗动画靠**双 rAF** 驱动(单 rAF 初始态与首帧合并会闪现无动画),改 SheetProvider 时勿退回单层
 - 长按菜单:**全局禁用**(body user-select:none + -webkit-touch-callout:none,input/textarea 恢复可编辑),复制一律走显式复制按钮
 - `.chart-touch`(图表专用叠加):`touch-action: pan-y`——纵向滑动交还页面滚动(修复移动端图表卡住滚动),横向拖动留给 scrub;触摸端**长按 350ms 唤出数据预览**(震动反馈,移动超 8px 取消判定让位给滚动/scrub);桌面鼠标 hover 不受影响
 
@@ -78,9 +78,10 @@
 12. **`preserveAspectRatio="none"` 会把 SVG `<circle>` 拉成椭圆**(纵向 1:1、横向被拉伸),`vectorEffect` 只救描边不救形状——hover 数据点一律用 HTML 绝对定位圆点叠加(横向百分比定位 + 纵向像素定位,纵向缩放恒为 1);竖直 `<line>` 形状不受拉伸影响但仍需补 `vectorEffect="non-scaling-stroke"` 防止宽屏下被拉粗。
 13. **触屏设备 `<select>` 的焦点样式会残留**(iOS 从原生选择器选完不自动 blur,`:focus` 绿框一直挂着);**不能在 change 里同步 blur()**——与 iOS 自身的焦点恢复竞态,会导致下一次快速打开菜单被闪关。标准方案:触屏(`hover: none`)给元素加 `.no-ring` 类压掉 `:focus` 样式、真实 blur 时移除,桌面(`hover: hover`)选完直接 `blur()`;统一走 AdvancedSettings.tsx 的 `selectAfterChange()`。配套:`.field:focus` 只准用 `background-color`,**禁用 `background` 简写**——简写会重置 background-image/position,select 的小三角形(背景图绘制)每次焦点切换都会"瞬移"。
 14. **设置页表单控件不要用 `<label>` 包裹**——label 被点击时会聚焦关联输入框(点标题也触发),用户要求只有点击控件本身才聚焦;标题用 `div + span` 结构。Login 登录表单例外(点击文字聚焦账号/密码是标准登录体验)。
-15. **iOS 上连续弹出系统选择器有冷却**:WebKit 对关闭后约 300ms 内的再次 `showPicker()` 会静默吞掉(不报错不弹出),点击事件也不会到达页面。方案:`nativePickers.ts` 记录 `lastDismissAt`,冷却期内 `pickViaNativeSelect` 返回 false 回退自绘锚定菜单。苹果设备上的原生选择器入口用"胶囊 + 透明 select 铺满(`absolute inset-0`)+ 免交互图标/文字/箭头"结构——select 只负责弹出,显示全靠免交互层;select 会按最宽 option 撑宽,必须限制宽度否则胶囊变形。
+15. **iOS 上连续弹出系统选择器有冷却**:WebKit 对关闭后约 300ms 内的再次弹出会静默吞掉,点击事件也不会到达页面(曾据此做 `pickViaNativeSelect` 冷却回退,该方案已随坑 18 一并删除——它从未在 iOS 生效)。苹果设备上的原生选择器入口用"胶囊 + 透明 select 铺满(`absolute inset-0`)+ 免交互图标/文字/箭头"结构——select 只负责弹出,显示全靠免交互层;select 会按最宽 option 撑宽,必须限制宽度否则胶囊变形。
 16. **`express.static` 会拦截 `/index.html`**:SPA 回退中间件拿不到该路径,`maxAge` 会把 index.html 缓存 1 小时导致 iOS 端测试一直跑旧 bundle——须在 static 之前显式路由 `/index.html` 并以 `no-cache` 下发(SPA 回退 `/` 同理)。
 17. **判定"苹果设备"不能只看 UA**:PC 浏览器设备模拟会伪装 UA 成 iPhone/iPad,`showPicker()` 又在桌面 Chrome 上可用,结果原生选择器弹在隐藏 select(左下角 1px)上,弹层错乱。`isAppleMobile()` 必须双重判定:UA 含 iPhone/iPad(或 Macintosh+多点触控)**且** `navigator.vendor === 'Apple Computer, Inc.'`(模拟不伪装 vendor;iOS 上所有浏览器都是 WebKit,vendor 恒为 Apple)。非苹果/模拟环境一律回自绘锚定下拉。
+18. **`<select>` 的 `showPicker()` 在 WebKit/iOS 上不存在**(2026-09-23 查 MDN browser-compat-data 确认:Safari/safari_ios 为 `preview` 且置于开关后;只有 Chrome 121+/Firefox 122+ 有)。所以**苹果端的原生选择器必须是页面里真实渲染的 `<select>` 覆盖层**(`ui.tsx` 的 `PickSelect`:胶囊 + `absolute inset-0` 透明 select + 免交互图标层),**不能靠 JS 唤起**。`pickViaNativeSelect` 已删除(它在 iOS 上恒返回 false,等于死代码);`usePick` 现在永远走自绘锚定菜单——**新增任何单选项,苹果分支必须自己写 `isAppleMobile() ? <PickSelect/> : usePick`**,漏写就退化成自绘下拉(客户端排序按钮即此坑)。另:同行控件高度别写死(搜索框 15px 字号 × 1.45 行高 + `py-2.5` = 43.75px,曾把排序按钮写 `h-[42px]` 导致上下各差 0.88px),用 `self-stretch` 跟随行高。
 
 ## Git 工作流(2026-09-21 定稿)
 
