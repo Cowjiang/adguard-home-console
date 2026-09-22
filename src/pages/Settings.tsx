@@ -79,7 +79,7 @@ export default function Settings() {
 
 export function GeneralSettings() {
   const { cfg } = useAuth()
-  const pick = usePick({ menuOnMobile: true })
+  const pick = usePick()
   const { data: ql, mutate: mQl } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
   const { data: sc, mutate: mSc } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
 
