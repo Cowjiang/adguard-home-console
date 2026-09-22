@@ -11,6 +11,7 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1"
     GENERATE_INFOPLIST_FILE: YES
+    DEVELOPMENT_TEAM: ${AGH_APPLE_TEAM}
 targets:
   AdGuardConsole:
     type: application
@@ -19,7 +20,7 @@ targets:
       - path: AdGuardConsole
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.adguardhome.console
+        PRODUCT_BUNDLE_IDENTIFIER: ${AGH_BUNDLE_ID}
         PRODUCT_NAME: AdGuardConsole
         INFOPLIST_FILE: AdGuardConsole/Info.plist
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

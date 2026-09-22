@@ -137,5 +137,5 @@ Rust 代码规范:错误统一 `ProxyError → {status, error: msg}` 结构返�
 | 日期 | Phase | 结果/偏差 |
 | --- | --- | --- |
 | 2026-09-21 | — | 计划创建(评估完成,未动工) |
-| 2026-09-21 | 5.5 | 原生选择器实验(下拉被 TabBar 遮挡问题的两条替代路):A. usePick → WebKit 原生 `<select>` showPicker;B. 防护卡定时暂停 → 插件 presentSheet 玻璃弹层。新文件仅 `src/lib/nativePickers.ts`,均带 CSS 弹窗回退;tsc/vite build 绿,步骤见 TAURI_IOS_LOG.md §9 |
-| 2026-09-22 | 5.5 | **模拟器验证完成**(iPhone 18 Pro / iOS 27.0,TAURI_IOS_LOG.md §9.1):方案 B(presentSheet)全链路可用;方案 A(showPicker)在 iOS 27 WebKit 无此 API,静默回退 CSS 弹窗(回退机制验证有效,不白屏)。结论:铺开方向选 B,方案 A 弃用 |
+| 2026-09-21 | 5.5 | 原生选择器实验(下拉被 TabBar 遮挡问题的两条替代路):A. usePick → WebKit 原生 `<select>` showPicker;B. 防护卡定时暂停 → 插件 presentSheet 玻璃弹层。新文件仅 `src/lib/nativePickers.ts`,均带 CSS 弹窗回退;tsc/vite build 绿,步骤见 `.agents/logs/tauri-ios.md` §9 |
+| 2026-09-22 | 5.5 | **模拟器验证完成**(iPhone 18 Pro / iOS 27.0,`.agents/logs/tauri-ios.md` §9.1):方案 B(presentSheet)全链路可用;方案 A(showPicker)在 iOS 27 WebKit 无此 API,静默回退 CSS 弹窗(回退机制验证有效,不白屏)。结论:铺开方向选 B,方案 A 弃用 |

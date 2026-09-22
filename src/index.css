@@ -306,6 +306,21 @@ body {
   animation: content-in 0.28s ease-out both;
 }
 
+/* Tab / 筛选切换:内容区轻量上浮淡入(比 page-in 快,不抢页面转场的戏) */
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tab-in {
+  animation: tab-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* ---------- 桌面下拉菜单项 ---------- */
 .menu-item {
   transition: background 0.12s ease;

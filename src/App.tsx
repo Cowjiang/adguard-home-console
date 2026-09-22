@@ -11,6 +11,8 @@ import StatsPage from './pages/StatsPage'
 import TopListPage from './pages/TopListPage'
 import QueryLog from './pages/QueryLog'
 import LogDetailPage from './pages/LogDetailPage'
+import ClientDetailPage from './pages/ClientDetailPage'
+import ClientFormPage from './pages/ClientFormPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
 import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, AboutSettings } from './pages/Settings'
@@ -81,6 +83,8 @@ export default function App() {
               <Route path="/protection/check" element={<CheckHostPage />} />
               <Route path="/rewrites" element={<RewritesPage />} />
               <Route path="/clients" element={<Clients />} />
+              <Route path="/clients/detail" element={<ClientDetailPage />} />
+              <Route path="/clients/form" element={<ClientFormPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/general" element={<GeneralSettings />} />
               <Route path="/settings/dns" element={<DnsSettings />} />
