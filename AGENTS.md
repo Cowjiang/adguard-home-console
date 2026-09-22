@@ -14,6 +14,7 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - 开发：`npm run dev:all`（前端 5173 + 服务端 8787；只跑 `npm run dev` 会缺 API 代理）
 - 构建：`npm run build`；生产模式：`npm start`（8787 托管 dist）
 - 类型检查：`npm run check`（`tsc --noEmit`）
+- 提案校验：`node scripts/verify-proposals.mjs`（改动提案的路径、分类或状态后必跑）
 - Rust 测试：`cd src-tauri && cargo test`
 - 本地 AGH 模拟：`node scripts/mock-agh.mjs`（监听 127.0.0.1:3990，任意非空 Basic 凭据）
 - iOS 工程生成 / 构建：`./scripts/ios-signing.sh generate tauri|ios`、`./scripts/ios-signing.sh tauri build --target aarch64`
@@ -66,6 +67,7 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - `docs/RUST_PLAN.md` / `docs/IOS_NATIVE_PLAN.md` — 两条原生线的施工蓝图与验收标准
 - `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，不随仓库分发**；单位与字段约定以 `PROJECT_MEMORY.md` §3 为准，勿假设该目录可用。
 - `.agents/` — agent 的能力与产物目录，完整约定见 `.agents/README.md`：
-  - `skills/` / `workflows/` — 可复用能力与工作流（Agent Skills 规范，跨工具可移植）。
+  - `skills/` — 可复用能力与多步流程（Agent Skills 规范，跨工具可移植）。
+  - `pipelines/` — 提案生命周期：非平凡的行为 / 架构 / 契约 / 流程变更，**先在 `proposals/<class>/` 登记提案再动手**，轨道规则与模板见 `.agents/pipelines/WORKFLOW.md`。
   - `logs/` / `reviews/` — 施工日志与会话存档 / 报告与验收。命名 `kebab-case`，快照类前置 `YYYY-MM-DD-`，流水类不写日期。
   - `evidence/` — 取证截图。**截图一律不提交**：该目录已被 `.gitignore` 忽略，只在本地留存；随应用分发的图标资源（`Assets.xcassets`、`src-tauri/icons/`）属 App 内容，不在此列。

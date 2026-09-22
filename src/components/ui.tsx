@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { isAppleMobile, pickViaNativeSelect } from '../lib/nativePickers'
 import { TOP_LEVEL_ROUTES } from '../lib/routes'
 import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
@@ -548,16 +547,14 @@ function MenuHost({ children }: { children: ReactNode }) {
 }
 
 /**
- * 单选选择器:苹果设备优先 WebKit 原生 <select>(showPicker,见 lib/nativePickers.ts);
- * 其余一切设备(含移动端)一律自绘锚定下拉菜单。
- * 2026-09-23 用户定稿:废弃底部上滑(sheet)回退,除苹果外统一自定义下拉组件。
+ * 单选选择器:一律自绘锚定下拉菜单。
+ * 苹果设备的原生选择器不走本函数——WebKit 未实现 <select> 的 showPicker()
+ * (Safari 仅在预览版置于开关后),原生入口必须是真实渲染的 <select> 覆盖层,
+ * 见 PickSelect 与各页面的 isAppleMobile() 分支。
  */
 export function usePick() {
   const menu = useContext(MenuContext)
-  return <T extends string | number>(req: PickReq<T>) => {
-    if (isAppleMobile() && pickViaNativeSelect(req)) return
-    menu.open(req)
-  }
+  return <T extends string | number>(req: PickReq<T>) => menu.open(req)
 }
 
 function pickText(node: ReactNode): string {
@@ -570,19 +567,21 @@ function pickText(node: ReactNode): string {
 
 /** 苹果移动设备用的真实原生 <select>:点击即弹系统选择器,无任何 JS 介入 */
 export function PickSelect<T extends string | number>({
-  value, options, onPick, className, placeholder,
+  value, options, onPick, className, placeholder, ariaLabel,
 }: {
   value?: T
   options: { label: ReactNode; value: T }[]
   onPick: (v: T) => void
   className?: string
   placeholder?: string
+  ariaLabel?: string
 }) {
   const current = value != null ? String(value) : (placeholder ?? '')
   return (
     <select
       className={`appearance-none outline-none ${className ?? ''}`}
       style={{ WebkitTapHighlightColor: 'transparent' }}
+      aria-label={ariaLabel}
       value={current}
       onChange={(e) => {
         const o = options.find((x) => String(x.value) === e.target.value)

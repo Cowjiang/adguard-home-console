@@ -66,7 +66,7 @@
 - **下拉框小三角形瞬移**(用户反馈):`.field:focus` 误用 `background` 简写,重置了绘制三角形的 background-image/position,0.2s 过渡下三角形每次焦点切换都从左上角滑回右侧;改为只写 `background-color`。
 - **点击表单标题聚焦输入框**(用户反馈):设置页曾用 `<label>` 包裹控件,点标题/说明文字也会聚焦;全部改为 `div + span`(仅 Login 登录表单保留 label)。排查过全部设置页:DNS(DnsSettings)、加密(EncryptionSettings)已清零,Login 按用户预期保留。
 - **测试上游误报失败**(用户反馈):`/test_upstream_dns` 成功时返回 `{"223.5.5.5":"ok"}` 形式映射,旧逻辑"对象非空即失败"导致全 ok 仍显示红色;改为过滤值为 `ok`/空的条目,全部通过显示绿色成功条,红色块只列真正出错的上游。
-- **移动端下拉最终定稿(用户定稿,2026-09-21)**:苹果移动设备(iPhone/iPad,含 iPadOS 伪装 Mac)上选择器一律走**原生 WebKit `<select>`**(与 DNS 设置页原生下拉同款,输入附件层不被任何元素遮挡);**非苹果设备**走自绘锚定下拉菜单(MenuHost,已做视口夹紧防溢出)。适用入口:概览时间范围、过滤器更新间隔、防护页更新间隔、查询日志/统计保留时长;**防护卡"定时暂停"例外——始终用自绘锚定菜单**(用户要求,原生 select 冷却期点击无响应体验差)。Tauri 插件 presentSheet(方案 B)与 isTauriShell 判定已废弃删除,实现见 `lib/nativePickers.ts`(冷却期回退逻辑同文件)。
+- **移动端下拉最终定稿(用户定稿,2026-09-21)**:苹果移动设备(iPhone/iPad,含 iPadOS 伪装 Mac)上选择器一律走**原生 WebKit `<select>`**(与 DNS 设置页原生下拉同款,输入附件层不被任何元素遮挡);**非苹果设备**走自绘锚定下拉菜单(MenuHost,已做视口夹紧防溢出)。适用入口:概览时间范围、过滤器更新间隔、防护页更新间隔、查询日志/统计保留时长;**防护卡"定时暂停"例外——始终用自绘锚定菜单**(用户要求,原生 select 冷却期点击无响应体验差)。Tauri 插件 presentSheet(方案 B)与 isTauriShell 判定已废弃删除,实现见 `lib/nativePickers.ts`(`isAppleMobile()` 判定)与 `ui.tsx` 的 `PickSelect`(原生入口)/`usePick`(自绘入口)。
 - **PC 浏览器设备模拟误判成苹果设备(用户反馈,2026-09-22)**:PC Chrome 开发者工具的设备模拟会把 UA 伪装成 iPhone/iPad,`isAppleMobile()` 原先只看 UA,模拟环境下判真 → 走 `pickViaNativeSelect()`,而桌面 Chrome 支持 `showPicker()`,结果在锚定于左下角的隐藏 1px `<select>` 上弹出桌面式原生下拉——弹层位置错乱、观感异常。修复:判定加第二道门 `navigator.vendor === 'Apple Computer, Inc.'`——设备模拟只改 UA 不改 vendor(Chrome 系为 `Google Inc.` 等),真苹果 WebKit(含 iOS 上的 Chrome/Edge/Firefox 等第三方浏览器)恒为 Apple vendor;模拟环境及一切非苹果设备统一回自绘锚定下拉(用户要求:除苹果设备外一律自定义下拉组件)。顺带清理:删除调试用 `__FORCE_APPLE__` 全局开关。
 
 ## 图表触摸交互重构(2026-09-21)
@@ -110,7 +110,7 @@
 ## 客户端改版二次修订:选择器统一 / 内联编辑 / 双端结构调整(2026-09-23 用户反馈,6 点全落实)
 
 1. **排序按钮与搜索框同行不换行**:SearchBar 加 `className` 透传,移动端布局 `flex items-center gap-2` + SearchBar flex-1 + 图标式排序按钮(`lg:hidden`,桌面用表头排序)。
-2. **选择器统一(全局,用户定稿)**:`ui.tsx` 的 `usePick` **删除底部上滑(sheet)回退分支**——苹果设备仍走 `pickViaNativeSelect()` 系统选择器,其余一切设备(含移动端浏览器)一律自绘锚定下拉菜单(`MenuContext`,portal 到 body,自动上/下翻转定位)。`menuOnMobile` 参数删除,6 处调用方(ProtectionCard/Dashboard/FiltersPages/Protection/Settings/AdvancedSettings)同步更新;全局不再有任何"单选用上滑弹窗"的场景。
+2. **选择器统一(全局,用户定稿)**:`ui.tsx` 的 `usePick` **删除底部上滑(sheet)回退分支**——苹果设备走页面里真实渲染的原生 `<select>` 覆盖层(`PickSelect`,见文末「客户端排序按钮…」节的更正),其余一切设备(含移动端浏览器)一律自绘锚定下拉菜单(`MenuContext`,portal 到 body,自动上/下翻转定位)。`menuOnMobile` 参数删除,6 处调用方(ProtectionCard/Dashboard/FiltersPages/Protection/Settings/AdvancedSettings)同步更新;全局不再有任何"单选用上滑弹窗"的场景。
 3. **详情页内联编辑(参考 DNS 设置页)**:ClientDetail 去掉 `onEdit`/编辑按钮——名称、IP/标识两行改为 `EditableTextRow`(点行进入编辑,input + 保存/取消,Enter 提交 Esc 取消),防护设置区"使用全局设置/过滤/安全防护/家长控制"全部 Switch 即时保存(`/clients/update`,乐观更新失败回滚,保存后 mutate 列表缓存);全局设置开启时防护三行退化为只读 OnOff 徽标。坑:桌面弹窗内容是 open 时捕获的静态 ReactNode,列表 mutate 不会重渲弹窗 → ClientDetail 内部用 `draft` useState 镜像配置自持状态(标题/图标也跟随 draft,新增 `displayName`)。
 4. **列表页持久卡片**:删除按钮移除(删除只保留在详情页);右侧与自动识别行一致显示源 + 次数 badge。
 5. **添加/编辑客户端独立页面**:新路由 `/clients/form`(`src/pages/ClientFormPage.tsx`),移动端点 + / "添加为持久客户端"均 `nav('/clients/form', { state: { initial, isNew, prefillIp } })` 进页(带 prefillIp 预填 IP;直达无 state 回空表单);桌面端保留居中弹窗(非上滑)。ClientForm 加 `showTitle` 开关,页面形态关掉内置标题避免与 PageHeader 重复;保存成功 mutate 列表缓存并 replace 回 /clients。
@@ -146,3 +146,16 @@
 - **Segmented 本体滑动动画**:用户澄清"tab 动画"指 tab 本体像 tabbar 一样左右平移——Segmented 重构为**滑动指示块**方案:容器 `relative`,激活视觉(accent-soft 底 + inset accent 描边)移到绝对定位 `<span>` 指示块上,按激活按钮的 `offsetLeft/offsetWidth` 定位,`transition-[left,width] 0.3s cubic-bezier(0.22,1,0.36,1)` 平移;按钮文字颜色 `transition-colors` 跟随,监听 window resize 重测量。外观设置页的主题 Segmented 同步受益。
 - **间距修复**:上轮把 Dashboard Top 榜单内容区的 `<div className="mt-4">` 换成 TabContent 时丢了与 Segmented 的间距——TabContent 加 `className` 透传,Dashboard 传 `mt-4` 恢复。
 - **注意**:改 Segmented 时勿把指示块改回"每项各自高亮"(会退回无平移动画);TabContent 包裹时检查是否吞掉了原有 margin。
+
+## 客户端排序按钮:高度对齐 + 苹果端走原生选择器(2026-09-23,用户反馈)
+
+- **症状**:①排序按钮(`h-[42px]`)比同行搜索框矮;②iOS 上点排序弹出的是自绘锚定下拉,没走系统选择器。
+- **高度实测**(390×844,dist + 8787):`SearchBar` = `py-2.5` + 15px 字号 × 行高 1.45 = **43.75px**(含 1px 边框),排序按钮写死 **42px** → 上下各差 0.88px。修复:**去掉魔数,按钮改 `self-stretch`**——行容器 `items-center`,搜索框决定行高,按钮自动等高(再改字号/内距不会再错位)。双端实测 `topDelta/bottomDelta = 0`。
+- **原生选择器根因**:`ui.tsx` 的 `usePick` 曾先试 `pickViaNativeSelect()`(动态建 1px 隐藏 `<select>` + `showPicker()`),但 **WebKit 没有实现 `HTMLSelectElement.showPicker()`**——MDN browser-compat-data 里 Safari/safari_ios 均为 `preview` 且置于开关后(Chrome 121+/Firefox 122+ 才有)。故 `isAppleMobile()` 为真时该函数**恒定返回 false**,usePick 永远落到自绘菜单;其他 5 处入口之所以"原生"是因为它们在渲染期就分支成 `PickSelect`(真实 `<select>` 铺满胶囊),而客户端排序按钮漏了这个分支。
+- **修复**:排序入口按既定模式分形——苹果设备渲染 `press glass relative … self-stretch rounded-full` 胶囊 + 透明 `<select>`(`absolute inset-0 h-full w-full bg-transparent text-transparent`)铺满,免交互图标层 `pointer-events-none`;其余设备保持 `usePick` 锚定下拉。`PickSelect` 新增可选 `ariaLabel`(原 button 的 `aria-label="排序方式"` 不能丢)。
+- **顺带清理**:删除 `nativePickers.ts` 的 `pickViaNativeSelect` / 冷却期计时 / `NativePickReq`(在 iOS 上恒为死代码,留着会诱导后续入口再踩),该文件只剩 `isAppleMobile()`;`usePick` 简化为"永远走自绘菜单"。**ProtectionCard「定时暂停」的行为因此零变化**(它本来就是靠 showPicker 失败回退到自绘菜单)。
+- **验证**(playwright + Chrome,390×844,dist/8787 + mock-agh 3990):
+  - 苹果环境(UA iPhone + `navigator.vendor='Apple Computer, Inc.'`):胶囊内 `select[aria-label="排序方式"]` 存在且 5 个选项、文字透明、`elementFromPoint` 命中该 select(点击直达系统选择器)、无冗余 button;`selectOption(name-asc)` → 列表 `["iPad-Pro","iPhone-15","LivingTV","VPS-Tailscale"]` 与 `localeCompare('zh-Hans-CN')` 升序一致,`name-desc` 恰为逆序,期间**未出现自绘菜单**;胶囊 title 随选择更新。
+  - 非苹果环境(Android UA):不渲染 select,点击弹出自绘锚定下拉(5 项)、选中后排序列一致、菜单关闭。
+  - 双端高度:搜索框 43.75 = 排序控件 43.75,上下偏差 0。
+
