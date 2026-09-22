@@ -211,3 +211,29 @@
   - 屏幕原点/缩放需按截图地标标定(本次:窗口内偏移 (520,74)、scale 0.762,Zoom 或窗口尺寸变化后需重标);
   - 模拟器屏幕 402×874pt;原生 tab bar 四项中心 y≈820,x≈73/156/238/321。
 - 构建前清掉了 `gen/apple/build.old.*` 残留(869M,磁盘当时仅剩 4.5G)。
+
+## 11. WKWebView 系统侧滑返回(方案 A-1,2026-09-22)
+
+调研见 `docs/IOS_SWIPE_BACK_RESEARCH.md`(wry 0.55.1 有 `with_back_forward_navigation_gestures` 但 tauri 2.11.6 未透出;经 `with_webview` → `PlatformWebview::inner()` 拿 WKWebView 指针运行时开启,objc2-web-kit 类型绑定仅支持 macOS 故用 objc2 `msg_send!`)。分支 `feat/ios-swipe-back`。
+
+### 实现
+
+1. `src-tauri/Cargo.toml`:iOS target 增加 `objc2 = "0.6.4"`(与 wry 传递依赖同版本,不重复编译)。
+2. `src-tauri/src/lib.rs`:`setup` 钩子里 `enable_back_forward_gestures`——`get_webview_window("main")` + `with_webview`,`msg_send![wk, setAllowsBackForwardNavigationGestures: true]`。
+3. `src/lib/nativeTabbar.ts`:tab 切换/回根全部 `navigate(tab.to, { replace: true })`——tab 导航不进历史栈,侧滑只走业务层级(层级下钻仍 push)。CSS 版 NavLink(浏览器回退)保持 push 属正常网页行为,不动。
+
+### 模拟器验证(iPhone 18 Pro,UDID 1243721C-…,截图 `shots-tauri/verify/swipe-*.png`)
+
+| 项 | 结果 |
+| --- | --- |
+| 子页左缘右滑返回 | ✓ `/protection/filters` → `/protection`,tab 选中态同步正确(swipe-5 → swipe-6) |
+| 悬停取消(拖一半停 400ms 松手) | ✓ 回弹留在子页(swipe-7);simtap 新增 `drag` / `dragcancel` 模式 |
+| 转场中途快照(录屏逐帧) | ✓ 左侧露出上一页的正确实时快照,子页圆角卡片右移,标准 iOS 交互转场(swipe-frame-hover-snapshot.png)——研究文档标注的最大不确定点(SPA pushState 快照陈旧)实测排除 |
+| 构建残留 | 复现 "Directory not empty",`gen/apple/build` 改名挪开后构建通过 |
+
+### 已知行为(记录,非 bug)
+
+- 历史栈底是启动落点 `/`(DebugAutoLogin/Login 均 replace),从 tab 根页继续侧滑会回到 `/`——栈语义使然,观感可接受。
+- `AGH_ROUTE` 落点偶发被 Login 自动连接的 `nav('/')` 竞态覆盖(既有问题,与本次改动无关,待后续排查)。
+- 同一开关会启用右缘"前滑",与历史栈 forward 条目配合,目前无可前滑场景,无影响。
+- simtap 标定随 Device Hub 窗口尺寸/缩放变化需重标(本次:窗口内偏移 (522,82)、scale 0.732)。
