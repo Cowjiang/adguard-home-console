@@ -89,3 +89,10 @@
 3. **IAB 截图在轮询密集页面(日志 2s/防护 5s)频繁超时或截到中间帧**(顶栏/标题看似消失):先用 `evaluate` 查 DOM 的 rect/opacity/text 确认真实状态,再重试截图;clip 截图有双影伪影,验证一律用全页截图(与 PROJECT_MEMORY 第 9 节一致)。
 4. IAB tab 的 `tabs.list().find(url)` → `tabs.get(id)` 每个新 kernel 都要重做(绑定不跨调用)。
 5. `useIsDesktop` 放 `src/lib/useIsDesktop.ts`,页面在顶部调用(勿放条件 return 之后,坑 4)。
+
+## 日志详情改版与全局弹窗形态统一(2026-09-22,用户提出)
+
+- **移动端日志详情改为独立页面**:点日志卡片/表格行不再弹底部浮层,改为 `nav('/log/detail', { state: { item } })` 进入子页 `src/pages/LogDetailPage.tsx`(记录经 location.state 传递,直达/刷新无 state 时显示"记录不存在"空态并带返回按钮)。页面按返回按钮规则用 `PageHeader back`(标题"请求详情");保存拦截/白名单规则成功后 toast 并 `nav(-1)` 返回 /log(POP 保留列表滚动位置)。`/log/detail` 天然命中 CSS TabBar(`startsWith('/log')`)与原生 TabBar `routeToId` 的 log 高亮,子页回点 tab 回 /log 的既有逻辑自动生效。
+- **LogDetail 抽为共享组件** `src/components/LogDetail.tsx`(含 reasonMeta),桌面弹窗与移动端详情页共用同一份渲染;QueryLog.tsx 瘦身。
+- **桌面端 SheetProvider 改居中弹窗**:`ui.tsx` 的 SheetProvider 按 `useIsDesktop` 分形态——桌面 `items-center` + 打开动画改 `translateY(8px) scale(0.97)`,去掉拖拽指示条与安全区 padding;移动端保持底部上滑 + 指示条不变。此改动是全局的:日志详情、useConfirm 确认框、usePick 移动回退、客户端表单、添加过滤器/重写/租约、安全搜索等所有走 sheet 的场景,桌面端一律居中弹窗。
+- **底部浮层排查结论(移动端)**:剩余 sheet 场景——①客户端表单(Clients)、②添加过滤器/重写(FiltersPages)、③添加静态租约(AdvancedSettings)、④安全搜索(Protection)、⑤useConfirm 确认框、⑥usePick 非苹果移动设备的单选回退——均为"表单输入/确认/选择"类,iOS 底部弹层是原生惯例且键盘遮挡友好,**保留不动**;唯一"浏览信息"型浮层就是日志详情,已改页。
