@@ -83,8 +83,23 @@ export default function Dashboard() {
     })
   }
 
-  if (error) return <Loading text="连接服务器中…" />
-  if (!stats) return <Loading />
+  // 三个分支的根 div 结构一致,React 复用同一节点,切换时不重播 page-in 动画
+  if (error && !stats) {
+    return (
+      <div className="page-in mx-auto w-full page-shell px-4">
+        <div className="flex min-h-[55vh] items-center justify-center">
+          <Loading text="连接服务器中…" />
+        </div>
+      </div>
+    )
+  }
+  if (!stats) {
+    return (
+      <div className="page-in mx-auto w-full page-shell px-4">
+        <DashSkeleton />
+      </div>
+    )
+  }
 
   // 移动端扩展指标(统计页合并):请求构成
   const safeBrowsing = stats.num_replaced_safebrowsing
@@ -96,7 +111,8 @@ export default function Dashboard() {
 
   return (
     <div className="page-in mx-auto w-full page-shell px-4">
-      {/* 防护主卡 + 统计块:桌面并排 */}
+      <div className="content-in">
+        {/* 防护主卡 + 统计块:桌面并排 */}
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
         <div className="grid grid-cols-2 gap-3">
@@ -246,6 +262,32 @@ export default function Dashboard() {
               </div>
             </Card>
           )}
+        </div>
+      </div>
+      </div>
+    </div>
+  )
+}
+
+/** 首次加载骨架:复刻首屏结构,根容器保持挂载,数据到达后仅替换内容、不重播页面动画 */
+function DashSkeleton() {
+  const block = 'glass specular rounded-3xl animate-pulse'
+  return (
+    <div className="content-in">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className={`${block} h-[168px] lg:h-full`} />
+        <div className="grid grid-cols-2 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`${block} h-[78px]`} />
+          ))}
+        </div>
+      </div>
+      <div className={`${block} mt-4 h-[228px]`} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className={`${block} h-[300px] lg:col-span-2`} />
+        <div className="flex flex-col gap-4">
+          <div className={`${block} h-[220px]`} />
+          <div className={`${block} h-[92px]`} />
         </div>
       </div>
     </div>
