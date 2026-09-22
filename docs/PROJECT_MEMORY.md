@@ -136,4 +136,16 @@
   - **勿扩大忽略范围**:`gen/apple` 的 `project.yml` / `Podfile` / `LaunchScreen.storyboard` / `ExportOptions.plist` / `Sources/**` / `Info.plist` / `entitlements` / `Assets.xcassets`,以及 `ios/` 的全部 Swift 源码与 `Tests/Fixtures` 都是人维护内容,必须入库。
   - `ios/AdGuardConsole.xcodeproj` 在忽略前是**生成后又手改过**的(committed spec 里没有 `DEVELOPMENT_TEAM`,产物里却有),故谁跑一次 xcodegen 谁的签名就丢——现签名已收进 `project.yml`,该隐患随忽略一并消除。
   - 每位开发者需自备 `.env.signing`(含仓库所有者),否则会被脚本拦下——这是刻意的,好过静默生成坏工程。
-  - `tauri ios init` 会自动 `brew install xcodegen`(本机 2026-09-23 因此装上 2.46.0)。
+  - `tauri ios init` 会自动 `brew install xcodegen`(前提:brew 可用)。
+- **重新生成前的坑(实测)**:target sources 里含 `Externals` 目录,若 `Externals/**/libapp.a`(上次构建产物)在生成时已存在,XcodeGen 会把它当资源加进 Copy Resources,与 preBuildScript 的输出撞车 → `Multiple commands produce .../libapp.a`。故 **xcodegen generate 前必须 `find Externals -name '*.a' -delete`**;`tauri ios build` 本身不重跑 xcodegen,残留只影响"下一次重新生成"。报同错时先清 DerivedData 再试。
+- **brew 不可用时的替代**(如 macOS 版本过新未获支持,任何 brew 命令都崩):XcodeGen 可从 GitHub Release 的 zip 直装二进制;Podfile 无依赖时 pod install 是空操作,可跳过 `generate tauri` 的 pod 步骤、在 `src-tauri/gen/apple` 手动 `xcodegen generate`(签名变量 source `.env.signing`)。
+
+## 13. 路由转场与原生控件(2026-09-23,feat/ios-swipe-back)
+
+- **WKWebView 对程序化 `history.back()` 无原生动画**(实测:去掉 CSS 转场后是瞬时硬切)。返回按钮的动画必须由 CSS 快照层(`routeTransition.tsx` 的退场克隆)承担,`markBackTap()` 不能省;侧滑手势返回由 WKWebView 原生快照接管,**不要**再叠加 CSS 动画。
+- **滑动转场层必须不透明**:新页容器与旧页快照层若为透明背景,对方页面内容会整个透出(双重曝光,前进穿帮的头号来源)。`index.css` 的 `.rt-page-bg`(body 底色 + `.ambient` 光晕复制)在转场期间挂两层,结束摘除;矮内容页容器转场期加 `minHeight:100dvh`,否则下半屏漏出快照。
+- **入场动画闩要认"方向语义"而非"CSS 转场"**:侧滑手势的 POP 无 CSS 动画,若 page-in 闩不生效,落地页会重播入场动画(`fill-mode: both` 首帧 opacity:0;iOS 手势转场期间动画还可能被挂起不启动 → 整页空白)。实现上 `TransitionCtx.dir`(含手势 POP)与 `exiting`(CSS 转场进行中)解耦,闩读 dir、导航条读 exiting。
+- **原生控件悬浮在 WebView 之上,不参与 CSS 平移**:进入二级页须等转场结束再 `createComponent`(`useTransitionBusy` 忙闲门,等待期让 CSS 胶囊随导航条滑入、结束后同位同尺寸交接),离开二级页立即移除(退场页按钮洞由快照克隆补回);锚点公式见插件 `activateAnchorConstraints`:`safeAreaLayoutGuide + (margin=16)+dx/dy` 双轴同付,对齐 CSS 胶囊用 dx:0/dy:-4/尺寸 36。转场中新页导航条永远拿 IN 动画(拿 OUT 会反向平移再跳回)。
+- **跨 tab 跳转用 `useTabJump`**(lib/navMeta.ts):replace 不进历史栈(侧滑因此天然禁用跨 tab 返回)+ `markNavAnim('push')` 让转场层照常做 push 动画 —— 视觉下钻、栈上平级。tab 间跳转若用 push 会进 WKWebView 历史栈,侧滑就能跨 tab 返回(违背 IOS_SWIPE_BACK_RESEARCH.md §4.3)。
+- **z 层序**:POP 退场快照层 z=50,须盖过固定导航条(body portal z-40),旧页才能连同导航条从新页之上滑走;上限低于 Sheet/Toast。
+- 验证技巧:`routeTransition.tsx` 的 `DURATION_MS` 临时改 3000(vite HMR 即时生效)+ 中途截图即慢动作取证;注意 `cubic-bezier(0.32,0.72,0,1)` 前载严重,40% 时间已完成约 92% 位移,截图要趁早。
