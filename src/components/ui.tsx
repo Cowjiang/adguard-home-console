@@ -17,14 +17,19 @@ import { markBackTap } from '../lib/backNav'
 /** 顶级路由定义在 lib/routes.ts,此处 re-export 供旧引用方兼容 */
 export { TOP_LEVEL_ROUTES }
 
-export function Screen({ children, pad = true }: { children: ReactNode; pad?: boolean }) {
-  // 滑动转场进行中跳过 page-in 淡入,避免与平移叠加;闩住一次性,
-  // 防止转场结束后 dir 归零时 page-in 类重新补挂导致动画重播
+/** page-in 闩:滑动转场进行中跳过 page-in 淡入,避免与平移叠加;闩住一次性,
+ *  防止转场结束后 dir 归零时 page-in 类重新补挂导致动画重播。
+ *  页面根节点(无论是否经 Screen)统一用它挂 page-in。 */
+export function usePageInClass(): string {
   const t = useRouteTransition()
   const noAnim = useRef(false)
   if (t.dir) noAnim.current = true
+  return noAnim.current ? '' : 'page-in'
+}
+
+export function Screen({ children, pad = true }: { children: ReactNode; pad?: boolean }) {
   return (
-    <div className={`page-shell mx-auto w-full ${pad ? 'px-4' : ''} ${noAnim.current ? '' : 'page-in'}`}>
+    <div className={`page-shell mx-auto w-full ${pad ? 'px-4' : ''} ${usePageInClass()}`}>
       {children}
     </div>
   )
@@ -73,15 +78,13 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   }
 
   if (floating) {
-    // 固定导航条与页面层做同步平移(push/pop),转场时随页面滑动
-    const barAnim = transition.dir
-      ? transition.exiting
-        ? transition.dir === 'push'
-          ? 'rt-push-out'
-          : 'rt-pop-out'
-        : transition.dir === 'push'
-          ? 'rt-push-in'
-          : 'rt-pop-in'
+    // 固定导航条与页面层做同步平移(push/pop),转场时随页面滑动。
+    // 旧页的导航条由退场快照克隆携带滑出,存活的新页导航条永远拿 IN 动画
+    // (拿 OUT 会反向平移后再跳回 = 前进穿帮);原生手势转场无 CSS 动画,不加类
+    const barAnim = transition.exiting
+      ? transition.dir === 'push'
+        ? 'rt-push-in'
+        : 'rt-pop-in'
       : ''
     return createPortal(
       <div
@@ -92,15 +95,17 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
         {/* 滚动边缘渐变遮罩:见 NavScrim 注释 */}
         <NavScrim />
         <div className="relative flex h-12 items-center px-4">
-          {!nativeBack && (
-            <button
-              onClick={goBack}
-              className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
-              aria-label="返回"
-            >
-              <ChevronLeft size={20} />
-            </button>
-          )}
+          {/* 原生玻璃按钮接管时仅视觉隐藏:转场快照克隆此条时补回按钮,
+              避免滑出的旧页在按钮位留洞(原生控件瞬时移除,无法随页面滑动) */}
+          <button
+            data-back-btn
+            onClick={goBack}
+            style={nativeBack ? { visibility: 'hidden' } : undefined}
+            className="press glass specular pointer-events-auto flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
+            aria-label="返回"
+          >
+            <ChevronLeft size={20} />
+          </button>
           <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
             {title}
           </div>
