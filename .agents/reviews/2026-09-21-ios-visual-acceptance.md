@@ -2,7 +2,7 @@
 
 > 任务:对 **SwiftUI 原生版** 与 **Tauri 混合壳版** 与 **Web 版**(设计系统主形态=深色)做逐页视觉对照,产出验收结论 + 第二轮施工清单(仅原生版)+ 无法复刻项清单。
 > 用户验收口径:"UI 变化不大,除非实现不了;实现不了的列出来"。
-> 本报告只做验收,未改任何业务代码。补充取证截图存 `docs/shots-accept/`。
+> 本报告只做验收,未改任何业务代码。补充取证截图存 `.agents/evidence/acceptance/`。
 
 ---
 
@@ -10,13 +10,13 @@
 
 | 端 | 材料 | 说明 |
 | --- | --- | --- |
-| Web 基准 | `docs/shots-web/01–09*.png`(390×844 深色)+ `light/01–05.png` | 8787 Express + mock AGH(127.0.0.1:3990)实拍 |
-| SwiftUI 原生版 | `docs/shots-native/01–09*.png` + 本次补拍 `docs/shots-accept/native-10–14*.png` | iPhone 17 模拟器,app `com.adguardhome.console` |
-| Tauri 壳版 | `docs/shots-tauri/01–04*.png` + 本次补拍 `docs/shots-accept/tauri-20/21*.png` | iPhone 18 Pro 模拟器,"AGH Console"(同一 bundle id,内嵌同一套前端 dist) |
+| Web 基准 | `.agents/evidence/web/01–09*.png`(390×844 深色)+ `light/01–05.png` | 8787 Express + mock AGH(127.0.0.1:3990)实拍 |
+| SwiftUI 原生版 | `.agents/evidence/native/01–09*.png` + 本次补拍 `.agents/evidence/acceptance/native-10–14*.png` | iPhone 17 模拟器,app `com.adguardhome.console` |
+| Tauri 壳版 | `.agents/evidence/tauri/01–04*.png` + 本次补拍 `.agents/evidence/acceptance/tauri-20/21*.png` | iPhone 18 Pro 模拟器,"AGH Console"(同一 bundle id,内嵌同一套前端 dist) |
 
 **本次补充取证**(simctl 完成,结束后已全部还原):
 
-- `native-10-login-dark` / `native-11-login-light`:登录页。方法:`simctl keychain reset` 清掉已存实例 → 带预填 env 冷启动(AUTOCONNECT 不置位)。**旧 `shots-native/01-login.png` 实为一张深色概览(命名错位),且 `08-protection-paused.png` 摄于收敛前的旧构建(统计黑字、拦截线红色),均不作为本轮证据。**
+- `native-10-login-dark` / `native-11-login-light`:登录页。方法:`simctl keychain reset` 清掉已存实例 → 带预填 env 冷启动(AUTOCONNECT 不置位)。**旧 `.agents/evidence/native/01-login.png` 实为一张深色概览(命名错位),且 `08-protection-paused.png` 摄于收敛前的旧构建(统计黑字、拦截线红色),均不作为本轮证据。**
 - `native-12-paused-light` / `native-13-paused-dark`:防护暂停态当前构建实拍。方法:mock AGH `POST /control/protection {enabled:false,duration:3600000}` → 冷启动 app → 截图 → `enabled:true` 还原。
 - `tauri-20-overview-dark`:Tauri 版深色概览(此前只有浅色)。
 - `native-14-restore-check` / `tauri-21-restore-light`:收尾还原核对。
@@ -34,32 +34,32 @@
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 页面结构:防护卡→2×2 统计→趋势图→Top 榜单→上游→服务器信息 | ✅ 一致 | `native-13-paused-dark` / `shots-native/06-dark` vs `shots-web/02-overview`、`06-overview-bottom` |
+| 页面结构:防护卡→2×2 统计→趋势图→Top 榜单→上游→服务器信息 | ✅ 一致 | `native-13-paused-dark` / `.agents/evidence/native/06-dark` vs `.agents/evidence/web/02-overview`、`06-overview-bottom` |
 | 卡片质感:#121419 实色 + 1pt 白 8% 边框 + 连续圆角 | ✅ | `06-dark`,与 Web 逐卡对比无肉眼差 |
 | 语义色:今日查询=翡翠、已拦截=玫红、耗时/客户端=天蓝 | ✅ | `06-dark` / `native-12-paused-light`(浅色 #059669/#E11D48/#0284C7 亦正确) |
 | 数字排版:22pt bold rounded + tabular | ✅(12.5k / 2,170 / 23 ms 与 Web 同构) | `06-dark` |
 | 趋势图:查询=翡翠面积+描线,拦截=天蓝细线 | ✅(旧 08 截图里的红线是旧构建;当前构建已天蓝) | `06-dark`、`native-12-paused-light` |
-| Top 榜单:胶囊三段 + 名称/细条/右对齐数值三列 | ✅ | `shots-native/07-overview-bottom` |
+| Top 榜单:胶囊三段 + 名称/细条/右对齐数值三列 | ✅ | `.agents/evidence/native/07-overview-bottom` |
 | 上游卡:翡翠图标气泡 + 天蓝 ms 徽标 | ✅(额外多一列响应数,见下) | `07-overview-bottom` |
-| 请求构成环形图 | ❌ **整块缺失**(Web 概览第三张卡) | `shots-web/02-overview` 底部 vs `06-dark` |
-| 顶部状态胶囊"防护运行中 \| AdGuard Home Console" | ❌ 缺失(Web 全页面常驻) | `shots-web/02` 顶部 vs `06-dark` |
-| 防护卡质感 | ⚠️ Web = 翡翠 20% 混入 `#15171D` 实色的 140° 渐变 + 边框;原生 = 翡翠 10% 平涂(直接叠在页面黑底上),深色下明显偏"黑绿"、比 Web 更暗更闷 | `native-13-paused-dark` vs `shots-web/08-protection-paused` |
-| 防护卡两枚按钮(定时暂停/刷新状态) | ⚠️ 原生 `.bordered` 带翡翠 tint;Web 为中性深灰胶囊白字 | `06-dark` vs `shots-web/02-overview` |
-| 趋势图坐标轴 | ⚠️ 原生有 Y 轴数字(750/500/250/0)+ 纵向网格线;Web 无 Y 轴、仅横向淡虚线;X 轴原生"11 15 19 23"小时数,Web"06:00 10:00…" | `06-dark` vs `shots-web/02-overview` |
-| Top 榜单"查看更多"按钮 | ❌ 缺失 | `shots-web/06-overview-bottom` vs `07-overview-bottom` |
-| 防护暂停态 | ✅(玫红 tint + ShieldOff + 恢复时间倒计时,语义/色 token 均对) | `native-12/13` vs `shots-web/08` |
+| 请求构成环形图 | ❌ **整块缺失**(Web 概览第三张卡) | `.agents/evidence/web/02-overview` 底部 vs `06-dark` |
+| 顶部状态胶囊"防护运行中 \| AdGuard Home Console" | ❌ 缺失(Web 全页面常驻) | `.agents/evidence/web/02` 顶部 vs `06-dark` |
+| 防护卡质感 | ⚠️ Web = 翡翠 20% 混入 `#15171D` 实色的 140° 渐变 + 边框;原生 = 翡翠 10% 平涂(直接叠在页面黑底上),深色下明显偏"黑绿"、比 Web 更暗更闷 | `native-13-paused-dark` vs `.agents/evidence/web/08-protection-paused` |
+| 防护卡两枚按钮(定时暂停/刷新状态) | ⚠️ 原生 `.bordered` 带翡翠 tint;Web 为中性深灰胶囊白字 | `06-dark` vs `.agents/evidence/web/02-overview` |
+| 趋势图坐标轴 | ⚠️ 原生有 Y 轴数字(750/500/250/0)+ 纵向网格线;Web 无 Y 轴、仅横向淡虚线;X 轴原生"11 15 19 23"小时数,Web"06:00 10:00…" | `06-dark` vs `.agents/evidence/web/02-overview` |
+| Top 榜单"查看更多"按钮 | ❌ 缺失 | `.agents/evidence/web/06-overview-bottom` vs `07-overview-bottom` |
+| 防护暂停态 | ✅(玫红 tint + ShieldOff + 恢复时间倒计时,语义/色 token 均对) | `native-12/13` vs `.agents/evidence/web/08` |
 
 ### 1.2 日志页 ✅ 接近达标
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 卡片流 + qtype 彩色竖条 + 彩色 qtype 小标 + "缓存"标 + 副行耗时 ms + 右侧语义徽标 | ✅ 全部落地 | `shots-native/03-log`、`09-log-scrolled` vs `shots-web/03-log`、`07-log-scrolled` |
+| 卡片流 + qtype 彩色竖条 + 彩色 qtype 小标 + "缓存"标 + 副行耗时 ms + 右侧语义徽标 | ✅ 全部落地 | `.agents/evidence/native/03-log`、`09-log-scrolled` vs `.agents/evidence/web/03-log`、`07-log-scrolled` |
 | 徽标语义色(黑名单=玫红/放行=翡翠/上游错误·无效请求=琥珀/白名单=翡翠/重写=紫) | ✅(token 对齐,重写紫已纠正) | `03-log` |
 | qtype 色表 | ✅ token 同源(`AGStyle.qtype` 照搬 QTYPE_COLORS;浅色 CNAME=#B45309 与 Web 浅色一致,非色差) | `AGStyle.swift:54` |
-| 筛选控件 | ⚠️ 原生 AGSegmented 单胶囊容器;Web 为独立 chips(间距 8px、全部=翡翠 soft+描边)。观感接近,可接受 | `03-log` vs `shots-web/03-log` |
-| qtype 小标底色 | ⚠️ Web qtype 文本带语义色 soft 胶囊底(浅色下明显);原生为裸文本 | `shots-web/light/03-log` vs `shots-native/03-log` |
+| 筛选控件 | ⚠️ 原生 AGSegmented 单胶囊容器;Web 为独立 chips(间距 8px、全部=翡翠 soft+描边)。观感接近,可接受 | `03-log` vs `.agents/evidence/web/03-log` |
+| qtype 小标底色 | ⚠️ Web qtype 文本带语义色 soft 胶囊底(浅色下明显);原生为裸文本 | `.agents/evidence/web/light/03-log` vs `.agents/evidence/native/03-log` |
 | 耗时格式 | ⚠️ Web 保留小数(5.65 ms / 3.80 ms);原生一律 `%.0f`(6 ms / 4 ms) | 同上 |
-| "实时"胶囊(标题右,绿点脉冲) | ❌ 缺失(2s 轮询存在,仅缺指示) | `shots-web/03-log` vs `shots-native/03-log` |
+| "实时"胶囊(标题右,绿点脉冲) | ❌ 缺失(2s 轮询存在,仅缺指示) | `.agents/evidence/web/03-log` vs `.agents/evidence/native/03-log` |
 | 搜索 | ✅ `.searchable` 保留原生(既定保留项) | — |
 | 额外差异 | ℹ️ 原生多"最近 100 条 · 每 2 秒刷新"节头;Web 无。无害 | `03-log` |
 
@@ -67,11 +67,11 @@
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 顶部统计块存在(规则总数翡翠 / 黑白数玫红) | ✅ 结构有 | `shots-native/04-filters` vs `shots-web/04-protection` |
+| 顶部统计块存在(规则总数翡翠 / 黑白数玫红) | ✅ 结构有 | `.agents/evidence/native/04-filters` vs `.agents/evidence/web/04-protection` |
 | 规则总数口径与格式 | ⚠️ Web=178,581(分组数字,含 2 条自定义,副标题"含 2 条自定义");原生=182.8k(compact 缩写,未含 userRules,副标题"拦截 + 白名单") | 同上 |
 | "过滤器列表"统计卡 | ⚠️ Web:"黑2 / 白1"黑=玫红、白=翡翠双色 + 圆形刷新钮 + "1 天前更新";原生:label"列表"、值"2 黑 · 1 白"整串玫红、无刷新钮、无更新时间 | 同上 |
 | 拦截/白名单列表行:图标气泡 + 名称 + 规则数 + 已启用徽标 | ✅(已启用=翡翠 soft 胶囊) | `04-filters` |
-| "过滤功能"六行图标气泡入口组(黑名单/白名单/自定义规则/拦截服务/DNS 重写/规则检测) | ❌ 缺失(原生尾部仅一行"后续版本提供"说明) | `shots-web/04-protection` vs `04-filters` |
+| "过滤功能"六行图标气泡入口组(黑名单/白名单/自定义规则/拦截服务/DNS 重写/规则检测) | ❌ 缺失(原生尾部仅一行"后续版本提供"说明) | `.agents/evidence/web/04-protection` vs `04-filters` |
 | "安全防护"分组(浏览安全/家长控制开关) | ❌ 缺失 | 同上 |
 | 自定义规则行 | ⚠️ 原生裸 monospace 文本行(无卡片、无图标气泡);Web 收在分组卡内 | `04-filters` |
 
@@ -79,20 +79,20 @@
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 主题三段胶囊分段(跟随系统/深色/浅色,选中=翡翠 soft+描边) | ✅ 与 Web `09-settings-app` 一致 | `shots-native/05-settings` vs `shots-web/09-settings-app` |
+| 主题三段胶囊分段(跟随系统/深色/浅色,选中=翡翠 soft+描边) | ✅ 与 Web `09-settings-app` 一致 | `.agents/evidence/native/05-settings` vs `.agents/evidence/web/09-settings-app` |
 | 服务器信息行(地址/版本/运行状态/DNS 端口) | ✅ 系统行样式,数值等宽+可选中文本 | `05-settings` |
 | 退出登录(红字) | ✅ | `05-settings` |
-| 图标气泡功能入口组(查询日志与统计/DNS/访问控制/加密/DHCP/应用设置/系统管理,各带彩色气泡+副标题) | ❌ 缺失(原生=标准设置页,Web=七行入口卡) | `shots-web/05-settings` vs `05-settings` |
+| 图标气泡功能入口组(查询日志与统计/DNS/访问控制/加密/DHCP/应用设置/系统管理,各带彩色气泡+副标题) | ❌ 缺失(原生=标准设置页,Web=七行入口卡) | `.agents/evidence/web/05-settings` vs `05-settings` |
 | 标题下版本副标题("AdGuard Home 0.107.79")与底部居中版本号 | ⚠️ 原生无副标题;版本在"关于"节内 | 同上 |
 
 ### 1.5 登录页 ✅ 接近达标
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 渐变图标块(翡翠→天蓝,76px/圆角 24/投影) | ✅ | `native-10-login-dark` vs `shots-web/01-login` |
+| 渐变图标块(翡翠→天蓝,76px/圆角 24/投影) | ✅ | `native-10-login-dark` vs `.agents/evidence/web/01-login` |
 | 标题 | ✅(原生多一行副标题"连接你的 AdGuard Home 实例",Web 无;无害) | 同上 |
 | 表单卡(glass-strong 实色+边框,22px 圆角) | ✅ | `native-10` |
-| 输入框质感 | ⚠️ Web 每个输入域是实色内嵌框(14px 圆角+1px 边框,聚焦翡翠描边);原生 TextField 无底无边,深色下表单卡内只有"标签+文字",输入区域边界感缺失 | `native-10-login-dark` vs `shots-web/01-login` |
+| 输入框质感 | ⚠️ Web 每个输入域是实色内嵌框(14px 圆角+1px 边框,聚焦翡翠描边);原生 TextField 无底无边,深色下表单卡内只有"标签+文字",输入区域边界感缺失 | `native-10-login-dark` vs `.agents/evidence/web/01-login` |
 | 主按钮:翡翠→天蓝渐变胶囊 | ✅(缺 Web 的"→"箭头,可忽略) | `native-10` |
 | 底部说明 | ℹ️ 原生一句"凭据保存在本机 Keychain"(Web 两行浏览器语境文案)——语义正确,保留 | 同上 |
 
@@ -166,7 +166,7 @@
 **R10 过滤器页自定义规则行收纳**
 - 文件:`Features/Filters/FiltersView.swift:106-118`:裸 monospace 行包一层 `.agCard(cornerRadius:12)` + 行首紫色 `doc.text` 16pt 气泡,弱结构差异消除。
 
-**落地顺序建议**:R1+R2+R4(概观三连,一次提交)→ R3 → R7 → R8 → R9+R10 → R5+R6(涉及子页节奏,可与 N4/N7 里程碑合并排期)。每步用 `docs/shots-accept/` 同角度截图对照。
+**落地顺序建议**:R1+R2+R4(概观三连,一次提交)→ R3 → R7 → R8 → R9+R10 → R5+R6(涉及子页节奏,可与 N4/N7 里程碑合并排期)。每步用 `.agents/evidence/acceptance/` 同角度截图对照。
 
 ---
 
@@ -191,10 +191,10 @@ Tauri 版与 Web 版是**同一套前端**(同 dist),验收重点是"壳"带来�
 
 | 检查点 | 结论 | 证据 |
 | --- | --- | --- |
-| 页面结构/信息密度/语义色/数字/图表 | ✅ 与 Web 基准逐像素同构:顶部状态胶囊、防护渐变卡、2×2 统计、面积图+天蓝拦截线、请求构成环形图全部在位 | `shots-tauri/02-overview`(浅)vs `shots-web/light/02-overview`;**`shots-accept/tauri-20-overview-dark` vs `shots-web/02-overview`(深)——深色下两者几乎无法区分** |
-| 原生 UITabBar vs Web CSS 标签栏 | ✅ 可接受:胶囊形玻璃 bar + 选中白色透镜,观感与 Web 胶囊栏同族;图标换 SF Symbols 实心(概览=house、过滤器=shield、日志=doc、设置=gearshape),与 Web lucide 线性图标(漏斗)隐喻略不同,**建议保留(既定决策),如要逐像素对齐可后续给 UITabBar 配自定义图标资源** | `shots-tauri/04-tabbar`、`tauri-20-overview-dark` 底部 |
-| 选中态 | ✅ 透镜+翡翠文字/图标,与 Web text-accent 语义一致 | `shots-tauri/04-tabbar` |
-| TabBarInsets 安全区 | ✅ `--tabbar-space` 经 `getTabBarInsets` 注入(`src/lib/nativeTabbar.ts`):日志页最后一张卡片完整停在 bar 上方;概览页内容在玻璃 bar 下自然穿过透出(与 Web 悬浮栏行为一致,非遮挡) | `shots-tauri/03-log` 底部、`tauri-20-overview-dark` 底部 |
+| 页面结构/信息密度/语义色/数字/图表 | ✅ 与 Web 基准逐像素同构:顶部状态胶囊、防护渐变卡、2×2 统计、面积图+天蓝拦截线、请求构成环形图全部在位 | `.agents/evidence/tauri/02-overview`(浅)vs `.agents/evidence/web/light/02-overview`;**`.agents/evidence/acceptance/tauri-20-overview-dark` vs `.agents/evidence/web/02-overview`(深)——深色下两者几乎无法区分** |
+| 原生 UITabBar vs Web CSS 标签栏 | ✅ 可接受:胶囊形玻璃 bar + 选中白色透镜,观感与 Web 胶囊栏同族;图标换 SF Symbols 实心(概览=house、过滤器=shield、日志=doc、设置=gearshape),与 Web lucide 线性图标(漏斗)隐喻略不同,**建议保留(既定决策),如要逐像素对齐可后续给 UITabBar 配自定义图标资源** | `.agents/evidence/tauri/04-tabbar`、`tauri-20-overview-dark` 底部 |
+| 选中态 | ✅ 透镜+翡翠文字/图标,与 Web text-accent 语义一致 | `.agents/evidence/tauri/04-tabbar` |
+| TabBarInsets 安全区 | ✅ `--tabbar-space` 经 `getTabBarInsets` 注入(`src/lib/nativeTabbar.ts`):日志页最后一张卡片完整停在 bar 上方;概览页内容在玻璃 bar 下自然穿过透出(与 Web 悬浮栏行为一致,非遮挡) | `.agents/evidence/tauri/03-log` 底部、`tauri-20-overview-dark` 底部 |
 | 渲染异常 | ✅ 深浅色均正常(WKWebView 跟随设备外观),无白边、无拉伸、无字体回退异常;深色实拍无渲染伪影 | `tauri-20-overview-dark` |
 | 滚动性能 | ⚠️ **未能实测**:无手势注入手段,无法肉眼评估滚动帧率。风险面评估:页面模糊层只剩 tab bar 一处背板 blur(卡片全实色),与 Web 版发热改造后的状态相同,预期与 Web 相当;**建议在真机上人工滚一遍概览/日志复核**(唯一遗留验证项) | — |
 | 与 Web 的其他差异 | ℹ️ 无。前端同源,Web 端后续改什么 Tauri 同步受益 | — |
@@ -228,8 +228,8 @@ R7/R8/R9/R10 为半小时级小项,可穿插任意提交。
 
 - 原生版日志/过滤器/设置的**深色实拍**(本轮因无手势注入未能切换 tab;token 为动态色,风险低)。
 - Tauri 版**真机滚动帧率**肉眼复核。
-- `docs/shots-native/01-login.png`(实为深色概览)与 `08-protection-paused.png`(旧构建)建议下一轮重拍归档,避免误导。
+- `.agents/evidence/native/01-login.png`(实为深色概览)与 `08-protection-paused.png`(旧构建)建议下一轮重拍归档,避免误导。
 
 ### 收尾确认
 
-- 两台模拟器外观已恢复 light;iPhone 17 app 已恢复登录运行态、iPhone 18 Pro app 已恢复浅色运行态;mock 防护已恢复开启;本会话未启动任何常驻进程,无需要清理的后台任务;未 git commit;`docs/` 下除本报告与 `docs/shots-accept/`(新增取证截图)外未动任何文件。
+- 两台模拟器外观已恢复 light;iPhone 17 app 已恢复登录运行态、iPhone 18 Pro app 已恢复浅色运行态;mock 防护已恢复开启;本会话未启动任何常驻进程,无需要清理的后台任务;未 git commit;`docs/` 下除本报告与 `.agents/evidence/acceptance/`(新增取证截图)外未动任何文件。

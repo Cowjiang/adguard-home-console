@@ -1,6 +1,6 @@
 # 会话对话历史与事件时间线(2026-09-21)
 
-> 应用户要求,记录本次会话的用户指令原文、assistant 决策与行动、以及所有子 agent 的活动与结局。本文是人与 agent 协作过程的存档;技术细节见各专项日志(TAURI_IOS_LOG / IOS_NATIVE_LOG / IOS_UI_GAP_REPORT / IOS_SESSION_LOG)。
+> 应用户要求,记录本次会话的用户指令原文、assistant 决策与行动、以及所有子 agent 的活动与结局。本文是人与 agent 协作过程的存档;技术细节见各专项日志与报告(`.agents/logs/` 与 `.agents/reviews/`)。
 
 ## 1. 用户指令原文(按时间序)
 
@@ -34,8 +34,8 @@
 | #1 Tauri iOS 首发(agent_6bdf…) | RUST_PLAN Phase 5.5 混合壳 spike | 跑 23 分钟:装好 npm 版 tauri-cli、手动离线装 iOS rust-std(rustup 镜像损坏绕道)、建好 src-tauri 脚手架与日志 §1–2;**因锁屏/验证码实例超时死亡** |
 | #2 SwiftUI 原生(agent_5d97…) | IOS_NATIVE_PLAN N0–N3 | **启动即被用户并发上限杀掉**(限制=1 个后台 agent),改由主 agent 接手 |
 | #3 Tauri 接力(agent_a3b0…) | 从 #1 断点续作 | **完成**:cargo test 11/11 + clippy 绿、api.ts 适配、tauri ios init、system-components 插件(查明 swift-rs 机制)、iPhone 18 Pro 构建运行、4 张截图。关键突破:iOS 27 强制 UIScene 生命周期(tao patch 社区分支)、窗口须显式声明、仓库根 .cargo/config.toml。spike 结论:**混合壳路线成立** |
-| #4 UI 对比(agent_d943…) | Web vs 原生逐页差距 | 完成:实拍 Web 深浅色整套(Playwright+Chromium)+ 26 条差距清单(G1–G26)+ Top5 收敛建议 + 保留原生清单 → `docs/IOS_UI_GAP_REPORT.md` |
-| #5 视觉验收(agent_bc7c…) | 两版 vs Web 正式验收(用户指令 #9) | **完成**:Tauri 96/100 通过;原生 78/100 → R1–R10 第二轮清单 + 无法复刻项 8 条 → `docs/IOS_VISUAL_ACCEPTANCE.md`;补拍 7 张取证截图(shots-accept/) |
+| #4 UI 对比(agent_d943…) | Web vs 原生逐页差距 | 完成:实拍 Web 深浅色整套(Playwright+Chromium)+ 26 条差距清单(G1–G26)+ Top5 收敛建议 + 保留原生清单 → `.agents/reviews/2026-09-21-ios-ui-gap.md` |
+| #5 视觉验收(agent_bc7c…) | 两版 vs Web 正式验收(用户指令 #9) | **完成**:Tauri 96/100 通过;原生 78/100 → R1–R10 第二轮清单 + 无法复刻项 8 条 → `.agents/reviews/2026-09-21-ios-visual-acceptance.md`;补拍 7 张取证截图(.agents/evidence/acceptance/) |
 | #6(主 agent 亲自) | 第二轮施工 R1–R10 | **完成**:环形图/防护卡渐变/状态胶囊/图表轴/过滤器与设置入口组/日志实时徽标/登录 field/查看更多;解码 10/10、UI 测试 2/2、截图重拍 |
 
 ## 4. 事件时间线(要点)
@@ -56,7 +56,7 @@
 
 ## 5. 交付物索引
 
-- 原生线:`ios/`(xcodegen 工程,SwiftUI,Swift 6)→ `docs/IOS_NATIVE_LOG.md`、截图 `docs/shots-native/`
-- Tauri 线:`src-tauri/` + `gen/apple/`(混合壳)→ `docs/TAURI_IOS_LOG.md`、截图 `docs/shots-tauri/`
-- 共享:`scripts/mock-agh.mjs`、`docs/IOS_SESSION_LOG.md`(编排日志)、`docs/IOS_UI_GAP_REPORT.md`(差距报告)、本文件
+- 原生线:`ios/`(xcodegen 工程,SwiftUI,Swift 6)→ `.agents/logs/ios-native.md`、截图 `.agents/evidence/native/`
+- Tauri 线:`src-tauri/` + `gen/apple/`(混合壳)→ `.agents/logs/tauri-ios.md`、截图 `.agents/evidence/tauri/`
+- 共享:`scripts/mock-agh.mjs`、`.agents/logs/orchestration.md`(编排日志)、`.agents/reviews/2026-09-21-ios-ui-gap.md`(差距报告)、本文件
 - 计划文档回填:`docs/IOS_NATIVE_PLAN.md` §4/§7(N0–N3)、`docs/RUST_PLAN.md` §7(Phase 5.5,Tauri 收尾后回填)

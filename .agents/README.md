@@ -1,0 +1,79 @@
+# .agents/
+
+本目录存放供仓库内工作的各类 AI agent 使用的**能力**与**工作产物**。**入口规则在仓库根 `AGENTS.md`**，本文件只说明目录约定。
+
+## 与 docs/ 的分工
+
+| 目录 | 放什么 | 判据 |
+| --- | --- | --- |
+| `docs/` | 常青规格与知识：项目记忆、施工蓝图、交互定稿 | 会被反复读、随代码演进更新 |
+| `.agents/` | agent 能力，以及带时间属性的过程产物：日志、报告、验收、证据 | 一次性产出，记录"当时发生了什么" |
+
+## 布局
+
+```
+.agents/
+├── skills/          Agent Skills 规范（<name>/SKILL.md）
+├── workflows/       预留：后续工作流（约定待定，见下）
+├── logs/            施工日志与会话存档
+├── reviews/         报告 / 验收 / 验证任务书（一次性快照）
+└── evidence/        取证素材（截图等），按来源分 web | native | tauri | acceptance
+```
+
+## 命名规则
+
+一律 `kebab-case` 全小写（与 Agent Skills 对技能名的要求同风格）：
+
+- **流水类**（持续追加的日志）：不带日期前缀，如 `logs/tauri-ios.md`、`logs/orchestration.md`；日期写在文内。
+- **快照类**（一次性产出的报告 / 验收 / 任务书）：前缀 `YYYY-MM-DD-`，如 `reviews/2026-09-21-ios-visual-acceptance.md`。同一天多份靠主题区分。
+- 引用其他文件一律写**仓库根相对路径**（`docs/PROJECT_MEMORY.md`、`.agents/logs/tauri-ios.md`），不要写相对本文件位置的 `../` 路径。
+
+## skills/
+
+遵循 [Agent Skills](https://agentskills.io) 规范，与工具无关——实现该规范的客户端会扫描 `<项目根>/.agents/skills/`。
+
+一个技能 = 一个目录，目录名即技能名，根必须含 `SKILL.md`：
+
+```
+.agents/skills/<name>/
+├── SKILL.md         必需
+└── ...              可选：脚本、参考资料等随技能分发的资源
+```
+
+`SKILL.md` 以 YAML frontmatter 开头，至少要 `name` 和 `description`：
+
+```md
+---
+name: <技能名，与目录名一致>
+description: <做什么 + 什么时候用。agent 只凭这一句决定是否加载>
+---
+
+<正文：命中后才会被读到的详细指令>
+```
+
+写法要点：
+
+- **`description` 决定命中率**。要同时说清「做什么」和「什么场景下用」，agent 平时只看到这一句。
+- **渐进披露**：未命中时只有 `name` + `description` 进入上下文，命中后才加载正文——所以正文可以写长，`description` 要精炼。
+- 随技能分发的脚本/资料放在同目录下，正文里用相对路径引用（相对 `SKILL.md` 所在目录）。
+
+### 本机注意（Mavis 运行时）
+
+Mavis 目前只从 `~/.minimax/skills/`（全局）与 `~/.minimax/agents/<agent>/skills/`（agent 私有）装载技能，**不会扫描项目内的 `.agents/skills/`**。
+
+所以放在这里的目的有两个：**随仓库分发**、**跨工具可移植**。要让本机的 Mavis 实际用上某个技能，需另行安装到上述目录之一。
+
+## workflows/
+
+预留给后续工作流。**目前尚无约定**——第一个工作流落地时在此定稿，并同步更新本节与根 `AGENTS.md`。
+
+## logs/ reviews/ evidence/
+
+- `logs/` — 按线或按会话一份：`tauri-ios.md`（Tauri 壳线）、`ios-native.md`（SwiftUI 原生线）、`orchestration.md`（跨线编排）、`transcript-<日期>.md`（会话存档）。
+- `reviews/` — 报告与验收结论。**结论落地后，仍然有效的规范要回写 `docs/`**——`reviews/` 是当时的判据，不是现状。
+- `evidence/` — 报告引用的原始素材，按来源分目录。新素材用**带来源与用途**的文件名（如 `<端>-<序号>-<页面>-<状态>.png`），避免再次出现"文件名与内容对不上"的情况。
+
+## 维护
+
+- 新增技能或工作流后，同步根 `AGENTS.md` 的「必读文档」，让 agent 知道去哪儿找。
+- 本目录随仓库分发：**勿放机器专属配置、凭据或密钥**（签名值走 `.env.signing`，见 `PROJECT_MEMORY.md` §12）。
