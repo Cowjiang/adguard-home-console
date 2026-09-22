@@ -7,7 +7,7 @@
 
 :root,
 [data-theme='dark'] {
-  /* Jinx 式深色:纯黑底 + 近实色深灰卡片,磨砂只保留给导航/浮层 */
+  /* Jinx 式深色:纯黑底 + 近实色深灰卡片;磨砂只给导航与浮层(浮层用 --glass-pop) */
   --bg: #060608;
   --bg-elevated: #0f1116;
   --ambient-1: rgba(52, 211, 153, 0.07);
@@ -16,6 +16,7 @@
 
   --glass: #121419;
   --glass-strong: #15171d;
+  --glass-pop: rgba(21, 23, 29, 0.72);
   --glass-nav: rgba(40, 42, 50, 0.45);
   --nav-bright: brightness(1.08);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -55,6 +56,7 @@
 
   --glass: rgba(255, 255, 255, 0.72);
   --glass-strong: rgba(255, 255, 255, 0.85);
+  --glass-pop: rgba(255, 255, 255, 0.85);
   --glass-nav: rgba(255, 255, 255, 0.78);
   --glass-border: rgba(15, 23, 42, 0.07);
   --glass-border-strong: rgba(15, 23, 42, 0.12);
@@ -144,18 +146,16 @@ body {
   box-shadow: var(--glass-inset), var(--shadow-card);
 }
 .glass-strong {
-  background: var(--glass-strong);
+  background: var(--glass-pop);
   border: 1px solid var(--glass-border-strong);
   box-shadow: var(--glass-inset), var(--shadow-card);
   backdrop-filter: blur(24px) saturate(1.6);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
 }
 .glass-nav {
   background: var(--glass-nav);
   border: 1px solid var(--glass-border-strong);
   box-shadow: var(--spec-top), var(--shadow-nav);
   backdrop-filter: blur(16px) saturate(1.6) var(--nav-bright, );
-  -webkit-backdrop-filter: blur(16px) saturate(1.6) var(--nav-bright, );
 }
 /* 顶部镜面高光,模拟玻璃折射 */
 .specular::after {
@@ -183,7 +183,6 @@ body {
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.03));
   backdrop-filter: blur(14px) saturate(1.7) brightness(1.12);
-  -webkit-backdrop-filter: blur(14px) saturate(1.7) brightness(1.12);
   box-shadow:
     0 8px 24px -8px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.32),
