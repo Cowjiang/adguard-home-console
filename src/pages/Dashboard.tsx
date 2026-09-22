@@ -6,7 +6,7 @@ import { ArrowDownRight, ArrowUpRight, ChevronDown, Globe, Laptop, ShieldAlert, 
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
 import { AreaChart, BarList, Donut, StatTile } from '../components/charts'
-import { Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect } from '../components/ui'
+import { Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect, TabContent } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
 import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
@@ -47,7 +47,7 @@ export default function Dashboard() {
     refreshInterval: 60000,
   })
   const [range, setRange] = useState<RangeKey>('24h')
-  const pick = usePick({ menuOnMobile: true })
+  const pick = usePick()
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))
@@ -197,7 +197,7 @@ export default function Dashboard() {
               { value: 'clients', label: '活跃客户端' },
             ]}
           />
-          <div className="mt-4">
+          <TabContent value={topTab} className="mt-4">
             {topTab === 'domains' && (
               <>
                 <BarList items={topN(stats.top_queried_domains, 10)} />
@@ -219,12 +219,17 @@ export default function Dashboard() {
               )
             )}
             {topTab === 'clients' && (
-              <BarList
-                items={topN(stats.top_clients, 10).map(([ip, v]) => [clientName(ip), v] as [string, number])}
-                color="var(--accent-2)"
-              />
+              <>
+                <BarList
+                  items={topN(stats.top_clients, 10).map(([ip, v]) => [clientName(ip), v] as [string, number])}
+                  color="var(--accent-2)"
+                />
+                <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/clients')}>
+                  查看更多
+                </Button>
+              </>
             )}
-          </div>
+          </TabContent>
         </Card>
 
         <div className="flex flex-col gap-4">
