@@ -51,14 +51,21 @@ fn enable_back_forward_gestures(app: &tauri::AppHandle) {
     use objc2::runtime::AnyObject;
     use tauri::Manager;
     let Some(win) = app.get_webview_window("main") else {
+        eprintln!("[SWIPE-BACK] get_webview_window(\"main\") = None");
         return;
     };
-    let _ = win.with_webview(move |webview| unsafe {
+    let result = win.with_webview(move |webview| unsafe {
         let wk = webview.inner() as *mut AnyObject;
-        if !wk.is_null() {
-            let _: () = objc2::msg_send![&*wk, setAllowsBackForwardNavigationGestures: true];
+        if wk.is_null() {
+            eprintln!("[SWIPE-BACK] WKWebView inner() = null");
+            return;
         }
+        let _: () = objc2::msg_send![&*wk, setAllowsBackForwardNavigationGestures: true];
+        eprintln!("[SWIPE-BACK] allowsBackForwardNavigationGestures = true (OK)");
     });
+    if let Err(e) = result {
+        eprintln!("[SWIPE-BACK] with_webview failed: {e:?}");
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
