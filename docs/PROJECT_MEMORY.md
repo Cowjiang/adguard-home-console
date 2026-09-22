@@ -46,6 +46,7 @@
 - **浅色**:未动,白色玻璃 + specular 保留
 - `--glass-strong:#15171d`(弹层实色);`--glass-nav: rgba(40,42,50,0.45)` + blur(16) saturate(1.6) + brightness(1.08)(玻璃=透出内容,模糊大了就是磨砂;iOS Safari 无折射滤镜,blur 是上限)
 - 模糊只存在于:标签栏、顶栏、弹层/Toast(**性能红线**:iOS 大面积 backdrop-filter+背景动画会发烫,已把卡片全部改实色,勿回退)
+- **浮层红线(2026-09-23 用户定稿)**:**任何弹窗/浮层一律屏幕居中出现,严禁从底部上升**——iOS 原生 tabbar 会挡住底部浮层。全部弹窗(确认框/表单/详情等)统一走 `ui.tsx` 的 `SheetProvider`,其容器已固定 `items-center`;新增弹层组件必须居中,勿引入 `items-end`/`translateY(60px)` 类底部入场。单选不弹层:苹果设备原生 select、其余自绘锚定下拉。另:弹窗动画靠**双 rAF** 驱动(单 rAF 初始态与首帧合并会闪现无动画),改 SheetProvider 时勿退回单层
 - 长按菜单:**全局禁用**(body user-select:none + -webkit-touch-callout:none,input/textarea 恢复可编辑),复制一律走显式复制按钮
 - `.chart-touch`(图表专用叠加):`touch-action: pan-y`——纵向滑动交还页面滚动(修复移动端图表卡住滚动),横向拖动留给 scrub;触摸端**长按 350ms 唤出数据预览**(震动反馈,移动超 8px 取消判定让位给滚动/scrub);桌面鼠标 hover 不受影响
 
