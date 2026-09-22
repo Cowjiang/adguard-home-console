@@ -45,6 +45,7 @@
 
 - **api.ts(计划内,唯一必改)**:探测 `window.__TAURI_INTERNALS__` → `invoke('agh_fetch', { method, target, authHeader, pathWithQuery, bodyJson })`,把返回的 `{status, content_type, body_text}` 按 fetch 语义归一(`!2xx → ApiError(status, data?.error || …)`;IPC 异常归一为 502)。浏览器路径原样保留,`tsc` 零错。AbortSignal 在 Tauri 分支不支持(SWR 可接受)。
 - **tauri ios init(坑 C)**:`gen/apple` 生成成功,但 cargo-mobile2 依赖探测把 `libimobiledevice` 的 bin 名写死为 `idevicesyslog`,缺失就走 `brew install`(macOS 27 必崩)。绕过:在 PATH 前置 stub `/tmp/tauri-stub-bin/idevicesyslog`(exit 0 的空脚本;仅骗过探测,模拟器链路不使用真机 syslog 工具),xcodegen 用 `/tmp/xcodegen/bin/xcodegen`(并行任务下载的 2.46.0),pod 1.12.1 已在本机。产物:`adguard-home-console.xcodeproj`(bundle id `com.adguardhome.console`)。
+  - **2026-09-23 更正(绕过手段已作废)**:本机 brew 恢复可用,`tauri ios init` 会自行 `brew install` 所需依赖(含 xcodegen 2.46.0 → `/opt/homebrew/bin/xcodegen`),**不需要** `idevicesyslog` stub,也不需要 `/tmp/xcodegen`;两个 /tmp 路径均已随临时目录清理。另:签名与 Bundle ID 现由 `project.yml` 占位符 + `.env.signing` 提供,见 `PROJECT_MEMORY.md` §12。
 - **图标**:`npx tauri icon` 生成全套(见 §3)。
 
 ## 5. 插件 spike:tauri-plugin-system-components(主选,v0.1.8)
