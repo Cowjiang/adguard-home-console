@@ -55,6 +55,7 @@
 - 栏体:胶囊(`rounded-full px-1.5 py-1.5`),`--glass-nav` 中灰磨砂
 - 透镜=两层:外层 `.tab-lens-track`(inline translateX 滑动,**transition 必须挂这层**)+ 内层 `.tab-lens`(白色玻璃药丸,WAAPI 拉伸形变);未选中文字 `text-t1`(深色白字/浅色黑字),选中 `text-accent`
 - 点击动效(WAAPI,当前幅度=用户认可的上一版):bar `scale(1.014,0.99)`,lens `scale(1.07,0.97)` @35%,380/440ms;**用户嫌 1.05/1.35 太夸张,勿加大**
+- 再点当前 tab = 平滑回顶部(定稿 2026-09-22):CSS 栏在 Layout.tsx onClick 判 isActive;原生栏(Tauri iOS)在 nativeTabbar.ts 用 pathnameRef 判 `routeToId`,子页回点还会 navigate 回父级(对齐 iOS 回根);工具 `src/lib/scrollToTop.ts`(reduced-motion 退化瞬时)。验证记录在 feat/ios-build 的 docs/TAURI_IOS_LOG.md §10
 
 ## 6. 页面/路由
 
