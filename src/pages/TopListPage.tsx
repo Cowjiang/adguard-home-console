@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { swrFetcher, type Stats } from '../lib/api'
 import { RankTable } from '../components/charts'
-import { Loading, EmptyState, SearchBar, Card, PageHeader } from '../components/ui'
+import { usePageInClass, Loading, EmptyState, SearchBar, Card, PageHeader } from '../components/ui'
 import { fmtNum } from '../lib/format'
 
 /** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
@@ -23,6 +23,7 @@ const KINDS = {
 } as const
 
 export default function TopListPage() {
+  const pageIn = usePageInClass()
   const { kind } = useParams<{ kind: keyof typeof KINDS }>()
   const { cfg } = useAuth()
   const [search, setSearch] = useState('')
@@ -46,7 +47,7 @@ export default function TopListPage() {
   const totalRequests = items.reduce((s, [, v]) => s + v, 0)
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <PageHeader back title={conf.title} subtitle={`共 ${fmtNum(items.length)} ${conf.unit}${search.trim() ? '(已过滤)' : ''} · ${fmtNum(totalRequests)} 次请求`} />
 
       <div className="mb-3">

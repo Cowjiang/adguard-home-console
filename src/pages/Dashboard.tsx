@@ -6,8 +6,9 @@ import { ArrowDownRight, ArrowUpRight, ChevronDown, Globe, Laptop, ShieldAlert, 
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
 import { AreaChart, BarList, Donut, StatTile } from '../components/charts'
-import { Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect } from '../components/ui'
+import { usePageInClass, Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
+import { useTabJump } from '../lib/navMeta'
 import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
 
@@ -35,8 +36,12 @@ type RangeKey = (typeof RANGE_OPTS)[number]['value']
 const RANGE_PICK_OPTS: { label: string; value: RangeKey }[] = RANGE_OPTS.map((o) => ({ label: o.label, value: o.value }))
 
 export default function Dashboard() {
+  const pageIn = usePageInClass()
   const { cfg, status } = useAuth()
   const nav = useNavigate()
+  // 跨 tab 跳转(tab 根页 → 另一个 tab 根页):replace 不进历史栈(侧滑不可
+  // 跨 tab 返回)+ push 转场动画;层级下钻(如 /top/*)仍用 nav push
+  const jump = useTabJump()
   const [topTab, setTopTab] = useState<'clients' | 'domains' | 'blocked'>('domains')
 
   const { data: stats, error } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
@@ -86,7 +91,7 @@ export default function Dashboard() {
   // 三个分支的根 div 结构一致,React 复用同一节点,切换时不重播 page-in 动画
   if (error && !stats) {
     return (
-      <div className="page-in mx-auto w-full page-shell px-4">
+      <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
         <div className="flex min-h-[55vh] items-center justify-center">
           <Loading text="连接服务器中…" />
         </div>
@@ -95,7 +100,7 @@ export default function Dashboard() {
   }
   if (!stats) {
     return (
-      <div className="page-in mx-auto w-full page-shell px-4">
+      <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
         <DashSkeleton />
       </div>
     )
@@ -110,21 +115,21 @@ export default function Dashboard() {
   const blockedPct = fmtPct(stats.num_blocked_filtering, stats.num_dns_queries)
 
   return (
-    <div className="page-in mx-auto w-full page-shell px-4">
+    <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className="content-in">
         {/* 防护主卡 + 统计块:桌面并排 */}
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
         <div className="grid grid-cols-2 gap-3">
-          <StatTile label="今日查询" value={fmtCompact(stats.num_dns_queries)} sub={`${fmtNum(stats.num_dns_queries)} 次`} onClick={() => nav('/log?filter=all')} />
-          <StatTile label="已拦截" value={fmtCompact(stats.num_blocked_filtering)} sub={`拦截率 ${blockedPct}`} accent="var(--danger)" onClick={() => nav('/log?filter=blocked')} />
+          <StatTile label="今日查询" value={fmtCompact(stats.num_dns_queries)} sub={`${fmtNum(stats.num_dns_queries)} 次`} onClick={() => jump('/log?filter=all')} />
+          <StatTile label="已拦截" value={fmtCompact(stats.num_blocked_filtering)} sub={`拦截率 ${blockedPct}`} accent="var(--danger)" onClick={() => jump('/log?filter=blocked')} />
           <StatTile label="平均耗时" value={fmtMs(stats.avg_processing_time)} sub="单次解析" accent="var(--accent-2)" />
           <StatTile
             label="客户端"
             value={fmtCompact((clients?.clients?.length ?? 0) + (clients?.auto_clients?.length ?? 0))}
             sub={`${clients?.clients?.length ?? 0} 个持久 · ${clients?.auto_clients?.length ?? 0} 个自动`}
             accent="var(--accent-2)"
-            onClick={() => nav('/clients')}
+            onClick={() => jump('/clients')}
           />
         </div>
       </div>
