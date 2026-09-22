@@ -83,6 +83,10 @@
 17. **判定"苹果设备"不能只看 UA**:PC 浏览器设备模拟会伪装 UA 成 iPhone/iPad,`showPicker()` 又在桌面 Chrome 上可用,结果原生选择器弹在隐藏 select(左下角 1px)上,弹层错乱。`isAppleMobile()` 必须双重判定:UA 含 iPhone/iPad(或 Macintosh+多点触控)**且** `navigator.vendor === 'Apple Computer, Inc.'`(模拟不伪装 vendor;iOS 上所有浏览器都是 WebKit,vendor 恒为 Apple)。非苹果/模拟环境一律回自绘锚定下拉。
 18. **`<select>` 的 `showPicker()` 在 WebKit/iOS 上不存在**(2026-09-23 查 MDN browser-compat-data 确认:Safari/safari_ios 为 `preview` 且置于开关后;只有 Chrome 121+/Firefox 122+ 有)。所以**苹果端的原生选择器必须是页面里真实渲染的 `<select>` 覆盖层**(`ui.tsx` 的 `PickSelect`:胶囊 + `absolute inset-0` 透明 select + 免交互图标层),**不能靠 JS 唤起**。`pickViaNativeSelect` 已删除(它在 iOS 上恒返回 false,等于死代码);`usePick` 现在永远走自绘锚定菜单——**新增任何单选项,苹果分支必须自己写 `isAppleMobile() ? <PickSelect/> : usePick`**,漏写就退化成自绘下拉(客户端排序按钮即此坑)。另:同行控件高度别写死(搜索框 15px 字号 × 1.45 行高 + `py-2.5` = 43.75px,曾把排序按钮写 `h-[42px]` 导致上下各差 0.88px),用 `self-stretch` 跟随行高。
 
+19. **Tauri iOS 包的前端是内嵌进二进制的**(2026-09-23 踩坑):WebView 的 origin 是 `tauri://localhost`,而 app bundle 里的 `assets/` 目录是**空的** —— 前端在 cargo 编译期被打进 `libapp.a`(有压缩,`strings` 搜不到页面文案)。所以**改了 `src/` 不重新构建 app,模拟器上跑的还是旧前端**;重新构建 = `rm -rf src-tauri/gen/apple/build` + `touch src-tauri/src/lib.rs`(tauri-build 不监听 dist)+ `./scripts/ios-signing.sh tauri build --debug --target aarch64-sim`(产物 `build/arm64-sim/AGH Console.app`,再用 `xcrun simctl install` 装上)。
+    - **排查"先前修好的问题又复现"先查这一步**:本次实测,模拟器上装的是 04:04 构建的包,而修复提交是 04:19 —— 看到的必然是旧行为(那版里还留着早已从源码删掉的调试 HUD)。判定手法:`xcrun simctl spawn <udid> log show --last 5m --predicate 'process == "AGH Console"' | grep SWIPE-BACK` 看原生日志,或比对二进制 mtime 与提交时间。
+    - 内嵌前端也意味着 `npm run build` + 刷新对 iOS 端**无效**,只有 Web/PWA(8787 托管 dist)吃 HMR/刷新。
+
 ## Git 工作流(2026-09-21 定稿)
 
 - **日常开发一律提交到 `dev` 分支并推送**——dev 的 push **不触发** Release 构建。
@@ -141,12 +145,18 @@
 - **重新生成前的坑(实测)**:target sources 里含 `Externals` 目录,若 `Externals/**/libapp.a`(上次构建产物)在生成时已存在,XcodeGen 会把它当资源加进 Copy Resources,与 preBuildScript 的输出撞车 → `Multiple commands produce .../libapp.a`。故 **xcodegen generate 前必须 `find Externals -name '*.a' -delete`**;`tauri ios build` 本身不重跑 xcodegen,残留只影响"下一次重新生成"。报同错时先清 DerivedData 再试。
 - **brew 不可用时的替代**(如 macOS 版本过新未获支持,任何 brew 命令都崩):XcodeGen 可从 GitHub Release 的 zip 直装二进制;Podfile 无依赖时 pod install 是空操作,可跳过 `generate tauri` 的 pod 步骤、在 `src-tauri/gen/apple` 手动 `xcodegen generate`(签名变量 source `.env.signing`)。
 
-## 13. 路由转场与原生控件(2026-09-23,feat/ios-swipe-back)
+## 13. 路由转场与原生控件(2026-09-23,feat/ios-swipe-back → fix/ios-back-button)
 
-- **WKWebView 对程序化 `history.back()` 无原生动画**(实测:去掉 CSS 转场后是瞬时硬切)。返回按钮的动画必须由 CSS 快照层(`routeTransition.tsx` 的退场克隆)承担,`markBackTap()` 不能省;侧滑手势返回由 WKWebView 原生快照接管,**不要**再叠加 CSS 动画。
-- **滑动转场层必须不透明**:新页容器与旧页快照层若为透明背景,对方页面内容会整个透出(双重曝光,前进穿帮的头号来源)。`index.css` 的 `.rt-page-bg`(body 底色 + `.ambient` 光晕复制)在转场期间挂两层,结束摘除;矮内容页容器转场期加 `minHeight:100dvh`,否则下半屏漏出快照。
-- **入场动画闩要认"方向语义"而非"CSS 转场"**:侧滑手势的 POP 无 CSS 动画,若 page-in 闩不生效,落地页会重播入场动画(`fill-mode: both` 首帧 opacity:0;iOS 手势转场期间动画还可能被挂起不启动 → 整页空白)。实现上 `TransitionCtx.dir`(含手势 POP)与 `exiting`(CSS 转场进行中)解耦,闩读 dir、导航条读 exiting。
-- **原生控件悬浮在 WebView 之上,不参与 CSS 平移**:进入二级页须等转场结束再 `createComponent`(`useTransitionBusy` 忙闲门,等待期让 CSS 胶囊随导航条滑入、结束后同位同尺寸交接),离开二级页立即移除(退场页按钮洞由快照克隆补回);锚点公式见插件 `activateAnchorConstraints`:`safeAreaLayoutGuide + (margin=16)+dx/dy` 双轴同付,对齐 CSS 胶囊用 dx:0/dy:-4/尺寸 36。转场中新页导航条永远拿 IN 动画(拿 OUT 会反向平移再跳回)。
-- **跨 tab 跳转用 `useTabJump`**(lib/navMeta.ts):replace 不进历史栈(侧滑因此天然禁用跨 tab 返回)+ `markNavAnim('push')` 让转场层照常做 push 动画 —— 视觉下钻、栈上平级。tab 间跳转若用 push 会进 WKWebView 历史栈,侧滑就能跨 tab 返回(违背 IOS_SWIPE_BACK_RESEARCH.md §4.3)。
-- **z 层序**:POP 退场快照层 z=50,须盖过固定导航条(body portal z-40),旧页才能连同导航条从新页之上滑走;上限低于 Sheet/Toast。
-- 验证技巧:`routeTransition.tsx` 的 `DURATION_MS` 临时改 3000(vite HMR 即时生效)+ 中途截图即慢动作取证;注意 `cubic-bezier(0.32,0.72,0,1)` 前载严重,40% 时间已完成约 92% 位移,截图要趁早。
+- **WKWebView 对程序化 `history.back()` 无原生动画**(实测:去掉 CSS 转场后是瞬时硬切)。返回按钮的动画必须由 CSS 快照层(`routeTransition.tsx` 的退场克隆)承担,`markBackTap()` 不能省。
+- **WKWebView 同文档侧滑的下层是空的(2026-09-23 逐帧实测,原生手势已被否决)**:手势进行中 WebKit 只渲染空白底(实测为纯 #E3E5EC、无任何内容),松手 commit 后才轮到我们渲染(还有约 300ms 全白窗口),观感就是"原页空白 → 内容忽然出现"。这条路径不受我们控制,**故 `src-tauri/src/lib.rs` 已把 `allowsBackForwardNavigationGestures` 置 false**,侧滑改由前端自研。
+- **自研边缘侧滑(`routeTransition.tsx` 的 `useEdgeSwipe`)**:push 落地时把"来路页面"的克隆按历史条目 idx 存进 `underlays`;左缘 24pt 内起手、横向位移超 10pt 才接管(斜向/纵向让位给滚动;touchmove 里 `preventDefault` 阻止页面滚动);拖拽只改 transform(命令式写内联 style,不经 React 重渲染),下层是真实快照并按 iOS 方式以 -28% 视差跟进;松手才判定(位移 ≥50% 或速度 >0.5pt/ms 提交):
+  - 提交:一次性把真实路由换上来(`consumeGestureCommit` 序号让转场层与原生按钮各读一次),转场层不播关键帧;下层快照与真实页面同像素,切换不可见,滚动位置由既有 POP 逻辑恢复;下层快照必须在这次布局效应里摘掉,否则会留在页面下方(z=0)从后续页面透明区域透出;
+  - 取消:零成本(不动历史、不重挂载),把 transform 收回去即可;
+  - 只对 iOS 壳生效(`__TAURI_INTERNALS__` + `isAppleMobile()`),浏览器/桌面端不被抢;
+  - **`useTabJump`(replace)落地的条目没有可用快照 → 自研侧滑在该条目不接管**(不误返回跨 tab),刻意为之,与 §5 的 tab 语义一致。
+- **滑动转场层必须不透明**:新页容器与旧页快照层若为透明背景,对方页面内容会整个透出(双重曝光,前进穿帮的头号来源)。`index.css` 的 `.rt-page-bg`(body 底色 + `.ambient` 光晕复制)在转场期间挂两层,结束摘除;矮内容页容器转场期加 `minHeight:100dvh`。**侧滑拖拽期间同样要给页面容器挂 `.rt-page-bg`**。
+- **入场动画闩要认"方向语义"而非"CSS 转场"**:无 CSS 动画的 POP(自研侧滑提交)若闩不生效,落地页会重播入场动画(`fill-mode: both` 首帧 opacity:0 → 整页空白)。实现上 `TransitionCtx.dir` 与 `exiting`(CSS 转场进行中)解耦,闩读 dir、导航条读 exiting。
+- **原生控件悬浮在 WebView 之上,不参与 CSS 平移**:转场时用 `appearOffsetX` 复刻导航条行程(前进 = +100vw,返回 = -28vw,时长 0.34s、曲线同 `rt-*`),让按钮**跟着导航条一起滑入** —— 已不再走"等转场结束再 createComponent"(那会出现 CSS 胶囊先到、原生按钮后到的二次出现,用户明确不接受)。插件侧是本地 vendor 版的 `ComponentsOverlay.swift` appearOffsetX 分支;自研侧滑期间按钮整体让位(`useGestureActive`),交给随页滑动的 CSS 胶囊。锚点公式见插件 `activateAnchorConstraints`:`safeAreaLayoutGuide + (margin=16)+dx/dy` 双轴同付,对齐 CSS 胶囊用 dx:0/dy:-8/尺寸 44(实测圆心 device 38,92)。
+- **跨 tab 跳转用 `useTabJump`**(lib/navMeta.ts):replace 不进历史栈 + `markNavAnim('push')` 让转场层照常做 push 动画 —— 视觉下钻、栈上平级。
+- **z 层序**:POP 退场快照层 z=50,须盖过固定导航条(body portal z-40);侧滑下层快照 z=0、页面容器 z=1;上限低于 Sheet/Toast。
+- 验证技巧:`routeTransition.tsx` 的 `DURATION_MS` 临时改 3000(vite HMR 即时生效)+ 中途截图即慢动作取证;注意 `cubic-bezier(0.32,0.72,0,1)` 前载严重,40% 时间已完成约 92% 位移,截图要趁早。模拟器逐帧取证、Device Hub 坐标标定与手势合成见 `.agents/logs/tauri-ios.md` §13。

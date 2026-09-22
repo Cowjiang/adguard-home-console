@@ -25,9 +25,10 @@ import {
   createContext, useContext, useEffect, useLayoutEffect, useRef, useState,
   useSyncExternalStore, type ReactNode,
 } from 'react'
-import { useLocation, useNavigationType, useOutlet } from 'react-router-dom'
-import { consumeBackTap } from './backNav'
+import { useLocation, useNavigate, useNavigationType, useOutlet } from 'react-router-dom'
+import { consumeBackTap, markBackTap } from './backNav'
 import { consumeNavAnim } from './navMeta'
+import { isAppleMobile } from './nativePickers'
 import { TOP_LEVEL_ROUTES } from './routes'
 import { useIsDesktop } from './useIsDesktop'
 
@@ -67,6 +68,265 @@ const TransitionCtx = createContext<TransitionInfo>({ dir: null, exiting: false 
 
 /** 页面内部组件(如 PageHeader、Screen)读取当前转场态 */
 export const useRouteTransition = () => useContext(TransitionCtx)
+
+/* ---------- 边缘侧滑(自研) ----------
+ * WKWebView 的同文档侧滑下层是空的:手势进行中 WebKit 只渲染空白底(实测
+ * 逐帧取证,见 .agents/logs/tauri-ios.md),commit 之后才轮到我们的页面渲染,
+ * 观感就是"原页空白 → 内容忽然出现"。这条路径不受我们控制,故关掉
+ * allowsBackForwardNavigationGestures,改由自身手势驱动:
+ *   1. 每次 push 时把"来路页面"的克隆存进 underlays(按历史条目 idx),
+ *      拖拽开始时把该克隆挂成底层,滑出的上层永远是真实内容;
+ *   2. 拖拽只改 transform(命令式,不经 React),松手才决定是否真地 nav(-1)
+ *      —— 取消时零成本,不重挂载、不回退历史;
+ *   3. 提交时一次性切到真实路由(instant),底层克隆与真实页面像素一致,
+ *      切换不可见。
+ * 只对 iOS 壳生效(浏览器/桌面端有各自的原生历史手势)。 */
+
+interface Underlay {
+  html: string
+  barHtml: string | null
+  y: number
+}
+
+const underlays = new Map<number, Underlay>()
+const UNDERLAY_MAX = 6
+
+const gestureSubs = new Set<() => void>()
+let gestureOn = false
+
+function setGestureOn(v: boolean) {
+  if (v === gestureOn) return
+  gestureOn = v
+  gestureSubs.forEach((f) => f())
+}
+
+/** 侧滑手势进行中(原生返回按钮据此让位给随页滑动的 CSS 胶囊) */
+export function useGestureActive(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      gestureSubs.add(cb)
+      return () => gestureSubs.delete(cb)
+    },
+    () => gestureOn
+  )
+}
+
+/* 侧滑提交(松手判定返回)后,本次导航不做 CSS 关键帧转场:页面在拖拽结束时
+   已经就位,只需要把真实路由换上来。用自增序号让多个消费者各读一次。 */
+let commitSeq = 0
+
+function noteGestureCommit() {
+  commitSeq++
+}
+
+/** 本次路由提交是否来自侧滑提交(每个消费者对一次提交只返回一次 true) */
+export function consumeGestureCommit(seen: { current: number }): boolean {
+  if (seen.current === commitSeq) return false
+  seen.current = commitSeq
+  return true
+}
+
+const EDGE_PX = 24
+const ENGAGE_PX = 10
+const COMMIT_RATIO = 0.5
+const FLICK_V = 0.5
+const PARALLAX = 0.28
+
+/** 自研侧滑只在 iOS 壳内接管:浏览器/桌面有各自的原生历史手势,不该被我们抢 */
+let tauriIOS: boolean | null = null
+function isTauriIOS(): boolean {
+  if (tauriIOS === null) {
+    tauriIOS =
+      typeof window !== 'undefined' &&
+      '__TAURI_INTERNALS__' in window &&
+      isAppleMobile()
+  }
+  return tauriIOS
+}
+
+function trimUnderlays(current: number) {
+  for (const k of [...underlays.keys()]) if (k > current) underlays.delete(k)
+  const keys = [...underlays.keys()].sort((a, b) => a - b)
+  while (keys.length > UNDERLAY_MAX) {
+    const k = keys.shift()
+    if (k !== undefined) underlays.delete(k)
+  }
+}
+
+function setTransform(el: Element | null, p: number, kind: 'page' | 'under') {
+  if (!(el instanceof HTMLElement)) return
+  const x = kind === 'page' ? p * 100 : (p - 1) * PARALLAX * 100
+  el.style.transform = `translate3d(${x}%, 0, 0)`
+}
+
+/** iOS 页面转场曲线 cubic-bezier(0.32,0.72,0,1) */
+function iosCurve(t: number): number {
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    const x = 3 * (1 - mid) * (1 - mid) * mid * 0.32 + 3 * (1 - mid) * mid * mid * 0 + mid * mid * mid
+    if (x < t) lo = mid
+    else hi = mid
+  }
+  const u = (lo + hi) / 2
+  return 3 * (1 - u) * (1 - u) * u * 0.72 + 3 * (1 - u) * u * u * 1 + u * u * u
+}
+
+function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: boolean) {
+  const nav = useNavigate()
+  const [layer, setLayer] = useState<Underlay | null>(null)
+  const navRef = useRef(nav)
+  navRef.current = nav
+  const applyRef = useRef<(p: number) => void>(() => {})
+  const st = useRef({
+    armed: false, on: false, x0: 0, y0: 0, p: 0, lastX: 0, lastT: 0, v: 0,
+    under: null as Underlay | null,
+    els: null as { page: HTMLElement | null; bar: HTMLElement | null; under: HTMLElement | null; underBar: HTMLElement | null } | null,
+    raf: 0,
+  })
+
+  const apply = (p: number) => {
+    const s = st.current
+    if (!s.els || !(s.els.under instanceof HTMLElement)) {
+      s.els = {
+        page: pageRef.current,
+        bar: document.body.querySelector('[data-floating-nav]'),
+        under: document.querySelector('[data-rt-underlay]'),
+        underBar: document.querySelector('[data-rt-underlay-bar]'),
+      }
+    }
+    const e = s.els
+    setTransform(e.page, p, 'page')
+    setTransform(e.bar, p, 'page')
+    setTransform(e.under, p, 'under')
+    setTransform(e.underBar, p, 'under')
+  }
+  applyRef.current = apply
+
+  const teardown = (keepLayer: boolean) => {
+    const s = st.current
+    if (s.raf) cancelAnimationFrame(s.raf)
+    s.raf = 0
+    if (s.els) {
+      for (const el of [s.els.page, s.els.bar]) if (el instanceof HTMLElement) el.style.transform = ''
+    }
+    s.els = null
+    s.on = false
+    s.armed = false
+    s.under = null
+    setGestureOn(false)
+    if (!keepLayer) setLayer(null)
+  }
+
+  const settle = (commit: boolean) => {
+    const s = st.current
+    const target = commit ? 1 : 0
+    const remain = Math.abs(target - s.p)
+    const dur = Math.max(110, 300 * remain)
+    const from = s.p
+    const t0 = performance.now()
+    const step = () => {
+      const t = Math.min(1, (performance.now() - t0) / dur)
+      const p = from + (target - from) * iosCurve(t)
+      s.p = p
+      apply(p)
+      if (t < 1) {
+        s.raf = requestAnimationFrame(step)
+        return
+      }
+      s.raf = 0
+      s.p = target
+      apply(target)
+      if (commit) {
+        // 页面已就位:交给真实路由接管,底层快照与真实页面同像素,切换不可见
+        noteGestureCommit()
+        markBackTap()
+        teardown(true)
+        navRef.current(-1)
+      } else {
+        teardown(false)
+      }
+    }
+    s.raf = requestAnimationFrame(step)
+  }
+
+  useEffect(() => {
+    if (!enabled) return
+    const onStart = (e: TouchEvent) => {
+      const s = st.current
+      if (s.on || s.armed || busy || e.touches.length !== 1) return
+      const t = e.touches[0]
+      if (t.clientX > EDGE_PX) return
+      const u = underlays.get(historyIdx())
+      if (!u) return
+      s.armed = true
+      s.x0 = t.clientX
+      s.y0 = t.clientY
+      s.lastX = t.clientX
+      s.lastT = performance.now()
+      s.v = 0
+      s.p = 0
+      s.under = u
+      s.els = null
+    }
+    const onMove = (e: TouchEvent) => {
+      const s = st.current
+      if (!s.armed || e.touches.length !== 1) return
+      const t = e.touches[0]
+      const dx = t.clientX - s.x0
+      const dy = t.clientY - s.y0
+      if (!s.on) {
+        if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
+          s.armed = false
+          return
+        }
+        if (dx < ENGAGE_PX) return
+        s.on = true
+        setGestureOn(true)
+        setLayer(s.under)
+      }
+      if (e.cancelable) e.preventDefault()
+      const now = performance.now()
+      const dt = now - s.lastT
+      if (dt > 0) s.v = (t.clientX - s.lastX) / dt
+      s.lastX = t.clientX
+      s.lastT = now
+      s.p = Math.min(1, Math.max(0, dx / window.innerWidth))
+      applyRef.current(s.p)
+    }
+    const onEnd = () => {
+      const s = st.current
+      if (!s.armed) return
+      if (!s.on) {
+        s.armed = false
+        return
+      }
+      settle(s.p >= COMMIT_RATIO || s.v > FLICK_V)
+    }
+    window.addEventListener('touchstart', onStart, { passive: true })
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onEnd, { passive: true })
+    window.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onStart)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onEnd)
+      window.removeEventListener('touchcancel', onEnd)
+    }
+  }, [enabled])
+
+  const clear = () => {
+    if (st.current.raf) cancelAnimationFrame(st.current.raf)
+    st.current.raf = 0
+    setGestureOn(false)
+    setLayer(null)
+  }
+
+  return { layer, clear }
+}
+
+
 
 /** 本组件实例挂载时正处于滑动转场 → 跳过入场动画,闩一次性(与 usePageInClass
  *  同语义,供 page-in 之外的入场动画复用:tab-in / content-in 等)。
@@ -110,6 +370,9 @@ export function TransitionArea() {
   const [navDir, setNavDir] = useState<TransitionDir | null>(null)
   const prevKeyRef = useRef(location.key)
   const pageRef = useRef<HTMLDivElement | null>(null)
+  const gestureCommitSeen = useRef(0)
+  const gesture = useEdgeSwipe(pageRef, !isDesktop && isTauriIOS())
+  const gestureLayer = gesture.layer
   // 渲染期捕获(先于 commit):此刻容器里还是旧页面的 DOM
   const captureRef = useRef<{ key: string; html: string; barHtml: string | null; y: number } | null>(null)
 
@@ -178,6 +441,15 @@ export function TransitionArea() {
     const cap = captureRef.current
     captureRef.current = null
 
+    // 来路快照:push 落地后,当前历史条目的"上一层页面"就是本次捕获的旧页,
+    // 自研侧滑靠它渲染下层(WebKit 同文档手势的下层是空的)
+    if (cap && cap.html) {
+      const idx = historyIdx()
+      if (navType === 'PUSH') underlays.set(idx, { html: cap.html, barHtml: cap.barHtml, y: cap.y })
+      else if (navType === 'POP') trimUnderlays(idx)
+      else trimUnderlays(idx - 1)
+    }
+
     // 滚动仲裁必须发生在首帧绘制前:PUSH 回顶,POP 恢复目标条目记忆位置
     if (navType === 'POP') {
       const ry = scrollMem.get(historyIdx()) ?? 0
@@ -188,6 +460,23 @@ export function TransitionArea() {
       window.scrollTo(0, 0)
     }
 
+    // 侧滑提交:页面在拖拽里已经就位(旧页已滑出、目标页已在下层铺满),
+    // 这里只把真实路由换上来,不能再播一遍关键帧转场;下层快照同时摘掉,
+    // 否则它会留在页面下方(z=0)从后续页面的透明区域透出
+    if (consumeGestureCommit(gestureCommitSeen)) {
+      setExit(null)
+      setEnterAnim(null)
+      setBusy(false)
+      setNavDir('pop')
+      const clear = gesture.clear
+      const t = setTimeout(() => {
+        clear()
+        setNavDir(null)
+      }, 80)
+      clear()
+      return () => clearTimeout(t)
+    }
+
     // 方向仲裁:dir = CSS 快照转场方向;跨 tab 跳转(replace + navMeta 标记)
     // 视觉按 push 处理,栈上平级不进历史
     const marked = consumeNavAnim()
@@ -196,8 +485,8 @@ export function TransitionArea() {
     else if (navType === 'POP' && consumeBackTap()) dir = 'pop'
     else if (navType !== 'POP' && marked === 'push') dir = 'push'
 
-    // 滑动转场语义方向:侧滑/前滑手势的 POP(无 backTap 标记)同样算 ——
-    // 原生快照接管动画,page-in 闩据此跳过入场动画
+    // 滑动转场语义方向:无 CSS 动画的 POP(原生手势;自研侧滑提交)同样算,
+    // page-in 闩据此跳过入场动画
     const slideDir: TransitionDir | null = dir ?? (navType === 'POP' ? 'pop' : null)
     setNavDir(slideDir)
 
@@ -234,15 +523,35 @@ export function TransitionArea() {
   return (
     <TransitionCtx.Provider value={{ dir: navDir, exiting: !!exit }}>
       <div className="relative">
+        {gestureLayer && (
+          <div
+            data-rt-underlay
+            aria-hidden
+            className="rt-page-bg"
+            style={{
+              position: 'fixed',
+              left: 0,
+              right: 0,
+              top: 0,
+              height: '100dvh',
+              zIndex: 0,
+              overflow: 'hidden',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ position: 'absolute', left: 0, right: 0, top: -gestureLayer.y }} dangerouslySetInnerHTML={{ __html: gestureLayer.html }} />
+            {gestureLayer.barHtml && <div data-rt-underlay-bar dangerouslySetInnerHTML={{ __html: gestureLayer.barHtml }} />}
+          </div>
+        )}
         <div
           ref={pageRef}
-          className={enterAnim ? `${enterAnim} rt-page-bg` : undefined}
+          className={enterAnim ? `${enterAnim} rt-page-bg` : gestureLayer ? 'rt-page-bg' : undefined}
           style={{
             position: 'relative',
             // 转场层不透明化后必须盖满视口:矮内容页(如规则编辑)容器高度不足,
-            // 下半屏会透出退场快照
-            minHeight: enterAnim ? '100dvh' : undefined,
-            zIndex: enterAnim?.startsWith('rt-push') ? 10 : 0,
+            // 下半屏会透出退场快照/侧滑下层
+            minHeight: enterAnim || gestureLayer ? '100dvh' : undefined,
+            zIndex: enterAnim?.startsWith('rt-push') ? 10 : gestureLayer ? 1 : 0,
           }}
         >
           {outlet}
