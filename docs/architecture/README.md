@@ -1,14 +1,17 @@
 # 架构
 
-本目录记录当前代码库的结构与接缝：系统由哪几条交付线组成、请求怎么走、模块怎么分工、产物怎么构建与部署。AGH 契约见 `docs/AGH_API.md`，Web 交互约定见 `docs/WEB_INTERACTION.md`，平台坑位与签名见 `docs/NATIVE_PLATFORMS.md`，实现约束与验证命令见 `docs/ENGINEERING.md`。
+**Status:** current
+**Updated:** 2026-09-23
+
+本目录记录当前代码库的结构与接缝：系统由哪几条交付线组成、请求怎么走、模块怎么分工、产物怎么构建与部署。AGH 契约见 `docs/agh-api.md`，Web 交互约定见 `docs/web-interaction.md`，平台坑位与签名见 `docs/native-platforms.md`，实现约束与验证命令见 `docs/engineering.md`。
 
 | 页 | 内容 |
 | --- | --- |
-| [Web/PWA 运行时](WEB_RUNTIME.md) | Express 进程、路由、AGH 代理语义、开发与生产形态 |
-| [React 前端](FRONTEND.md) | 入口、路由表、状态与配置、API 客户端、页面与组件划分 |
-| [Tauri 壳](TAURI_SHELL.md) | Rust 命令面、权限、平台插件、与 Web 前端的接缝 |
-| [SwiftUI iOS 应用](IOS_APP.md) | 原生应用结构、网络层、状态与工程生成 |
-| [构建与发布](BUILD_AND_RELEASE.md) | 构建产物、release 工作流、部署与回滚 |
+| [Web/PWA 运行时](web-runtime.md) | Express 进程、路由、AGH 代理语义、开发与生产形态 |
+| [React 前端](frontend.md) | 入口、路由表、状态与配置、API 客户端、页面与组件划分 |
+| [Tauri 壳](tauri-shell.md) | Rust 命令面、权限、平台插件、与 Web 前端的接缝 |
+| [SwiftUI iOS 应用](ios-app.md) | 原生应用结构、网络层、状态与工程生成 |
+| [构建与发布](build-and-release.md) | 构建产物、release 工作流、部署与回滚 |
 
 ## 交付线
 
@@ -24,6 +27,6 @@ AGH 不返回浏览器需要的 CORS 头，Web/PWA 的同源代理是必需品�
 
 - AGH 是唯一数据源：本仓没有自建数据库、没有服务端会话，读写都落到 AGH。
 - 浏览器与壳内只存连接配置与外观偏好，服务器端只读环境变量与仓库根 `.env`。
-- 连接配置的存储键、登录流程与首帧主题引导见 [React 前端](FRONTEND.md)。
+- 连接配置的存储键、登录流程与首帧主题引导见 [React 前端](frontend.md)。
 
 本目录只写结构与接缝，随代码更新；实现细节的取舍与踩坑留在对应主题页，不在这里重复。

@@ -1,5 +1,8 @@
 # Web 端布局与交互约定
 
+**Status:** current
+**Updated:** 2026-09-23
+
 ## 视觉与响应式结构
 
 - 移动端为四个 Tab：`/` 概览、`/protection` 过滤器、`/log` 日志、`/settings` 设置。`/protection` 保留旧 URL，客户端由概览入口进入。
