@@ -29,7 +29,7 @@ import { useLocation, useNavigate, useNavigationType, useOutlet } from 'react-ro
 import { consumeBackTap, markBackTap } from './backNav'
 import { consumeNavAnim } from './navMeta'
 import { isAppleMobile } from './nativePickers'
-import { TOP_LEVEL_ROUTES } from './routes'
+import { TAB_ROOT_ROUTES } from './routes'
 import { useIsDesktop } from './useIsDesktop'
 
 export type TransitionDir = 'push' | 'pop'
@@ -487,7 +487,7 @@ export function TransitionArea() {
     // 视觉按 push 处理,栈上平级不进历史
     const marked = consumeNavAnim()
     let dir: TransitionDir | null = null
-    if (navType === 'PUSH' && !TOP_LEVEL_ROUTES.includes(location.pathname)) dir = 'push'
+    if (navType === 'PUSH' && !TAB_ROOT_ROUTES.includes(location.pathname)) dir = 'push'
     else if (navType === 'POP' && consumeBackTap()) dir = 'pop'
     else if (navType !== 'POP' && marked === 'push') dir = 'push'
 

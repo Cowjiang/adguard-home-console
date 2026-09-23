@@ -132,7 +132,7 @@ export default function Dashboard() {
             value={fmtCompact((clients?.clients?.length ?? 0) + (clients?.auto_clients?.length ?? 0))}
             sub={`${clients?.clients?.length ?? 0} 个持久 · ${clients?.auto_clients?.length ?? 0} 个自动`}
             accent="var(--accent-2)"
-            onClick={() => jump('/clients')}
+            onClick={() => nav('/clients')}
           />
         </div>
       </div>

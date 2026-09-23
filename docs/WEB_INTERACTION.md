@@ -29,5 +29,6 @@
 ## 路由与转场
 
 - Tab 之间的程序化跳转使用 `useTabJump`：以 `replace` 保持历史栈的层级语义，同时可以播放前进动画。层级下钻使用 `push`。
+- 「顶级路由」分两个概念：移动端 tab 根（`src/lib/routes.ts` 的 `TAB_ROOT_ROUTES`，4 个 tab）与桌面侧边栏根（`TOP_LEVEL_ROUTES`）。`/clients`、`/stats` 只是桌面根，移动端按二级页处理：push 进入、有原生返回按钮与侧滑返回、顶部状态条不显示。
 - WKWebView 侧滑返回使用原生历史快照；程序化返回由 `src/lib/routeTransition.tsx` 的 CSS 快照层负责。转场中的新旧页面层必须不透明，相关样式为 `.rt-page-bg`。
-- 原生返回按钮悬浮在 WebView 之上；进入子页时需等 CSS 转场结束再创建，离开时立即移除。实现见 `src/lib/nativeBackButton.ts`。
+- 原生返回按钮悬浮在 WebView 之上；创建时用 `appearOffsetX` 随导航条一起滑入（不额外等转场结束），侧滑手势期间让位给随页滑动的 CSS 胶囊。实现见 `src/lib/nativeBackButton.ts`。
