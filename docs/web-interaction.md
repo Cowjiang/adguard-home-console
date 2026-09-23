@@ -36,3 +36,4 @@
 - WKWebView 侧滑返回使用原生历史快照；程序化返回由 `src/lib/routeTransition.tsx` 的 CSS 快照层负责。转场中的新旧页面层必须不透明，相关样式为 `.rt-page-bg`。
 - 移动端返回统一走 `src/lib/backNav.ts` 的 `navBack`：有历史条目就 POP，栈空（直落子页/刷新）才 replace 回父级。返回胶囊、原生按钮与表单保存/删除收尾共用它；**不得用 replace 导航到父级列表页**——那会在栈里留下重复条目，浏览器按一次返回等于没动（客户端表单保存曾如此）。
 - 原生返回按钮悬浮在 WebView 之上；创建时用 `appearOffsetX` 随导航条一起滑入（不额外等转场结束），侧滑手势期间让位给随页滑动的 CSS 胶囊。实现见 `src/lib/nativeBackButton.ts`。
+- 顶栏右侧操作按钮（`PageHeader` 的 `right` 槽位）统一用 `HeaderAction`（图标按钮补 `w-11`）或 `Button size="header"`：移动端 `h-11`，与返回胶囊同高（44pt 最小可点面积）；桌面端回到 `h-10` / 与 `sm` 一致的 `h-8`。tab 根页面没有悬浮顶栏与返回按钮，其内容头部按钮不受此约定约束。

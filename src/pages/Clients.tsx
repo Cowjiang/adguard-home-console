@@ -14,7 +14,7 @@ import { ClientDetail, kvCount, type ClientDetailData } from '../components/Clie
 import { fmtNum } from '../lib/format'
 import { isAppleMobile } from '../lib/nativePickers'
 import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
+  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
   Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge,
   SourceBadge, Pagination, usePick, PickSelect,
 } from '../components/ui'
@@ -283,9 +283,9 @@ export default function Clients() {
         title="客户端"
         subtitle={`${clients.length} 个持久 · ${autos.length} 个自动识别`}
         right={
-          <button onClick={() => openForm(null)} className="press glass flex h-10 w-10 items-center justify-center rounded-full text-accent" aria-label="添加客户端">
+          <HeaderAction onClick={() => openForm(null)} label="添加客户端" className="w-11 text-accent lg:w-10">
             <Plus size={19} />
-          </button>
+          </HeaderAction>
         }
       />
 
