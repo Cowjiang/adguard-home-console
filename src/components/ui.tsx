@@ -567,7 +567,9 @@ export function PickSelect<T extends string | number>({
   const current = value != null ? String(value) : (placeholder ?? '')
   return (
     <select
-      className={`appearance-none outline-none ${className ?? ''}`}
+      // overflow-hidden:WebKit 会把 <option> 按文字宽度真实布局,长选项(如「请求数从多到少」)
+      // 溢出这个被压到 56pt 的覆盖层并把整个文档撑宽,页面因此能左右拖动
+      className={`appearance-none outline-none overflow-hidden ${className ?? ''}`}
       style={{ WebkitTapHighlightColor: 'transparent' }}
       aria-label={ariaLabel}
       value={current}

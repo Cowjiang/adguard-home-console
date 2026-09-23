@@ -323,3 +323,12 @@
 - 改法:把「有历史条目就 POP(带 backNav 标记)、栈空才 replace 回父级」抽成 `src/lib/backNav.ts` 的 `navBack(nav, pathname)`,返回胶囊(`ui.tsx`)、原生按钮(`nativeBackButton.ts`)、表单保存/取消、详情删除收尾共用一个实现,三处重复的内联逻辑一并消除。
 - 边界:桌面端添加/编辑与详情走居中弹层(`Clients.openForm`/`openDetail` 的 isDesktop 分支),不经过这两个页面路由,行为不变;`ClientFormPage`/`ClientDetailPage` 的深链场景由 `navBack` 的栈空分支兜底。
 - 验收:`npm run check` / `npm run build` 绿;模拟器包已重建安装(iPhone 18 Pro),等用户复测保存返回与浏览器返回。
+
+## 15. 客户端页可左右拖动:原生 select 的 option 撑宽文档(2026-09-24)
+
+用户报「客户端页内容可以左右滑动,貌似页面宽度溢出了」。Chromium 里量不到(含长数据桩、402/390 两档宽度均无溢出),换 **playwright WebKit + iPhone UA** 复现:文档 `scrollWidth` 433 > 视口 402,但**没有任何元素 rect 越界**——常规 `getBoundingClientRect` 排查是失效的。
+
+- 定位手法:逐个元素 `display:none` 后看 `document.scrollingElement.scrollWidth` 是否回落。元凶是客户端页排序控件的原生 `<select>` 覆盖层(`PickSelect`,苹果分支):WebKit 把 `<option>` 当真实盒子按文字宽度布局,「请求数从多到少」比 56pt 的控件宽出 31px,且不被裁剪 → 溢出冒泡到文档。概览/防护/设置页的 PickSelect 也同源,只是那些控件较宽、选项未越界,所以只有客户端页暴露。
+- 修法:`PickSelect` 的 `<select>` 加 `overflow-hidden`(组件单点);实测 `select{overflow:hidden}` 与「外层 span 裁剪」都能把文档宽度收回 402,只给 `option` 加 ellipsis 无效。
+- 验收:WebKit 实测 `/clients` 402/402;13 条移动端路由全部 over=0;控件尺寸与位置逐点不变;`.field` 可见选择器即使塞超长 option 也不撑宽(无需改)。`npm run check`/`npm run build` 绿;模拟器包已重建安装。
+- 待用户复测:排序钮点击仍能唤出系统选择器(`overflow-hidden` 不改可点性,但只有模拟器能验证原生 picker)。平台事实记入 `docs/engineering.md`,提案 `.agents/pipelines/proposals/bug-fix/2026-09-24-native-select-doc-overflow.md`。
