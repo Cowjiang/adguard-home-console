@@ -22,7 +22,7 @@ export default function QueryLog() {
   const isDesktop = useIsDesktop()
   const nav = useNavigate()
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   // ?q= 预填搜索(客户端详情页"查看查询记录"跳入)
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
@@ -38,6 +38,29 @@ export default function QueryLog() {
     const t = setTimeout(() => setDebounced(search.trim()), 350)
     return () => clearTimeout(t)
   }, [search])
+
+  /**
+   * 筛选与搜索是页内状态:同步进 URL,但用 replace 不压历史栈(与 tab 切换同一约定)。
+   * 否则从日志详情返回或刷新时,组件按进入本页时的旧 ?filter= 重建,筛选会被拽回去。
+   */
+  const syncUrl = useCallback(
+    (next: { filter?: string; q?: string }) => {
+      setSearchParams((prev) => {
+        const p = new URLSearchParams(prev)
+        for (const [k, v] of Object.entries(next)) {
+          if (v) p.set(k, v)
+          else p.delete(k)
+        }
+        return p
+      }, { replace: true })
+    },
+    [setSearchParams]
+  )
+
+  const pickFilter = (key: string) => {
+    setFilterKey(key)
+    syncUrl({ filter: key })
+  }
 
   const reasons = LOG_FILTERS.find((f) => f.key === filterKey)?.reasons
   const basePath = '/querylog' + qs({
@@ -175,11 +198,15 @@ export default function QueryLog() {
 
       <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="lg:w-96 lg:flex-none">
-          <SearchBar value={search} onChange={setSearch} placeholder="搜索域名或客户端…" />
+          <SearchBar
+            value={search}
+            onChange={(v) => { setSearch(v); syncUrl({ q: v.trim() }) }}
+            placeholder="搜索域名或客户端…"
+          />
         </div>
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0 lg:pb-0">
           {LOG_FILTERS.map((f) => (
-            <Chip key={f.key} active={filterKey === f.key} onClick={() => setFilterKey(f.key)}>
+            <Chip key={f.key} active={filterKey === f.key} onClick={() => pickFilter(f.key)}>
               {f.label}
             </Chip>
           ))}
