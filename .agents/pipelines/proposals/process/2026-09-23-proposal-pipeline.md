@@ -28,3 +28,5 @@
 ## Note
 
 轨道规则与模板见 `.agents/pipelines/WORKFLOW.md`，分类见 `CLASSIFICATION.md`。本提案与流水线同批落地，属事后登记；此后 Noted 轨的变更应在动手前登记。
+
+2026-09-23：本提案中关于 `docs/*_PLAN.md` 继续承载跨变更蓝图的决定，已由 `.agents/pipelines/proposals/process/2026-09-23-separate-durable-docs.md` 更新；现行边界以 `.agents/pipelines/WORKFLOW.md` 为准。

@@ -15,9 +15,10 @@
 | 日期 | Class | 提案 | 状态 |
 | --- | --- | --- | --- |
 | 2026-09-23 | process | [提案流水线与轨道规则](proposals/process/2026-09-23-proposal-pipeline.md) | implemented |
+| 2026-09-23 | process | [拆分 docs 中的持久事实与工作过程](proposals/process/2026-09-23-separate-durable-docs.md) | implemented |
 
 ## 与 docs/ 的分工
 
-- `docs/*_PLAN.md` — 长期蓝图与阶段划分，跨多次变更，随代码演进更新。
+- `docs/` — 当前代码库的持久事实，入口见 `docs/README.md`。
 - 本目录 — 单个可独立交付变更的决策与验收（Accept 清单）。
-- `.agents/logs/`、`.agents/reviews/` — 施工日志与验收报告，记录"当时发生了什么"。
+- `.agents/logs/`、`.agents/reviews/` — 施工日志、旧计划快照与验收报告，记录"当时发生了什么"；旧阶段表不是当前待办。
