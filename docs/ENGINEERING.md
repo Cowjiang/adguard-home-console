@@ -16,6 +16,12 @@
 - 首屏加载与正常内容共用稳定的根节点，避免数据抵达时重挂载并重播页面入场动画。概览骨架与内容的淡入由 `content-in` 负责。
 - 当前 `server/index.mjs` 的 `express.static` 设置了一小时资源缓存；改动 HTML 缓存策略时需单独检查 `/index.html` 是否被静态中间件先拦截。
 
+## 发布
+
+- 推送 `main` 触发 `.github/workflows/release.yml`：构建后把 `dist/`、`server/`、`package.json` 打包为 `agh-console.tar.gz`，发布为 tag `v0.1.0-dev.<YYYYMMDD>.<短 sha>` 的 Release。纯 `docs/**`、`.agents/**`、`**.md` 推送由 `paths-ignore` 跳过，也可用 `workflow_dispatch` 手动触发。
+- Release 说明由 `scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag，再回退到最近 20 个提交。
+- Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线。同一提交重复运行会跳过创建，保持幂等。
+
 ## 验证入口
 
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
