@@ -340,3 +340,11 @@
 - 改法:`ui.tsx` 新增 `HeaderAction` 组件(移动 `h-11`/桌面 `lg:h-10`,图标按钮补 `w-11`)与 `Button` 的 `size="header"`(移动 `h-11 px-4`、桌面回落 `lg:h-8 lg:px-3.5`),7 个调用点全部改走统一入口,不再手写尺寸。
 - 桌面端本次刻意不动:实测 1280pt 下添加/更新仍 40pt、保存仍 32pt,与改动前逐点一致。tab 根页面(无悬浮顶栏与返回按钮)的内容头部按钮不在此约定内。
 - 验收:移动端 402pt(WebKit + iPhone UA)8 条路由右侧按钮实测 44pt = 返回胶囊;`npm run check` / `npm run build` 绿;模拟器包已重建安装。约定记入 `docs/web-interaction.md`,提案 `.agents/pipelines/proposals/bug-fix/2026-09-24-header-action-height.md`。
+
+## 17. 日志页筛选被旧 URL 拽回(2026-09-24)
+
+用户报「点已拦截进日志页 → 筛选器点全部 → 点一条日志 → 返回上一页 → 被强制回到已拦截的筛选器」。根因:`QueryLog` 的 `?filter=` / `?q=` 只在挂载时读一次,切筛选只改本地 state,**URL 一直停在进入本页时的旧值**(playwright 复现:界面已显示全部,URL 仍是 `?filter=blocked`)。于是任何重建本页的动作(进日志详情再返回、刷新、前后退)都按旧 URL 恢复筛选,把用户刚切走的筛选拽回来。
+
+- 改法:`QueryLog` 加 `syncUrl()`,筛选与搜索都用 `setSearchParams(..., { replace: true })` 同步进 URL——页内状态切换不压历史栈(与 tab 切换同一约定),但 URL 必须反映当前值。搜索沿用既有 `?q=`(客户端详情「查看查询记录」的预填参数),预填与当前值合一。
+- 验收(临时 playwright 探针,未入库):桌面 1280 → 点全部后 URL 变 `?filter=all`,刷新保持;搜索写 `?q=google` 且刷新保持。移动 402(WebKit) → 进 `/log/detail` 再返回,筛选停在全部(修复前为已拦截)。`npm run check`/`npm run build` 绿。
+- 约定记入 `docs/web-interaction.md`,提案 `.agents/pipelines/proposals/bug-fix/2026-09-24-log-filter-url-sync.md`。
