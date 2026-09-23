@@ -1,5 +1,8 @@
 # AdGuard Home v0.107.79 API 契约
 
+**Status:** current
+**Updated:** 2026-09-23
+
 本项目按 AGH v0.107.79 的 `/control/*` 契约实现。类型与调用点在 `src/lib/api.ts`；可执行模拟在 `scripts/mock-agh.mjs`。`_probe/` 中的 OpenAPI 与真实响应样本是本机探查材料，被 Git 忽略，克隆后不能假定存在。
 
 | 领域 | 当前契约 |

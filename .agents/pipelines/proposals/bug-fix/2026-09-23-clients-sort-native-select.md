@@ -25,4 +25,4 @@
 
 ## Note
 
-验证环境：playwright + Chrome 390×844，dist/8787 + mock AGH 3990；苹果环境以伪造 UA + `navigator.vendor='Apple Computer, Inc.'` 模拟，真机点击仍待用户确认。`showPicker()` 在 WebKit 不存在的依据：MDN browser-compat-data（Safari/safari_ios 为 `preview` 且置于开关后），以及 `.agents/logs/tauri-ios.md` §9.1 在 iOS 27 模拟器上的既有实测。细节见 `docs/PC_ADAPTATION.md` 同名小节与 `docs/PROJECT_MEMORY.md` §7 坑 18。
+验证环境：playwright + Chrome 390×844，dist/8787 + mock AGH 3990；苹果环境以伪造 UA + `navigator.vendor='Apple Computer, Inc.'` 模拟，真机点击仍待用户确认。`showPicker()` 在 WebKit 不存在的依据：MDN browser-compat-data（Safari/safari_ios 为 `preview` 且置于开关后），以及 `.agents/logs/tauri-ios.md` §9.1 在 iOS 27 模拟器上的既有实测。细节见 `.agents/reviews/2026-09-23-desktop-adaptation-snapshot.md` 的同名小节与 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §7 坑 18。
