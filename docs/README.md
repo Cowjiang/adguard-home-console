@@ -1,18 +1,23 @@
 # 代码库事实
 
-`docs/` 记录当前代码与已定下的持久约定。改动实现时同步修正对应事实页；日期化的方案、调研、交接、验证和施工记录放在 `.agents/`。本目录不承担待办队列。
+**Status:** current
+**Updated:** 2026-09-23
 
-| 主题 | 文档 | 主要代码来源 |
+`docs/` 记录当前代码与已定下的持久约定。本页只管本层：列出有哪些主题、入口在哪、怎么维护；点进入口再按需往下读，实现变化时同步修正事实页。本目录不承担待办队列。
+
+| 主题 | 入口 | 内容 |
 | --- | --- | --- |
-| 三条交付线与请求路径 | [架构](ARCHITECTURE.md) | `src/App.tsx`、`src/lib/api.ts`、`server/index.mjs` |
-| AdGuard Home v0.107.79 契约 | [API 契约](AGH_API.md) | `src/lib/api.ts`、`scripts/mock-agh.mjs` |
-| Web 端布局与交互 | [交互约定](WEB_INTERACTION.md) | `src/components/`、`src/pages/`、`src/index.css` |
-| Tauri 与 SwiftUI | [原生平台](NATIVE_PLATFORMS.md) | `src-tauri/`、`ios/`、`scripts/ios-signing.sh` |
-| 当前实现的工程约束 | [工程约束](ENGINEERING.md) | `src/`、`server/`、`AGENTS.md` |
+| 结构与接缝 | [architecture/README.md](architecture/README.md) | 三条交付线、请求路径、各端结构与构建发布；该目录自成一册，页面不在此展开 |
+| AdGuard Home v0.107.79 契约 | [agh-api.md](agh-api.md) | `/control/*` 的字段、单位与枚举 |
+| Web 端布局与交互 | [web-interaction.md](web-interaction.md) | 响应式结构、弹层与选择器、页面行为、路由转场 |
+| 原生平台 | [native-platforms.md](native-platforms.md) | Tauri 与 SwiftUI 两条原生线的现状、签名与工程生成 |
+| 工程约束 | [engineering.md](engineering.md) | 实现边界、发布流程、验证入口 |
 
-工作登记与历史：
+子目录以自己的 `README.md` 作为入口，本页不展开其下的页面；每个页面各自给出代码入口与元信息。需要提案、技能、施工历史或验收证据时，从 `.agents/README.md` 进入。
 
-- 当前提案和轨道规则：`.agents/pipelines/README.md`、`.agents/pipelines/WORKFLOW.md`。
-- 施工日志：`.agents/logs/`；一次性的方案、调研与验收快照：`.agents/reviews/`。
-- 截图证据：本地 `.agents/evidence/`，被 Git 忽略；历史提交仍可从 Git 找回。
-- 2026-09-23 迁移前的混合文档保存在 `.agents/reviews/2026-09-23-*-snapshot.md` 等同日快照中。它们记录当时状态，不作为当前事实来源。
+## 维护约定
+
+- 文件名用小写 kebab-case；目录索引固定为 `README.md`。
+- 每页标题下写两行元信息：`**Status:**` 与 `**Updated:**`（最后核对日期，`YYYY-MM-DD`）。
+- `Status` 取值：`current` 已对照代码核实；`stale` 已知与代码不一致、待核对；`draft` 尚未核实。
+- 改动事实页时同步更新 `Updated`；发现内容与代码不符，先把 `Status` 改成 `stale`，再核对修正。
