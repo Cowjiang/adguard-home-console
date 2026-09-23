@@ -14,12 +14,14 @@
 - 新建 `docs/architecture/`，入口为 `docs/architecture/README.md`；原 `ARCHITECTURE.md` 删除，引用它的 `docs/README.md` 与 `docs/native-platforms.md` 改指新入口。
 - 页面划分：`README.md`（交付线、状态归属与页索引）、`web-runtime.md`（Express 与开发/生产运行）、`frontend.md`（React 应用结构）、`tauri-shell.md`、`ios-app.md`、`build-and-release.md`；文件名遵循 `docs/README.md` 的小写 kebab-case 约定。
 - 边界：架构目录只写结构与接缝；AGH 契约留在 `agh-api.md`，交互约定留在 `web-interaction.md`，平台坑位与签名留在 `native-platforms.md`，实现约束与验证命令留在 `engineering.md`。
+- 索引分层：`docs/README.md` 只写本层主题与入口，子目录以自己的 `README.md` 作入口；目录内页面清单与各页代码入口不在上一层展开。
 - 目录索引以根 `AGENTS.md` 的一行职责为路由面，架构页不重复路径清单。
 - 纯文档变更，不动产品代码。
 
 ## Accept
 
-- [x] 从 `docs/README.md` 能按主题定位到 `docs/architecture/` 的具体页
+- [x] 从 `docs/README.md` 能按主题定位到 `docs/architecture/` 的入口，再由该入口定位到具体页
+- [x] `docs/README.md` 不出现子目录页面清单与代码来源
 - [x] 每页主题单一，页面之间不重复同一份事实
 - [x] 关键结论附源码出处（文件级路径），与代码一致
 - [x] 原 `ARCHITECTURE.md` 的引用全部改指新页，无死链
