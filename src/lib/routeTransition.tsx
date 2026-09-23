@@ -83,9 +83,36 @@ export const useRouteTransition = () => useContext(TransitionCtx)
  * 只对 iOS 壳生效(浏览器/桌面端有各自的原生历史手势)。 */
 
 interface Underlay {
-  html: string
-  barHtml: string | null
+  node: HTMLElement
+  barNode: HTMLElement | null
   y: number
+}
+
+/** 页面快照:cloneNode 直挂真实 DOM 节点。不能走 innerHTML 序列化再解析 ——
+ *  HTML 解析器不允许 button 嵌套 button(可点行内含开关按钮),解析后里层
+ *  按钮会被拆成兄弟节点,整行布局塌掉(开关"换行"到行下左侧)。 */
+function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null {
+  const live = pageRef.current
+  if (!live) return null
+  const node = live.cloneNode(true) as HTMLElement
+  node.querySelectorAll('.page-in,.content-in,.tab-in,.rise-in,.log-flash').forEach((el) => {
+    el.classList.remove('page-in', 'content-in', 'tab-in', 'rise-in', 'log-flash')
+  })
+  const bar = document.body.querySelector('[data-floating-nav]')
+  let barNode: HTMLElement | null = null
+  if (bar instanceof HTMLElement) {
+    barNode = bar.cloneNode(true) as HTMLElement
+    const backBtn = barNode.querySelector('[data-back-btn]')
+    if (backBtn instanceof HTMLElement) backBtn.style.visibility = 'visible'
+  }
+  return { node, barNode, y: Math.max(0, Math.round(window.scrollY)) }
+}
+
+/** 把快照节点挂进 React 渲染的空壳层(ref 每次提交都会跑,replaceChildren 幂等) */
+function attachNode(node: Node) {
+  return (el: HTMLDivElement | null) => {
+    if (el) el.replaceChildren(node)
+  }
 }
 
 const underlays = new Map<number, Underlay>()
@@ -130,7 +157,10 @@ const EDGE_PX = 24
 const ENGAGE_PX = 10
 const COMMIT_RATIO = 0.5
 const FLICK_V = 0.5
-const PARALLAX = 0.28
+/** 下层快照视差。取 0:拖拽是"按住可审视"的中间态,下层必须与返回落地后的
+ *  页面逐像素一致(行内的开关等右缘控件才不会先被盖住、又整体偏移地出现)。
+ *  这也与 UIKit 交互式返回一致 —— 揭示页停在终位,只有上层滑走。 */
+const PARALLAX = 0
 
 /** 自研侧滑只在 iOS 壳内接管:浏览器/桌面有各自的原生历史手势,不该被我们抢 */
 let tauriIOS: boolean | null = null
@@ -204,7 +234,10 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
   }
   applyRef.current = apply
 
-  const teardown = (keepLayer: boolean) => {
+  /** 收尾:摘 transform、卸下层快照、结束手势态。取消路径直接调;提交路径
+   *  必须等真实路由提交后的布局效应再调 —— 若在 nav(-1) 之前清 transform,
+   *  React 提交前的几帧会把子页整屏弹回 translate 0,盖在下层快照上(闪帧) */
+  const clear = () => {
     const s = st.current
     if (s.raf) cancelAnimationFrame(s.raf)
     s.raf = 0
@@ -216,7 +249,7 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
     s.armed = false
     s.under = null
     setGestureOn(false)
-    if (!keepLayer) setLayer(null)
+    setLayer(null)
   }
 
   const settle = (commit: boolean) => {
@@ -239,13 +272,13 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
       s.p = target
       apply(target)
       if (commit) {
-        // 页面已就位:交给真实路由接管,底层快照与真实页面同像素,切换不可见
+        // 页面已拖到就位:保持现状(子页在 100% 外、下层快照铺满),等真实
+        // 路由提交后由转场层布局效应统一收尾;这里绝不能先摘 transform
         noteGestureCommit()
         markBackTap()
-        teardown(true)
         navRef.current(-1)
       } else {
-        teardown(false)
+        clear()
       }
     }
     s.raf = requestAnimationFrame(step)
@@ -316,13 +349,6 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
     }
   }, [enabled])
 
-  const clear = () => {
-    if (st.current.raf) cancelAnimationFrame(st.current.raf)
-    st.current.raf = 0
-    setGestureOn(false)
-    setLayer(null)
-  }
-
   return { layer, clear }
 }
 
@@ -351,8 +377,8 @@ function historyIdx(): number {
 /** 退场快照:旧页内容 + 固定导航条克隆 */
 interface ExitLayer {
   key: string
-  html: string
-  barHtml: string | null
+  node: HTMLElement
+  barNode: HTMLElement | null
   /** 旧页滚动位置,快照层 top:-y 对齐 */
   y: number
   anim: string
@@ -374,27 +400,11 @@ export function TransitionArea() {
   const gesture = useEdgeSwipe(pageRef, !isDesktop && isTauriIOS())
   const gestureLayer = gesture.layer
   // 渲染期捕获(先于 commit):此刻容器里还是旧页面的 DOM
-  const captureRef = useRef<{ key: string; html: string; barHtml: string | null; y: number } | null>(null)
+  const captureRef = useRef<(Underlay & { key: string }) | null>(null)
 
   if (location.key !== prevKeyRef.current) {
-    const y = Math.max(0, Math.round(window.scrollY))
-    // 克隆固定导航条并校正 top:克隆在 transform 祖先内退化为相对转场层定位,
-    // top=y 使其仍贴视口顶层,随层同步平移
-    const bar = document.body.querySelector('[data-floating-nav]')
-    let barHtml: string | null = null
-    if (bar instanceof HTMLElement) {
-      const clone = bar.cloneNode(true) as HTMLElement
-      // 克隆条随快照层视口定位(top 由层坐标系给出),补回被原生按钮隐藏的返回胶囊
-      const backBtn = clone.querySelector('[data-back-btn]') as HTMLElement | null
-      if (backBtn) backBtn.style.visibility = 'visible'
-      barHtml = clone.outerHTML
-    }
-    captureRef.current = {
-      key: prevKeyRef.current,
-      html: pageRef.current?.innerHTML ?? '',
-      barHtml,
-      y,
-    }
+    const cap = capturePage(pageRef)
+    if (cap) captureRef.current = { ...cap, key: prevKeyRef.current }
     prevKeyRef.current = location.key
   }
 
@@ -443,9 +453,9 @@ export function TransitionArea() {
 
     // 来路快照:push 落地后,当前历史条目的"上一层页面"就是本次捕获的旧页,
     // 自研侧滑靠它渲染下层(WebKit 同文档手势的下层是空的)
-    if (cap && cap.html) {
+    if (cap) {
       const idx = historyIdx()
-      if (navType === 'PUSH') underlays.set(idx, { html: cap.html, barHtml: cap.barHtml, y: cap.y })
+      if (navType === 'PUSH') underlays.set(idx, { node: cap.node, barNode: cap.barNode, y: cap.y })
       else if (navType === 'POP') trimUnderlays(idx)
       else trimUnderlays(idx - 1)
     }
@@ -460,20 +470,16 @@ export function TransitionArea() {
       window.scrollTo(0, 0)
     }
 
-    // 侧滑提交:页面在拖拽里已经就位(旧页已滑出、目标页已在下层铺满),
-    // 这里只把真实路由换上来,不能再播一遍关键帧转场;下层快照同时摘掉,
-    // 否则它会留在页面下方(z=0)从后续页面的透明区域透出
+    // 侧滑提交:页面在拖拽里已经就位(子页在 100% 外、下层快照铺满),这里只把
+    // 真实路由换上来,不能再播一遍关键帧转场;transform 与下层快照在本布局效应
+    // 里统一摘除(绘制前),下层快照若不摘会留在页面下方从后续透明区透出
     if (consumeGestureCommit(gestureCommitSeen)) {
+      gesture.clear()
       setExit(null)
       setEnterAnim(null)
       setBusy(false)
       setNavDir('pop')
-      const clear = gesture.clear
-      const t = setTimeout(() => {
-        clear()
-        setNavDir(null)
-      }, 80)
-      clear()
+      const t = setTimeout(() => setNavDir(null), 80)
       return () => clearTimeout(t)
     }
 
@@ -490,7 +496,7 @@ export function TransitionArea() {
     const slideDir: TransitionDir | null = dir ?? (navType === 'POP' ? 'pop' : null)
     setNavDir(slideDir)
 
-    if (!dir || isDesktop || !cap || !cap.html) {
+    if (!dir || isDesktop || !cap) {
       setExit(null)
       setEnterAnim(null)
       setBusy(false)
@@ -501,8 +507,8 @@ export function TransitionArea() {
     setBusy(true)
     setExit({
       key: cap.key,
-      html: cap.html,
-      barHtml: cap.barHtml,
+      node: cap.node,
+      barNode: cap.barNode,
       y: cap.y,
       anim: dir === 'push' ? 'rt-push-out' : 'rt-pop-out',
       // pop 退场层必须盖过固定导航条(z-40):旧页连同其导航条从新页(及其
@@ -539,8 +545,8 @@ export function TransitionArea() {
               pointerEvents: 'none',
             }}
           >
-            <div style={{ position: 'absolute', left: 0, right: 0, top: -gestureLayer.y }} dangerouslySetInnerHTML={{ __html: gestureLayer.html }} />
-            {gestureLayer.barHtml && <div data-rt-underlay-bar dangerouslySetInnerHTML={{ __html: gestureLayer.barHtml }} />}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: -gestureLayer.y }} ref={attachNode(gestureLayer.node)} />
+            {gestureLayer.barNode && <div data-rt-underlay-bar ref={attachNode(gestureLayer.barNode)} />}
           </div>
         )}
         <div
@@ -573,8 +579,8 @@ export function TransitionArea() {
           >
             {/* 视口锁定 + 内层 -y 对齐旧页滚动:POP 时新页会恢复记忆滚动位,
                 若随文档定位快照会整体错位 y_mem 像素(穿帮) */}
-            <div style={{ position: 'absolute', left: 0, right: 0, top: -exit.y }} dangerouslySetInnerHTML={{ __html: exit.html }} />
-            {exit.barHtml && <div dangerouslySetInnerHTML={{ __html: exit.barHtml }} />}
+            <div style={{ position: 'absolute', left: 0, right: 0, top: -exit.y }} ref={attachNode(exit.node)} />
+            {exit.barNode && <div ref={attachNode(exit.barNode)} />}
           </div>
         )}
       </div>

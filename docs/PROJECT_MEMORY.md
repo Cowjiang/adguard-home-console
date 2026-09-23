@@ -150,7 +150,10 @@
 - **WKWebView 对程序化 `history.back()` 无原生动画**(实测:去掉 CSS 转场后是瞬时硬切)。返回按钮的动画必须由 CSS 快照层(`routeTransition.tsx` 的退场克隆)承担,`markBackTap()` 不能省。
 - **WKWebView 同文档侧滑的下层是空的(2026-09-23 逐帧实测,原生手势已被否决)**:手势进行中 WebKit 只渲染空白底(实测为纯 #E3E5EC、无任何内容),松手 commit 后才轮到我们渲染(还有约 300ms 全白窗口),观感就是"原页空白 → 内容忽然出现"。这条路径不受我们控制,**故 `src-tauri/src/lib.rs` 已把 `allowsBackForwardNavigationGestures` 置 false**,侧滑改由前端自研。
 - **自研边缘侧滑(`routeTransition.tsx` 的 `useEdgeSwipe`)**:push 落地时把"来路页面"的克隆按历史条目 idx 存进 `underlays`;左缘 24pt 内起手、横向位移超 10pt 才接管(斜向/纵向让位给滚动;touchmove 里 `preventDefault` 阻止页面滚动);拖拽只改 transform(命令式写内联 style,不经 React 重渲染),下层是真实快照并按 iOS 方式以 -28% 视差跟进;松手才判定(位移 ≥50% 或速度 >0.5pt/ms 提交):
-  - 提交:一次性把真实路由换上来(`consumeGestureCommit` 序号让转场层与原生按钮各读一次),转场层不播关键帧;下层快照与真实页面同像素,切换不可见,滚动位置由既有 POP 逻辑恢复;下层快照必须在这次布局效应里摘掉,否则会留在页面下方(z=0)从后续页面透明区域透出;
+  - 提交:一次性把真实路由换上来(`consumeGestureCommit` 序号让转场层与原生按钮各读一次),转场层不播关键帧;下层快照与真实页面同像素,切换不可见,滚动位置由既有 POP 逻辑恢复;下层快照必须在这次布局效应里摘掉,否则会留在页面下方(z=0)从后续页面透明区域透出。**收尾(transform/快照摘除)必须等真实路由提交后的布局效应再做** —— 若在 `nav(-1)` 之前清 transform,React 提交前的几帧会把子页整屏弹回 translate 0 盖住下层(用户看到的"返回后闪一下新页面");
+  - **快照必须 cloneNode 直挂 DOM 节点,严禁 innerHTML 序列化再解析**(2026-09-23,用户实拍定位):可点行是 `<button>`,行内的开关也是 `<button>`,HTML 解析器不允许 button 嵌套 button —— 序列化再解析会把里层开关拆成兄弟节点,掉到行下左侧,观感是"开关被换行了"(过滤器页安全搜索行必现,div 行都正常)。转场层/下层快照现在渲染空壳 div,用 ref `replaceChildren` 挂克隆节点;
+  - **克隆要先摘入场动画类**(`page-in/content-in/tab-in/rise-in/log-flash`):这些类在新插入节点上会重播(page-in 0.38s 从 opacity 0 / translateY 14px / scale .985 起步),快照必须是静止画面;
+  - **下层快照视差为 0**(下层停在终位,只有上层滑走):拖拽是"按住可审视"的中间态,下层必须与返回落地后逐像素一致,行内右缘控件才不会"先被盖住、又整体偏移地出现";这也与 UIKit 交互式返回一致;
   - 取消:零成本(不动历史、不重挂载),把 transform 收回去即可;
   - 只对 iOS 壳生效(`__TAURI_INTERNALS__` + `isAppleMobile()`),浏览器/桌面端不被抢;
   - **`useTabJump`(replace)落地的条目没有可用快照 → 自研侧滑在该条目不接管**(不误返回跨 tab),刻意为之,与 §5 的 tab 语义一致。
