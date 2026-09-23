@@ -105,7 +105,6 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
       document.body
     )
   }
-
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -125,6 +124,29 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
       </div>
       {right && <div className="flex-none">{right}</div>}
     </div>
+  )
+}
+
+/**
+ * 顶栏右侧操作按钮(PageHeader 的 right 槽位):移动端高度与返回胶囊一致
+ * (h-11 / 44pt,iOS 最小可点面积),图标按钮补 w-11、带文字的补 px-4;
+ * 桌面端(lg)回到 h-10。所有顶栏右侧按钮都走这里或 Button 的 size="header"。
+ */
+export function HeaderAction({ onClick, label, className = '', children }: {
+  onClick?: (e: RMouseEvent<HTMLButtonElement>) => void
+  label?: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={`press glass flex h-11 flex-none items-center justify-center gap-1.5 rounded-full lg:h-10 ${className}`}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -228,10 +250,11 @@ export function Button({
   children, onClick, variant = 'primary', size = 'md', loading, disabled, className = '', type, label,
 }: {
   children: ReactNode; onClick?: (e: RMouseEvent<HTMLButtonElement>) => void; variant?: 'primary' | 'glass' | 'danger' | 'ghost'
-  size?: 'sm' | 'md' | 'lg'; loading?: boolean; disabled?: boolean; className?: string; type?: 'button' | 'submit'; label?: string
+  size?: 'sm' | 'md' | 'lg' | 'header'; loading?: boolean; disabled?: boolean; className?: string; type?: 'button' | 'submit'; label?: string
 }) {
   const base = 'press inline-flex items-center justify-center gap-2 rounded-full font-semibold select-none'
-  const sizes = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-[14.5px]', lg: 'h-12 px-6 text-[16px]' }[size]
+  // header:顶栏右侧槽位专用,移动端与返回胶囊同高(h-11),桌面与 sm 一致
+  const sizes = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-[14.5px]', lg: 'h-12 px-6 text-[16px]', header: 'h-11 px-4 text-[13px] lg:h-8 lg:px-3.5' }[size]
   const variants = {
     primary: 'text-white shadow-lg',
     glass: 'glass text-t1',

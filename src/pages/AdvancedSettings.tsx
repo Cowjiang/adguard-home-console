@@ -82,7 +82,7 @@ toast('清除失败:' + e.message, 'err')
   return (
     <Screen>
       <PageHeader back title="DNS 设置" right={
-        dirty ? <Button size="sm" loading={saving} onClick={save}>保存</Button> : undefined
+        dirty ? <Button size="header" loading={saving} onClick={save}>保存</Button> : undefined
       } />
 
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
@@ -345,7 +345,7 @@ export function AccessSettings() {
 
   return (
     <Screen>
-      <PageHeader back title="访问控制" right={dirty ? <Button size="sm" loading={saving} onClick={save}>保存</Button> : undefined} />
+      <PageHeader back title="访问控制" right={dirty ? <Button size="header" loading={saving} onClick={save}>保存</Button> : undefined} />
 
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
         <div>
@@ -422,7 +422,7 @@ export function EncryptionSettings() {
 
   return (
     <Screen>
-      <PageHeader back title="加密设置" right={dirty ? <Button size="sm" loading={saving} onClick={save}>保存</Button> : undefined} />
+      <PageHeader back title="加密设置" right={dirty ? <Button size="header" loading={saving} onClick={save}>保存</Button> : undefined} />
 
       <Card className="p-4">
         <div className="flex items-center gap-3">
@@ -651,7 +651,7 @@ export function DhcpSettings() {
 
   return (
     <Screen>
-      <PageHeader back title="DHCP 服务器" right={<Button size="sm" loading={saving} onClick={() => saveConfig(cur)}>保存</Button>} />
+      <PageHeader back title="DHCP 服务器" right={<Button size="header" loading={saving} onClick={() => saveConfig(cur)}>保存</Button>} />
 
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
         <div>

@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
 import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
+  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
   Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect, TabContent,
 } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
@@ -114,9 +114,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   return (
     <Screen>
       <PageHeader back title={whitelist ? '白名单过滤器' : '黑名单过滤器'} subtitle={`${filters.length} 个列表 · 更新间隔 ${data ? hoursLabel(data.interval) : '…'}`} right={
-        <button onClick={refreshAll} className="press glass flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold text-t1">
+        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> 更新
-        </button>
+        </HeaderAction>
       } />
 
       {isLoading && <Loading />}
@@ -476,9 +476,9 @@ export function RewritesPage() {
   return (
     <Screen>
       <PageHeader back title="DNS 重写" subtitle={`${entries?.length ?? 0} 条记录`} right={
-        <button onClick={openAdd} className="press glass flex h-10 w-10 items-center justify-center rounded-full text-accent" aria-label="添加">
+        <HeaderAction onClick={openAdd} label="添加" className="w-11 text-accent lg:w-10">
           <Plus size={19} />
-        </button>
+        </HeaderAction>
       } />
 
       <Group>

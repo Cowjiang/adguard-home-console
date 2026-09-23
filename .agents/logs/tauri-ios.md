@@ -332,3 +332,11 @@
 - 修法:`PickSelect` 的 `<select>` 加 `overflow-hidden`(组件单点);实测 `select{overflow:hidden}` 与「外层 span 裁剪」都能把文档宽度收回 402,只给 `option` 加 ellipsis 无效。
 - 验收:WebKit 实测 `/clients` 402/402;13 条移动端路由全部 over=0;控件尺寸与位置逐点不变;`.field` 可见选择器即使塞超长 option 也不撑宽(无需改)。`npm run check`/`npm run build` 绿;模拟器包已重建安装。
 - 待用户复测:排序钮点击仍能唤出系统选择器(`overflow-hidden` 不改可点性,但只有模拟器能验证原生 picker)。平台事实记入 `docs/engineering.md`,提案 `.agents/pipelines/proposals/bug-fix/2026-09-24-native-select-doc-overflow.md`。
+
+## 16. 顶栏右侧按钮高度对齐返回胶囊(2026-09-24)
+
+用户要求「移动端顶栏右边的按钮高度都要跟返回按钮一样」。排查全项目:顶栏右侧槽位(`PageHeader` 的 `right`)只有 7 处,尺寸各异——客户端/重写的「添加」与过滤器页「更新」`h-10`(40pt),三处设置页「保存」用 `Button size="sm"`(`h-8`,32pt),返回胶囊是 `h-11`(44pt)。
+
+- 改法:`ui.tsx` 新增 `HeaderAction` 组件(移动 `h-11`/桌面 `lg:h-10`,图标按钮补 `w-11`)与 `Button` 的 `size="header"`(移动 `h-11 px-4`、桌面回落 `lg:h-8 lg:px-3.5`),7 个调用点全部改走统一入口,不再手写尺寸。
+- 桌面端本次刻意不动:实测 1280pt 下添加/更新仍 40pt、保存仍 32pt,与改动前逐点一致。tab 根页面(无悬浮顶栏与返回按钮)的内容头部按钮不在此约定内。
+- 验收:移动端 402pt(WebKit + iPhone UA)8 条路由右侧按钮实测 44pt = 返回胶囊;`npm run check` / `npm run build` 绿;模拟器包已重建安装。约定记入 `docs/web-interaction.md`,提案 `.agents/pipelines/proposals/bug-fix/2026-09-24-header-action-height.md`。
