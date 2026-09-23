@@ -33,4 +33,4 @@
 
 ## 4. 记录要求
 
-把结果(含截图,存 `.agents/evidence/tauri/`)追加到 `.agents/logs/tauri-ios.md` §9 末尾(新建小节"§9.1 验证结果"),并更新 `docs/RUST_PLAN.md` §7 进度表中"未真机验证"字样。若验证失败需回退,`git revert 6123492` 即可,改动仅 5 个文件。
+把结果(含截图,存 `.agents/evidence/tauri/`)追加到 `.agents/logs/tauri-ios.md` §9 末尾(新建小节"§9.1 验证结果"),并更新 `.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` §7 进度表中"未真机验证"字样。若验证失败需回退,`git revert 6123492` 即可,改动仅 5 个文件。

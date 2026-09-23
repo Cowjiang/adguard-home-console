@@ -1,6 +1,8 @@
 # Rust 跨平台开发计划 — Windows / macOS / Android / iOS(供后续会话施工)
 
-> 创建:2026-09-21。配套必读:`PROJECT_MEMORY.md`(项目概况/坑/用户偏好)、`PC_ADAPTATION.md`(桌面适配)、`README.md`(功能总览)。
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
+> 创建:2026-09-21。配套必读:`.agents/reviews/2026-09-23-project-memory-snapshot.md`(项目概况/坑/用户偏好)、`.agents/reviews/2026-09-23-desktop-adaptation-snapshot.md`(桌面适配)、`README.md`(功能总览)。
 > 本文档是施工蓝图:先读"现状与结论",再按 Phase 顺序施工。**每个 Phase 有明确验收标准,完成后在本文档勾选并记录偏差。**
 
 ---
@@ -13,13 +15,13 @@
 - 前端所有 API 调用集中在 `src/lib/api.ts` 的 `api()` 函数,走相对路径 `/api/agh/*`;凭据存 localStorage(`agh.console.cfg.v1`)。**改 Rust 层时前端理论上只需动 `api.ts` 一个文件。**
 - `src/lib/auth.tsx` 负责 SvrConfig(url/username/password)、登录探测(`GET /status`)、主题;登录判定依赖 `s.version` 存在。
 - `_probe/` 有 v0.107.79 官方 OpenAPI 规范(`openapi.yaml`/`openapi.json`)与 20+ 个端点的**真实响应样本**,可直接作为 Rust 层测试夹具。
-- API 关键事实(单位全是 **毫秒**、reason 是字符串枚举、stats 的 top_* 是单键对象数组等)详见 `PROJECT_MEMORY.md` 第 3 节。
+- API 关键事实(单位全是 **毫秒**、reason 是字符串枚举、stats 的 top_* 是单键对象数组等)详见 `.agents/reviews/2026-09-23-project-memory-snapshot.md` 第 3 节。
 - 本机工具链(Windows):rustc/cargo 1.88.0 已装 ✓;Node 24 ✓。
 
 ## 1. 目标与结论
 
 **目标**:把现有 Web 控制台打包为原生应用,支持 **Windows / Android / iOS / macOS**。Rust 承担原 proxyAGH 的代理逻辑(以及未来的本地能力)。
-**分工变更(2026-09-21,用户决策)**:iOS 改走**纯 SwiftUI 原生 App**(真 iOS 26 液态玻璃,URLSession 直连无 CORS、无需 Rust 代理),见 `IOS_NATIVE_PLAN.md`;**本计划(Tauri)只覆盖 Windows / Android / macOS**。
+**分工变更(2026-09-21,用户决策)**:iOS 改走**纯 SwiftUI 原生 App**(真 iOS 26 液态玻璃,URLSession 直连无 CORS、无需 Rust 代理),见 `.agents/reviews/2026-09-23-ios-native-plan-snapshot.md`;**本计划(Tauri)只覆盖 Windows / Android / macOS**。
 
 **技术选型(已定,施工勿再摇摆)**:**Tauri 2.x**。理由:
 - 一套 Rust 核心 + WebView 壳,四平台全覆盖;前端 `dist/` 原样作为 `frontendDist`,UI 零重写。
@@ -34,7 +36,7 @@
 
 | # | 事项 | 说明 |
 | --- | --- | --- |
-| R1 | **macOS 构建需 Mac** | Windows 无法交叉产出 .app(Xcode 工具链私有)。本机是 Windows → macOS 走 CI(GitHub Actions `macos-latest` runner)或借用 Mac;先做 Windows + Android。iOS 同理且已移交原生线(`IOS_NATIVE_PLAN.md`)。 |
+| R1 | **macOS 构建需 Mac** | Windows 无法交叉产出 .app(Xcode 工具链私有)。本机是 Windows → macOS 走 CI(GitHub Actions `macos-latest` runner)或借用 Mac;先做 Windows + Android。iOS 同理且已移交原生线(`.agents/reviews/2026-09-23-ios-native-plan-snapshot.md`)。 |
 | R2 | **明文 HTTP** | AGH 实例常为 `http://`(目标实例 `http://<AGH_HOST>:3990`,Tailscale CGNAT 段)。Android 需 `usesCleartextTraffic`/network_security_config;iOS 侧见 IOS_NATIVE_PLAN(ATS 例外 + NSLocalNetworkUsageDescription)。 |
 | R3 | iOS 签名 | 真机调试可用免费 Apple ID(7 天有效期);分发需 $99/年开发者账号。是否购买**需用户决定**。 |
 | R4 | 移动端后台节流 | App 切后台后 webview 定时器被暂停,SWR 轮询(2s 日志/5s stats)会停;回前台应立即刷新。验证时注意,勿误判为 bug。 |
@@ -95,7 +97,7 @@ Rust 代码规范:错误统一 `ProxyError → {status, error: msg}` 结构返�
 4. `npx tauri android build --apk`(debug 自签名先行;release 签名 keystore 由用户提供/生成,密码勿入库)。
 5. 验收:真机安装 APK,局域网 http 实例与 Tailscale 实例均可登录使用;`gen/` 生成物入 .gitignore 与否做决定并记录。
 
-### Phase 5:macOS(R1,需 Mac 或 CI;iOS 已移交 IOS_NATIVE_PLAN.md) — [ ]
+### Phase 5:macOS(R1,需 Mac 或 CI;iOS 已移交 .agents/reviews/2026-09-23-ios-native-plan-snapshot.md) — [ ]
 1. 方案 A(推荐):GitHub Actions `macos-latest`:`rustup target add aarch64-apple-darwin x86_64-apple-darwin` + `tauri-action`/手写 workflow,产出 .dmg(通用二进制)。
 2. macOS 默认无沙盒,局域网/Tailscale 明文 http 可直连,无 Android/iOS 的权限配置负担。
 3. 有条件时:开发者签名 + 公证(避免 Gatekeeper 拦截);无证书则用户右键打开绕行。

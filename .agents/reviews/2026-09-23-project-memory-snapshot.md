@@ -1,11 +1,13 @@
 # AdGuard Home Console — 项目记忆(供后续会话快速恢复上下文)
 
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
 > 用途:新会话先读此文件,避免重新探查。最后更新:2026-09-23
 
 ## 1. 项目概况
 
 - **名称**:AdGuard Home Console(曾用名 AdGuard Console,已全局改名)
-- **路径**:`D:\Codes\adguard-home-console`(2026-09-21 由 adguard-home-admin-mobile 改名,会话内被 ZCode 占用未能自动改,用户手动改;若本文件还在旧路径说明改名未完成)
+- **路径**:仓库目录曾由 adguard-home-admin-mobile 改名为 adguard-home-console；当时的本机绝对路径不再保留。
 - **定位**:AdGuard Home 移动优先管理控制台,UI = iOS 26/27 Liquid Glass × Jinx 参考
 - **栈**:Vite 8 + React 19 + TS + Tailwind 4 + swr + lucide-react + Express 4(Node 24)
 - **运行**:`npm run build && npm start`(8787 端口,服务器常驻后台跑的就是这个);开发 `npm run dev:all`(5173+8787)。实例地址等私有配置在 `.env`(已 gitignore,勿提交)
@@ -147,6 +149,6 @@
 - **滑动转场层必须不透明**:新页容器与旧页快照层若为透明背景,对方页面内容会整个透出(双重曝光,前进穿帮的头号来源)。`index.css` 的 `.rt-page-bg`(body 底色 + `.ambient` 光晕复制)在转场期间挂两层,结束摘除;矮内容页容器转场期加 `minHeight:100dvh`,否则下半屏漏出快照。
 - **入场动画闩要认"方向语义"而非"CSS 转场"**:侧滑手势的 POP 无 CSS 动画,若 page-in 闩不生效,落地页会重播入场动画(`fill-mode: both` 首帧 opacity:0;iOS 手势转场期间动画还可能被挂起不启动 → 整页空白)。实现上 `TransitionCtx.dir`(含手势 POP)与 `exiting`(CSS 转场进行中)解耦,闩读 dir、导航条读 exiting。
 - **原生控件悬浮在 WebView 之上,不参与 CSS 平移**:进入二级页须等转场结束再 `createComponent`(`useTransitionBusy` 忙闲门,等待期让 CSS 胶囊随导航条滑入、结束后同位同尺寸交接),离开二级页立即移除(退场页按钮洞由快照克隆补回);锚点公式见插件 `activateAnchorConstraints`:`safeAreaLayoutGuide + (margin=16)+dx/dy` 双轴同付,对齐 CSS 胶囊用 dx:0/dy:-4/尺寸 36。转场中新页导航条永远拿 IN 动画(拿 OUT 会反向平移再跳回)。
-- **跨 tab 跳转用 `useTabJump`**(lib/navMeta.ts):replace 不进历史栈(侧滑因此天然禁用跨 tab 返回)+ `markNavAnim('push')` 让转场层照常做 push 动画 —— 视觉下钻、栈上平级。tab 间跳转若用 push 会进 WKWebView 历史栈,侧滑就能跨 tab 返回(违背 IOS_SWIPE_BACK_RESEARCH.md §4.3)。
+- **跨 tab 跳转用 `useTabJump`**(lib/navMeta.ts):replace 不进历史栈(侧滑因此天然禁用跨 tab 返回)+ `markNavAnim('push')` 让转场层照常做 push 动画 —— 视觉下钻、栈上平级。tab 间跳转若用 push 会进 WKWebView 历史栈,侧滑就能跨 tab 返回(违背 .agents/reviews/2026-09-23-ios-swipe-back-research.md §4.3)。
 - **z 层序**:POP 退场快照层 z=50,须盖过固定导航条(body portal z-40),旧页才能连同导航条从新页之上滑走;上限低于 Sheet/Toast。
 - 验证技巧:`routeTransition.tsx` 的 `DURATION_MS` 临时改 3000(vite HMR 即时生效)+ 中途截图即慢动作取证;注意 `cubic-bezier(0.32,0.72,0,1)` 前载严重,40% 时间已完成约 92% 位移,截图要趁早。

@@ -1,6 +1,6 @@
 # iOS 原生线施工日志(IOS_NATIVE_PLAN N0–N3)
 
-> 2026-09-21。施工:ZCode 主 agent(前台)。按 `IOS_NATIVE_PLAN.md` Phase N0→N3 顺序,实际环境 Xcode 27.0 / iOS 27.0 SDK(计划假设 Xcode 26,文档允许以新 SDK 为准)。
+> 2026-09-21。施工:ZCode 主 agent(前台)。按 `.agents/reviews/2026-09-23-ios-native-plan-snapshot.md` Phase N0→N3 顺序,实际环境 Xcode 27.0 / iOS 27.0 SDK(计划假设 Xcode 26,文档允许以新 SDK 为准)。
 > 测试数据:全部走本地 mock(`scripts/mock-agh.mjs`,127.0.0.1:3990,admin/demo),不访问真实实例(用户要求)。
 
 ## 1. 环境与脚手架(N0)

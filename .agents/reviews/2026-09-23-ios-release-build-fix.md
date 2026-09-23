@@ -1,5 +1,7 @@
 # iOS Release 构建修复记录（Xcode 27 + swift-rs）
 
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
 2026-09-22 修复了 release 模式 iOS 构建链接失败的问题（debug 不受影响）。
 
 ## 现象
@@ -34,7 +36,7 @@ Undefined symbols for architecture arm64:
    `RUSTUP_DIST_SERVER=https://static.rust-lang.org rustup component add llvm-tools`，
    但本机 rustup 配置了 aliyun 镜像且覆盖无效。）
 2. swift-rs 源码补丁（registry 内）：
-   `~/.cargo/registry/src/mirrors.ustc.edu.cn-38d0e5eb5da2abae/swift-rs-1.0.8/src-rs/build.rs`
+   `<cargo-registry>/swift-rs-1.0.8/src-rs/build.rs`
    第 514 行左右，`in_own_member = norm(module) == pkg;` 改为：
    ```rust
    in_own_member = norm(module) == pkg
@@ -60,11 +62,11 @@ Undefined symbols for architecture arm64:
   TabBar、新实心盾牌图标均正常。
 - 真机 iPhone 16 Pro 的 `.ipa` 已产出；安装时设备已断开 USB（devicectl 报
   `usage assertion` 4016），重新连接后执行上面 devicectl 命令即可。
-- 注意：`.env` 的 `AGH_DEFAULT_URL` 指向 `100.76.99.57:3990`，验证需
+- 注意：当时 `.env` 的 `AGH_DEFAULT_URL` 指向本机测试地址，验证需
   `PORT=3990 npm run dev:server` 起 mock；mock 重启后旧会话失效（401），
   应用显示"服务离线/加载中"，重新登录即可恢复。
 
-## 其他坑（沿用 docs/TAURI_IOS_LOG.md）
+## 其他坑（沿用 .agents/logs/tauri-ios.md）
 
 - 每次构建前如遇 `failed to rename app ... Directory not empty`，把
   `gen/apple/build` 改名挪开即可（本日志期间因此产生了 5 个 build.old.*，已清理）。

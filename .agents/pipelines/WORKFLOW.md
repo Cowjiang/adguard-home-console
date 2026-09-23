@@ -81,8 +81,8 @@ node scripts/verify-proposals.mjs
 
 ## 边界
 
-- `docs/` 记耐久知识：项目记忆、蓝图、交互定稿，随代码演进更新。
-- `docs/*_PLAN.md` 的阶段表决定**接下来做哪一块**；提案决定**这一块怎么做、怎么算做完**。
+- `docs/` 只记当前代码库的持久事实，按架构、契约、交互和平台主题维护；`docs/README.md` 是入口。
+- 待做的非平凡变更先登记提案，提案决定目标、决策与验收。迁移前的跨阶段计划保存在 `.agents/reviews/`，只作历史输入，不再直接决定下一块工作。
 - `proposals/` 记当前决策，`rejected/` 记明确否决，`archives/` 记历史与替代关系。
 - `.agents/logs/`、`.agents/reviews/` 记过程；`.agents/skills/` 放可复用能力，不装项目状态。
 - 纯 `docs/`、`.agents/` 改动不需要跑前端或 Rust 测试；动了代码就按根 `AGENTS.md` 跑对应检查。

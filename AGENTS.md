@@ -28,13 +28,13 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - `src-tauri/` — Tauri 壳与 Rust 代理；`src-tauri/gen/apple/` 是生成出来的 iOS 工程
 - `ios/` — 纯 SwiftUI iOS 工程（xcodegen 生成）
 - `scripts/` — `mock-agh.mjs`、`ios-signing.sh`、`server-pull.sh`（服务器端拉取部署）
-- `docs/` — 常青规格与知识（项目记忆、施工蓝图、交互定稿），见文末「必读文档」
+- `docs/` — 当前代码库的持久事实（架构、API 契约、交互与平台约定），入口见 `docs/README.md`
 - `.agents/` — agent 的能力与工作产物，约定见 `.agents/README.md`
 
 ## Code style
 
 - 无 linter / formatter 配置，风格靠约定加 `npm run check` 把关（`tsconfig.json` 开了 `strict`）。
-- **代码里不写注释** —— 决策与背景一律写进 md：常青规格进 `docs/`，过程产物（日志/报告/验收/证据）进 `.agents/`（用户明确要求）。
+- **代码里不写注释** —— 决策与背景一律写进 md：当前有效的代码库事实进 `docs/`，提案与过程产物进 `.agents/`（用户明确要求）。
 - **不写宣传语 / 口号式文案**（如「优雅地管理」），见到即删。
 - 与用户交流用中文；commit message 用英文。
 - React 侧：Hooks 不可放在条件 return 之后（曾因此白屏）；SWR 统一用 `src/lib/api.ts` 的 `swrFetcher`（readonly 元组签名）。
@@ -44,7 +44,7 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 - **所有 duration / interval 单位是毫秒**。这是踩过两次的坑，写任何单位字段前先确认。
 - `stats` 的 `top_*` 是**单键对象数组**而非字典，需归一（见 `Dashboard.tsx`）。
 - Express 4 通配路由用 `app.use('/api/agh', handler)`，`app.all('/*path')` 不匹配。
-- 完整 API 差异表见 `docs/PROJECT_MEMORY.md` §3；`scripts/mock-agh.mjs` 按同一契约实现，可当可执行参考。
+- AGH v0.107.79 契约见 `docs/AGH_API.md`；`scripts/mock-agh.mjs` 按同一契约实现，可当可执行参考。
 
 ## Git workflow
 
@@ -62,12 +62,10 @@ AdGuard Home v0.107.79 的跨端管理控制台：React 19 + Vite + Tailwind 4 �
 
 ## 必读文档
 
-- `docs/PROJECT_MEMORY.md` — **先读这个**：API 差异表(§3)、17 条踩坑清单(§7)、设计系统(§4)、Git 工作流、用户偏好(§10)
-- `docs/PC_ADAPTATION.md` — 桌面适配与移动端交互定稿（选择器、图表触摸、表单行为）
-- `docs/RUST_PLAN.md` / `docs/IOS_NATIVE_PLAN.md` — 两条原生线的施工蓝图与验收标准
-- `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，不随仓库分发**；单位与字段约定以 `PROJECT_MEMORY.md` §3 为准，勿假设该目录可用。
+- `docs/README.md` — **先读这个**：当前事实的主题索引；按任务继续读架构、API、Web 交互、原生平台或工程约束
+- `_probe/` — AGH v0.107.79 的 OpenAPI 规范与真实响应样本。**已 gitignore，不随仓库分发**；单位与字段约定以 `docs/AGH_API.md` 为准，勿假设该目录可用。
 - `.agents/` — agent 的能力与产物目录，完整约定见 `.agents/README.md`：
   - `skills/` — 可复用能力与多步流程（Agent Skills 规范，跨工具可移植）。
-  - `pipelines/` — 提案生命周期：非平凡的行为 / 架构 / 契约 / 流程变更，**先在 `proposals/<class>/` 登记提案再动手**，轨道规则与模板见 `.agents/pipelines/WORKFLOW.md`。
+  - `pipelines/` — 提案生命周期：非平凡的行为 / 架构 / 契约 / 流程变更，**先在 `proposals/<class>/` 登记提案再动手**；旧计划不是当前待办，轨道规则与模板见 `.agents/pipelines/WORKFLOW.md`。
   - `logs/` / `reviews/` — 施工日志与会话存档 / 报告与验收。命名 `kebab-case`，快照类前置 `YYYY-MM-DD-`，流水类不写日期。
   - `evidence/` — 取证截图。**截图一律不提交**：该目录已被 `.gitignore` 忽略，只在本地留存；随应用分发的图标资源（`Assets.xcassets`、`src-tauri/icons/`）属 App 内容，不在此列。
