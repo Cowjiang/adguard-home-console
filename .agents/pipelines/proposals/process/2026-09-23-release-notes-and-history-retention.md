@@ -34,7 +34,7 @@
 - [x] 重复运行同一提交不会因 tag 已存在而失败（配置层面）
 - [x] `main` 推送构建 tarball 并创建 release（配置层面）
 - [x] `.github/workflows/release.yml` 结构校验通过，`node scripts/verify-proposals.mjs` 通过
-- [ ] 真实推送到 `main` 后的端到端运行成功（仓库为私有，本地无法触发 Actions）
+- [x] 真实推送到 `main` 后的端到端运行成功
 
 ## Note
 
@@ -42,6 +42,6 @@
 
 - `scripts/release-notes.sh` 以 LF 副本在 Git Bash 下运行，覆盖 7 例：`before` 是祖先、`before` 是 force push 前的旧 `main`、`before` 全零、`before` 为空、`before` 是无效 sha，以及「存在祖先 tag」和「祖先 tag 与有效 `before` 并存」两种组合。标题与提交条数均符合预期。
 - `.github/workflows/release.yml` 通过结构校验：无 TAB、缩进为 2 的倍数、顶层键为 `name`/`on`/`permissions`/`concurrency`/`jobs`、`fetch-depth: 0` 与 `bash scripts/release-notes.sh` 存在、删除与自动说明相关片段已全部消失。
-- 唯一未验证项是真实的端到端发版，待下一次推 `main` 时观察。
+- 端到端已验证：把 `dev` 推到 `main`（`f6de85e`）后工作流运行成功，远端生成 tag `v0.1.0-dev.20260923.f6de85e`，而旧 tag `v0.1.0-dev.20260921.0aba843` 仍然保留，确认删除步骤确已移除。该次 `7525ed4..f6de85e` 只含 1 个提交，与「本次推送」的预期一致。
 
 本仓 Git 配置 `core.autocrlf=true`，索引内为 LF；`scripts/release-notes.sh` 由 workflow 以 `bash` 显式调用，不依赖执行位。
