@@ -11,9 +11,9 @@
 
 ## Decision
 
-- 新建 `docs/architecture/`，入口为 `docs/architecture/README.md`；原 `ARCHITECTURE.md` 删除，引用它的 `docs/README.md` 与 `docs/NATIVE_PLATFORMS.md` 改指新入口。
-- 页面划分：`README.md`（交付线、状态归属与页索引）、`WEB_RUNTIME.md`（Express 与开发/生产运行）、`FRONTEND.md`（React 应用结构）、`TAURI_SHELL.md`、`IOS_APP.md`、`BUILD_AND_RELEASE.md`；文件名沿用 `docs/` 现有的大写下划线风格。
-- 边界：架构目录只写结构与接缝；AGH 契约留在 `AGH_API.md`，交互约定留在 `WEB_INTERACTION.md`，平台坑位与签名留在 `NATIVE_PLATFORMS.md`，实现约束与验证命令留在 `ENGINEERING.md`。
+- 新建 `docs/architecture/`，入口为 `docs/architecture/README.md`；原 `ARCHITECTURE.md` 删除，引用它的 `docs/README.md` 与 `docs/native-platforms.md` 改指新入口。
+- 页面划分：`README.md`（交付线、状态归属与页索引）、`web-runtime.md`（Express 与开发/生产运行）、`frontend.md`（React 应用结构）、`tauri-shell.md`、`ios-app.md`、`build-and-release.md`；文件名遵循 `docs/README.md` 的小写 kebab-case 约定。
+- 边界：架构目录只写结构与接缝；AGH 契约留在 `agh-api.md`，交互约定留在 `web-interaction.md`，平台坑位与签名留在 `native-platforms.md`，实现约束与验证命令留在 `engineering.md`。
 - 目录索引以根 `AGENTS.md` 的一行职责为路由面，架构页不重复路径清单。
 - 纯文档变更，不动产品代码。
 

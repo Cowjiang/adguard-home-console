@@ -1,5 +1,8 @@
 # Web/PWA 运行时
 
+**Status:** current
+**Updated:** 2026-09-23
+
 生产形态只有一个 Node 进程：`server/index.mjs` 托管 `dist/` 并把 `/api/agh/*` 反代到目标 AGH。开发形态是 Vite dev server 加同一个进程。
 
 代码入口：`server/index.mjs`、`vite.config.ts`、`index.html`、`package.json`。

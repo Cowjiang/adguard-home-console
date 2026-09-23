@@ -3,7 +3,7 @@
  *
  * 侧滑返回依赖 WKWebView 历史栈(backForwardList),tab 根页面之间的跳转必须
  * replace 才不会把上一个 tab 压进栈(否则侧滑会跨 tab 返回,见
- * docs/WEB_INTERACTION.md 的路由与转场约定);但 replace 默认无转场。
+ * docs/web-interaction.md 的路由与转场约定);但 replace 默认无转场。
  * markNavAnim('push') 让 TransitionArea 对这类 replace 照常执行 push 平移动画
  * —— 视觉上是下钻,栈上是平级。
  */

@@ -1,9 +1,12 @@
 # 工程约束与已知边界
 
+**Status:** current
+**Updated:** 2026-09-23
+
 ## 实现约束
 
 - React Hooks 必须在条件返回之前调用。`src/lib/api.ts` 的 `swrFetcher` 接受只读三元组；新增 SWR 调用沿用它。
-- 所有 AGH `duration` / `interval` 字段以毫秒为单位，见 [API 契约](AGH_API.md)。`stats.top_*` 使用单键对象数组，消费前需归一。
+- 所有 AGH `duration` / `interval` 字段以毫秒为单位，见 [API 契约](agh-api.md)。`stats.top_*` 使用单键对象数组，消费前需归一。
 - Express 4 的 AGH 代理注册为 `app.use('/api/agh', handler)`。`app.all('/*path')` 不匹配所需路径。
 - `/filtering/refresh` 可能下载大量规则，因此 Express 与 Rust 代理都有单独的长超时分支。
 - 密码和 `Authorization` 不写入日志。Web/Tauri 的连接配置目前在本地 `localStorage`；签名值在被忽略的本地文件。

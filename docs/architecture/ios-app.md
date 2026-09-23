@@ -1,5 +1,8 @@
 # SwiftUI iOS 应用
 
+**Status:** current
+**Updated:** 2026-09-23
+
 `ios/` 是与 Web 并行的原生线：纯 SwiftUI + `URLSession` 直连 AGH `/control/*`，不经代理。它与 Tauri iOS 壳在当前代码里并存，不是二选一关系。
 
 代码入口：`ios/AdGuardConsole/AdGuardConsoleApp.swift`、`ios/AdGuardConsole/Network/APIClient.swift`、`ios/AdGuardConsole/Models/Models.swift`、`ios/AdGuardConsole/State/AppSession.swift`。
@@ -38,7 +41,7 @@
 
 - 不使用毛玻璃材质：卡片是实色底 + 1pt 边框 + 连续圆角；深浅色经 `UIColor { trait in }` 动态解析。
 - 以原生控件为主：`Toggle`、`Menu`、`.searchable`、`.refreshable`、`.presentationDetents`；图表用 Swift Charts（`SectorMark` 环图、`AreaMark`/`LineMark` 趋势），分段控件用 `matchedGeometryEffect`。
-- 本线没有自定义返回手势或转场实现；侧滑返回由系统 `NavigationStack` 提供（WKWebView 那套转场在 Tauri 线，见 `docs/WEB_INTERACTION.md`）。
+- 本线没有自定义返回手势或转场实现；侧滑返回由系统 `NavigationStack` 提供（WKWebView 那套转场在 Tauri 线，见 `docs/web-interaction.md`）。
 
 ## 测试
 

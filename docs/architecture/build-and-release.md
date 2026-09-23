@@ -1,5 +1,8 @@
 # 构建与发布
 
+**Status:** current
+**Updated:** 2026-09-23
+
 三条交付线共用一份 Web 构建产物；发布走 GitHub Release，服务器只拉取产物，不在服务器上构建。
 
 代码入口：`.github/workflows/release.yml`、`scripts/release-notes.sh`、`scripts/server-pull.sh`、`package.json`。
