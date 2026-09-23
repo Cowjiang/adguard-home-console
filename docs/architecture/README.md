@@ -15,11 +15,11 @@
 
 ## 交付线
 
-| 端 | 代码 | 传输层 | 访问 AGH 的路径 |
-| --- | --- | --- | --- |
-| Web/PWA | `src/` + `server/` | Node 进程 | 浏览器请求同源 `/api/agh/*`，Express 转发到 AGH `/control/*` |
-| Tauri 2 | `src/` + `src-tauri/` | Rust | 前端调用 `agh_fetch`，Rust 直接请求 AGH |
-| 纯 SwiftUI iOS | `ios/` | URLSession | 原生直接请求 AGH `/control/*` |
+| 端 | 代码 | 传输层 | 访问 AGH 的路径 | 详见 |
+| --- | --- | --- | --- | --- |
+| Web/PWA | `src/` + `server/` | Node 进程 | 浏览器请求同源 `/api/agh/*`，Express 转发到 AGH `/control/*` | [运行时](web-runtime.md)、[前端](frontend.md) |
+| Tauri 2 | `src/` + `src-tauri/` | Rust | 前端调用 `agh_fetch`，Rust 直接请求 AGH | [Tauri 壳](tauri-shell.md) |
+| 纯 SwiftUI iOS | `ios/` | URLSession | 原生直接请求 AGH `/control/*` | [SwiftUI iOS 应用](ios-app.md) |
 
 AGH 不返回浏览器需要的 CORS 头，Web/PWA 的同源代理是必需品；两条原生线不受此限制。Web 与 Tauri 共用同一个 React 前端，差异集中在传输层：`src/lib/api.ts` 按运行环境选择同源 `fetch` 或 Rust 命令。
 
@@ -29,4 +29,4 @@ AGH 不返回浏览器需要的 CORS 头，Web/PWA 的同源代理是必需品�
 - 浏览器与壳内只存连接配置与外观偏好，服务器端只读环境变量与仓库根 `.env`。
 - 连接配置的存储键、登录流程与首帧主题引导见 [React 前端](frontend.md)。
 
-本目录只写结构与接缝，随代码更新；实现细节的取舍与踩坑留在对应主题页，不在这里重复。
+本目录只写结构与接缝，随代码更新；实现细节的取舍与踩坑留在对应主题页（入口见 [docs/README.md](../README.md)），不在这里重复。
