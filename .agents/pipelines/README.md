@@ -16,6 +16,7 @@
 | --- | --- | --- | --- |
 | 2026-09-23 | process | [提案流水线与轨道规则](proposals/process/2026-09-23-proposal-pipeline.md) | implemented |
 | 2026-09-23 | process | [拆分 docs 中的持久事实与工作过程](proposals/process/2026-09-23-separate-durable-docs.md) | implemented |
+| 2026-09-23 | process | [收敛 Agent 入口并按任务逐层披露](proposals/process/2026-09-23-progressive-agent-entrypoints.md) | implemented |
 
 ## 与 docs/ 的分工
 
