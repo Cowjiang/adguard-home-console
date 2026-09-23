@@ -24,6 +24,7 @@
 
 ## 验证入口
 
+- 初次安装：`npm install`。Web 开发使用 `npm run dev:all`，同时启动 Vite 与 API 代理；生产模式先 `npm run build`，再 `npm start`。
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
 - Web 代码：`npm run check`、`npm run build`。
 - Rust 测试：先运行 `node scripts/mock-agh.mjs`，再运行 `cd src-tauri && cargo test`。有三个测试在 mock 不可用时会跳过实际请求。
