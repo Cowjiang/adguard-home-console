@@ -307,3 +307,11 @@
 2. **"侧滑过程中安全搜索的开关被换行了"**:真正根因不在布局,在快照的**序列化方式** —— 快照走 `innerHTML` 字符串再经 `dangerouslySetInnerHTML` 解析,而安全搜索行因可点击被渲染成 `<button>`,行内开关也是 `<button>`;HTML 解析器不允许 button 嵌套 button,解析后里层开关被拆成兄弟节点掉到行下左侧(前两行是 div 所以没事;用户原话"上两个开关没溢出,第三个溢出了")。修复:快照改 `cloneNode` 直挂真实 DOM 节点(转场层/下层快照渲染空壳 div + ref `replaceChildren`),`attachNode` 幂等。这也顺带修好了 CSS push/pop 退场层的同类隐患。
 3. **下层视差归零**:原 -28% 视差让拖拽中的下层内容比返回后整体偏左(最多 113pt),用户按住审视中间态时"跟返回前后都不一样"。改 0(下层停终位,只有上层滑走,与 UIKit 交互式返回一致)。
 4. 验收(逐帧,scroll≈480 → DNS 重写):整段拖拽三行开关全部在行内、位置与返回后逐像素一致;提交瞬间逐帧 diff vs 落地页平滑收敛(2.17→0.003,无尖峰=无闪帧)。
+
+## 14. 客户端页返回按钮与侧滑修复(2026-09-24,fix/clients-back-nav)
+
+用户报:概览统计卡进 `/clients` 后无原生返回按钮、侧滑不接管。两个独立原因叠加:`/clients` 在 `TOP_LEVEL_ROUTES`(为桌面侧边栏设计的分类)里被 `nativeBackButton` 按顶级路由移除按钮;入口走 `useTabJump`(replace)不进历史栈,自研侧滑只对 PUSH 落地(有来路快照)的条目接管。提案见 `.agents/pipelines/proposals/bug-fix/2026-09-24-clients-back-nav.md`。
+
+- 改法:`src/lib/routes.ts` 拆出 `TAB_ROOT_ROUTES`(移动端 4 个 tab 根)与 `TOP_LEVEL_ROUTES`(收窄为桌面侧边栏根);返回按钮显隐、TopBar 状态条、转场方向仲裁三处消费方改用前者;概览统计卡入口改 `nav('/clients')` push。push 落地后侧滑快照/滚动恢复/深链回退均由现有机制自动生效,Rust 侧零改动。
+- 坑再确认:重建前必须 `rm -rf src-tauri/gen/apple/build` + `touch src-tauri/src/lib.rs`,否则模拟器跑旧包误判(§13.1 同款,本次主动执行)。
+- 验收:用户模拟器验证通过(push 转场 + 原生按钮 + 侧滑返回、tab 互切不可侧滑跨 tab 回归正常);`npm run check` / `npm run build` 绿。

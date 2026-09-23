@@ -14,7 +14,7 @@
  */
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { TOP_LEVEL_ROUTES } from './routes'
+import { TAB_ROOT_ROUTES } from './routes'
 import { markBackTap } from './backNav'
 import { consumeGestureCommit, useGestureActive } from './routeTransition'
 
@@ -100,7 +100,7 @@ export function useNativeBackButton(enabled: boolean) {
   // 路由 → 显隐(顶级页移除,二级页创建;创建即随导航条滑入,见文件头注释)
   useEffect(() => {
     if (!enabled) return
-    const want = !TOP_LEVEL_ROUTES.includes(pathname) && !gesturing
+    const want = !TAB_ROOT_ROUTES.includes(pathname) && !gesturing
     const routeChange = lastPath.current !== pathname
     if (routeChange) lastPath.current = pathname
     // 侧滑提交的返回:页面在拖拽里已经就位,按钮直接落位,不再滑入
