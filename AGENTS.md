@@ -33,9 +33,17 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 ## 始终遵守
 
 - 非平凡变更先按 `.agents/README.md` 指引登记提案，再实施；小改动走 Direct 轨。提案模板和分类以流水线文档为准。
-- 代码里不写注释；背景和决策写入相应 Markdown。文案不写宣传语或口号。
-- 与用户交流用中文；commit message 用英文 conventional commit。
 - 不提交凭据、签名值、机器专属配置或取证截图。`_probe/` 是本机忽略材料，不可假定克隆后存在。
+
+## 代码规范
+
+- 仓库不配 linter / formatter，风格靠约定加 `npm run check`（`tsconfig.json` 开了 `strict`）：TS/TSX 用 2 空格缩进、单引号、不写行尾分号，Rust 与 Swift 保持 4 空格。
+- 新代码按既有分层落位：页面进 `src/pages/`，通用组件与基础控件进 `src/components/`，请求、状态与工具进 `src/lib/`；Swift 按 `Features/`、`Network/`、`State/`、`Models/`、`Design/`、`Support/` 分目录；Rust 保持一文件一件事。
+- 所有 AGH 请求经 `src/lib/api.ts` 的 `api()`；SWR 只用 `swrFetcher`，key 形如 `['<简称>', cfg, path]`。React Hooks 不放在条件返回之后。
+- AGH 时间字段一律毫秒，`stats.top_*` 是单键对象数组、消费前归一；端点、枚举与单位以 `docs/agh-api.md` 为准，其余实现约束见 `docs/engineering.md`。
+- 注释只解释约束和原因，不复述代码；背景与决策落进 `docs/` 或 `.agents/` 的 Markdown。面向用户的文案不写宣传语或口号。
+- 改完按范围跑校验：Web 跑 `npm run check` 与 `npm run build`；Rust 先起 `node scripts/mock-agh.mjs` 再 `cd src-tauri && cargo test`；iOS 走 `scripts/ios-signing.sh`；文档与提案跑 `node scripts/verify-proposals.mjs`。
+- commit message 用英文 conventional commit（`feat(scope):`、`fix(scope):`、`docs:`、`refactor(scope):`、`ci:`）；交流与仓库文档用中文。
 
 ## 分支与发布
 
