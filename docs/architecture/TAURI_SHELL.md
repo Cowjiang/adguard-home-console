@@ -1,0 +1,51 @@
+# Tauri 2 壳
+
+`src-tauri/` 把同一个 React 前端装进系统 WebView，并用 Rust 复刻 Express 代理的传输语义，使 Web 与壳内共用页面，同时不依赖浏览器的同源代理。
+
+代码入口：`src-tauri/src/lib.rs`、`src-tauri/src/proxy.rs`、`src-tauri/tauri.conf.json`、`src-tauri/plugins/tauri-plugin-system-components/`。
+
+## crate 结构
+
+- 包 `adguard-home-console`，库名 `adguard_home_console_lib`（`staticlib`/`cdylib`/`rlib`，Tauri 移动端约定），二进制只调用 `run()`。
+- 模块面很小：`src-tauri/src/proxy.rs` 承担全部网络逻辑，`src-tauri/src/lib.rs` 负责注册命令、debug 登录注入与 iOS 专属处理。
+- 依赖 tauri 2、reqwest（rustls，不走系统 TLS）、tokio（proxy 单测自起 TCP）、thiserror；iOS 侧补 `objc2`。
+- `Cargo.toml` 有两处补丁：`tao` 指向 fork 分支，`tauri-plugin-system-components` 指向本仓 `plugins/` 下的实现。
+
+## 命令面
+
+`invoke_handler` 只注册两条命令：
+
+| 命令 | 行为 |
+| --- | --- |
+| `agh_fetch(method, target, auth_header, path_with_query, body_json)` | 发起一次 AGH 请求，返回 `{status, content_type, body_text}` |
+| `get_debug_login()` | 仅 debug 构建返回环境变量里的连接信息，release 恒为 `None` |
+
+`agh_fetch` 与 Express 代理保持同一套语义：
+
+- target 必须是 http(s)，只取 origin，target 自带路径丢弃；
+- 路径归一：`/api/agh` 前缀换成 `/control`，已带 `/control` 的原样，其余补 `/control/` 前缀；
+- 只发 `Authorization`（非空时）与 `Content-Type: application/json`（非 GET/HEAD），body 缺省 `{}`；
+- 上游 301/302/307/308 手动跟随最多 3 跳，只更换 origin；
+- 超时 25 秒，路径含 `/filtering/refresh` 时 120 秒；
+- 失败不返回 `Err`，而是产出 `{error}` JSON 与 400/502 状态码，由前端统一处理；响应体原样透传，不在 Rust 解析 JSON。
+
+## 权限
+
+- 唯一 capability `default`：窗口 `main`，权限 `core:default` + `system-components:default`。
+- 插件默认权限集覆盖 18 条 `allow-*`：tab bar 7 条、sheet 2 条、component 4 条、listener 2 条、glass 3 条。
+
+## system-components 插件
+
+`src-tauri/plugins/tauri-plugin-system-components/` 是本仓维护的 Tauri 插件（上游 v0.1.8 的本地分支，增加了 `appearAnimation`），为壳提供原生 UI 叠加层。
+
+- 命令面 16 条：TabBar（configure / remove / show / hide / select_tab / set_badge / get_tab_bar_insets）、Sheet（present / dismiss）、组件（create / update / update_components / remove）、玻璃（is_glass_supported / set_window_glass / clear_window_glass）。
+- 平台分工：iOS 全量实现，Android 只有 sheet，非 macOS 桌面一律返回 `Unsupported`，macOS 由 `tab_bar.rs`、`components.rs`、`window_glass.rs` 三块实现。
+- 事件通道分两套：macOS 走 Tauri 事件，iOS 走插件通道；前端经 `@sosweetham/tauri-plugin-system-components-api` 调用，本地类型补充在 `src/types/system-components.d.ts`。
+
+## 窗口与构建
+
+- `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.adguardhome.console`、单窗口 `main`（960×640，最小 400×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。
+- `beforeDevCommand`/`beforeBuildCommand` 复用 npm 脚本，壳与 Web 构建同一份 `dist/`。
+- iOS 在 setup 中禁用 WKWebView 的前进/后退手势，页面转场由前端自己负责（见 `docs/WEB_INTERACTION.md`）。
+- `src-tauri/gen/` 只生成 apple 一套工程且不入库；生成与构建统一走 `./scripts/ios-signing.sh`，签名值来自被忽略的 `.env.signing`。
+- `scripts/ios-deploy.sh` 安装 `src-tauri/gen/apple/build/arm64/AGH Console.ipa` 到已连接的真机。
