@@ -37,7 +37,7 @@ export function Ambient() {
   return <div className="ambient" />
 }
 
-/** 顶部悬浮状态条(仅顶级页面:二级页顶部由固定导航栏接管,见 docs/IOS_NAV_BAR_GLASS_PLAN.md) */
+/** 顶部悬浮状态条(仅顶级页面:二级页顶部由固定导航栏接管,见 docs/WEB_INTERACTION.md) */
 function TopBar() {
   const { status } = useAuth()
   const { pathname } = useLocation()
