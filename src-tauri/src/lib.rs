@@ -45,7 +45,7 @@ fn get_debug_login() -> Option<DebugLogin> {
 }
 
 /// 开启 WKWebView 系统侧滑返回(含悬停快照),驱动对象是 pushState 历史栈,
-/// 因此前端路由约定:tab 切换一律 replace,层级下钻才 push(见 docs/IOS_SWIPE_BACK_RESEARCH.md)。
+/// 因此前端路由约定:tab 切换一律 replace,层级下钻才 push(见 docs/WEB_INTERACTION.md)。
 #[cfg(target_os = "ios")]
 fn enable_back_forward_gestures(app: &tauri::AppHandle) {
     use objc2::runtime::AnyObject;

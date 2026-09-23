@@ -1,5 +1,7 @@
 # feat/navbar-glass 交接文档（2026-09-22）
 
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
 ## 当前状态
 
 分支 `feat/navbar-glass`，在 `abb8193` 之上合入了 `feat/ios-swipe-back` 的关键改动，并完成模拟器构建（debug, arm64-sim）。
@@ -57,7 +59,7 @@
 
 ```bash
 # 调试构建（模拟器 arm64-sim）
-cd /Users/cindy.x.q.kuang/Study/adguard-home-console
+cd <repo>
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.cargo/bin:$PWD/node_modules/.bin:$PATH"
 tauri ios build --debug --target aarch64-sim
 
@@ -74,7 +76,7 @@ xcrun simctl spawn booted log stream --predicate 'process == "AGH Console"' --st
 
 **常见坑**：
 - `tauri ios build` 报 "failed to rename app: Directory not empty" 时，mv 旧的 `gen/apple/build` 改名后重试（勿 rm -rf）
-- simtap 需要 Device Hub 窗口在前台；Simulator UDID = `1243721C-24C7-4DBB-9FDF-CD83D393B706`
+- simtap 需要 Device Hub 窗口在前台；Simulator UDID 由当前机器的 `simctl list devices` 查询。
 - 清理构建产物 `build.old-*` 到 ~/.Trash
 
 ## Fallback 建议
@@ -85,7 +87,7 @@ xcrun simctl spawn booted log stream --predicate 'process == "AGH Console"' --st
 - 顶部状态条 (`TopBar` + `NavScrim`) 一级页保留悬浮胶囊
 - 二级页固定栏接管 + 渐变遮罩
 
-建议定稿时撰写 `docs/IOS_CSS_FALLBACK_DECISION.md`，记录选择 CSS 方案的原因与取舍。
+当时建议另写 CSS 回退方案决策文件；该文件未创建，这项建议也未成为当前提案。
 
 ## 下一步具体动作
 
@@ -163,7 +165,7 @@ simctl 录屏逐帧证实),返回转场必须由 CSS 快照层负责,`markBackTa
 3. **客户端页无动画 + 跨 tab 侧滑可返回 = 跨 tab 跳转用了 push**
    `nav('/clients')`、`nav('/log?filter=…')` 是 tab 根页之间的跳转:push 到
    TOP_LEVEL 被转场排除(硬切,问题 4),且进了 WKWebView 历史栈,侧滑会跨 tab
-   返回(问题 6,违背 IOS_SWIPE_BACK_RESEARCH.md §4.3 的设计原则)。修复:新增
+   返回(问题 6,违背 .agents/reviews/2026-09-23-ios-swipe-back-research.md §4.3 的设计原则)。修复:新增
    `lib/navMeta.ts`(`useTabJump` = replace 不进栈 + `markNavAnim('push')` 标记),
    routeTransition 对带标记的 REPLACE 照常执行 push 动画 —— 视觉下钻、栈上平级。
    动画方向与历史栈操作从此解耦,这是通用抽象,后续跨 tab 入口一律用 `useTabJump`。
@@ -224,5 +226,5 @@ dy=-4 修正后重建 debug 包(iPhone 18 Pro 模拟器),设置 → DNS 设置�
   位移,截图时机宁早勿晚)→ 改回 340。
 - 模拟器走查:构建产物 `src-tauri/gen/apple/build/arm64-sim/AGH Console.app`,
   bundle id `com.adguardhome.console`;`simctl install` + `SIMCTL_CHILD_AGH_*
-  launch`;tap 用 /tmp/simtap.local.swift(需 DeviceHub 前台,402x874 逻辑点,
+  launch`;tap 使用当时的本机临时脚本(需 DeviceHub 前台,402x874 逻辑点,
   标定 scale 0.732);tab(355,833),设置页 DNS 行(200,304)。

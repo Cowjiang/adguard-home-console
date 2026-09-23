@@ -1,6 +1,8 @@
 # iOS 手势返回（侧滑返回 + 悬停预览）调研 —— Tauri 壳线可行性
 
-> 2026-09-22。**更新：方案 A-1 已在分支 `feat/ios-swipe-back` 实施，模拟器验证通过**（含悬停快照逐帧核对），实施与验证记录见 `TAURI_IOS_LOG.md` §11。下文为调研结论存档。
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
+> 2026-09-22。**更新：方案 A-1 已在分支 `feat/ios-swipe-back` 实施，模拟器验证通过**（含悬停快照逐帧核对），实施与验证记录见 `.agents/logs/tauri-ios.md` §11。下文为调研结论存档。
 
 ## 1. 现状
 
@@ -29,7 +31,7 @@ WKWebView 自带的 `allowsBackForwardNavigationGestures`（iOS 8+，[Apple 文�
 ## 4. SPA（pushState）下的行为与限制 —— 实施前必须真机验证的点
 
 1. **历史栈是否含 SPA 路由**：`history.pushState` 产生的同文档导航条目会进入 WKWebView 的 backForwardList，侧滑会触发真实的历史回退 → `popstate` → React Router 正常接住。方向可行，但"每个路由是否都 push、tab 切换是否 push"需要梳理（见第 5 节方案 A-2）。
-2. **悬停快照的正确性（最大不确定点）→ 已实测排除**：iOS 27 模拟器录屏逐帧核对，SPA pushState 导航下侧滑中途左侧露出的是上一路由的正确实时快照，子页以圆角卡片右移，标准 iOS 交互转场（`shots-tauri/verify/swipe-frame-hover-snapshot.png`）。
+2. **悬停快照的正确性（最大不确定点）→ 已实测排除**：iOS 27 模拟器录屏逐帧核对，SPA pushState 导航下侧滑中途左侧露出的是上一路由的正确实时快照，子页以圆角卡片右移，标准 iOS 交互转场（`.agents/evidence/tauri/verify/swipe-frame-hover-snapshot.png`）。
 3. **手势只认历史栈，不认业务层级**：如果从 `/log` push 到 `/settings`，侧滑也会返回 `/log`——与原生"返回上一层级"直觉不符。需要把导航分成两类：tab 间切换用 `navigate(to, { replace: true })`（不进历史栈，侧滑不可返回），层级下钻（概览→客户端、设置→子页、防护→子页）才 push。
 4. **与横向交互的冲突**：边缘手势触发区约 20pt，`.chart-touch` 的横向 scrub、手势驱动的横向滑动一般不受影响，但表格/列表若支持横向拖动需留意；反向影响是页面内的横向手势可能顶掉边缘手势起点。
 5. **手势与原生 TabBar 的层级**：手势动画作用于整个 WKWebView，原生玻璃 TabBar 在其上层不参与转场——侧滑时 TabBar 纹丝不动，原生 app 里 tab 栏本来也不动，观感应当成立，但需肉眼确认。

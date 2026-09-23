@@ -1,6 +1,8 @@
 # iOS 原生版方案 — SwiftUI + iOS 26 Liquid Glass(供后续会话施工)
 
-> 创建:2026-09-21。配套必读:`PROJECT_MEMORY.md`(API 差异表 §3、用户偏好 §10)、`RUST_PLAN.md`(Tauri 线:Windows/Android/macOS)、`README.md`(功能总览=需求规格)。
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
+> 创建:2026-09-21。配套必读:`.agents/reviews/2026-09-23-project-memory-snapshot.md`(API 差异表 §3、用户偏好 §10)、`.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md`(Tauri 线:Windows/Android/macOS)、`README.md`(功能总览=需求规格)。
 > **背景与决策**:用户要求 iOS 移动端采用原生 UI 组件(例:iOS 26 液态玻璃 tab bar)。经评估,iOS 走**纯 SwiftUI 原生 App**,与 Tauri 线并行;iOS 不再使用 Tauri 壳。
 
 ---
@@ -13,7 +15,7 @@
 | B. 混合壳:SwiftUI 原生 chrome + WKWebView 内容 | 原生 TabView/导航栏,内容页仍是 React | ❌ 不推荐:WKWebView 滚动与原生导航栏折叠联动是著名的坑,状态双份(SWR vs Swift),"半原生"体验割裂,维护两套心智 |
 | **C. 纯 SwiftUI 原生 App(当前选定)** | 全部 UI 用 SwiftUI 重写,URLSession 直连 AGH | ✅ 原生 TabView 免费获得真液态玻璃(现 Web 版透镜动效本就是在模仿它);Swift Charts 替代自绘 SVG;原生 Sheet/ContextMenu/Toggle/Picker/搜索/触觉反馈 |
 
-> **2026-09-21 补充**:社区已出现 Tauri 混合壳插件(`tauri-plugin-system-components` v0.1.8:iOS 原生 UITabBar + 液态玻璃弹层;`tauri-plugin-ios-glass-tabbar` v0.1.0),方案 B 的"胶水从零自研"问题部分被解决,详见 `RUST_PLAN.md` Phase 5.5。但材质不统一(真玻璃 bar 叠 CSS 模拟卡片)与 0.x 成熟度风险仍在,故本线(纯原生)保持默认,待 Phase 5.5 spike 结论出来后再最终二选一。
+> **2026-09-21 补充**:社区已出现 Tauri 混合壳插件(`tauri-plugin-system-components` v0.1.8:iOS 原生 UITabBar + 液态玻璃弹层;`tauri-plugin-ios-glass-tabbar` v0.1.0),方案 B 的"胶水从零自研"问题部分被解决,详见 `.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` Phase 5.5。但材质不统一(真玻璃 bar 叠 CSS 模拟卡片)与 0.x 成熟度风险仍在,故本线(纯原生)保持默认,待 Phase 5.5 spike 结论出来后再最终二选一。
 
 **关键技术事实:CORS 代理在 iOS 上不需要。** `/api/agh` 代理(Rust/Express)存在的唯一原因是浏览器跨域限制;原生 App 的 URLSession 直接请求 `http://<AGH>/control/*` 即可,Basic Auth 放请求头。因此 **iOS 版可以完全不依赖 Rust**;Rust 线(Tauri)只服务 Windows/Android/macOS。
 
@@ -29,7 +31,7 @@ iOS App(SwiftUI, 最低部署目标 iOS 26)
 凭据:iOS Keychain(keychain-access-groups,勿用 UserDefaults)
 ```
 
-- API 契约与坑完全复用 `PROJECT_MEMORY.md` §3:一切 duration/interval 单位是**毫秒**;reason 是字符串枚举(FilteredBlackList/.../RewriteRule 12 个);stats 的 `top_*` 是单键对象数组(需归一成 [k,v]);protection 用 `POST /control/protection {enabled, duration(ms)}`;querylog 支持 search/reason[]/older_than/offset/limit;`_probe/` 有全部端点真实响应样本,作为 Codable 解码测试夹具。
+- API 契约与坑完全复用 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §3:一切 duration/interval 单位是**毫秒**;reason 是字符串枚举(FilteredBlackList/.../RewriteRule 12 个);stats 的 `top_*` 是单键对象数组(需归一成 [k,v]);protection 用 `POST /control/protection {enabled, duration(ms)}`;querylog 支持 search/reason[]/older_than/offset/limit;`_probe/` 有全部端点真实响应样本,作为 Codable 解码测试夹具。
 - 轮询策略与 Web 版一致:stats 5s / clients 60s / filtering 20s / 实时日志 2s;**App 进后台取消 Task、回前台立即刷新一次**(scenePhase 驱动)。
 - 明文 HTTP:Info.plist 加 `NSAppTransportSecurity → NSAllowsArbitraryLoads`(实例多为 `http://`,含 Tailscale 100.64/10 段)或按需收敛;`NSLocalNetworkUsageDescription` 必填(iOS 14+ 访问局域网弹权限)。
 

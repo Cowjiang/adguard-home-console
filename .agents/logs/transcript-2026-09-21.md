@@ -59,4 +59,4 @@
 - 原生线:`ios/`(xcodegen 工程,SwiftUI,Swift 6)→ `.agents/logs/ios-native.md`、截图 `.agents/evidence/native/`
 - Tauri 线:`src-tauri/` + `gen/apple/`(混合壳)→ `.agents/logs/tauri-ios.md`、截图 `.agents/evidence/tauri/`
 - 共享:`scripts/mock-agh.mjs`、`.agents/logs/orchestration.md`(编排日志)、`.agents/reviews/2026-09-21-ios-ui-gap.md`(差距报告)、本文件
-- 计划文档回填:`docs/IOS_NATIVE_PLAN.md` §4/§7(N0–N3)、`docs/RUST_PLAN.md` §7(Phase 5.5,Tauri 收尾后回填)
+- 计划文档回填:`.agents/reviews/2026-09-23-ios-native-plan-snapshot.md` §4/§7(N0–N3)、`.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` §7(Phase 5.5,Tauri 收尾后回填)

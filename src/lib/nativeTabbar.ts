@@ -65,7 +65,7 @@ export function useNativeTabBar(): boolean {
             scrollToTop()
             return
           }
-          // tab 切换不进历史栈(replace),层级下钻才 push——侧滑返回只走业务层级,见 docs/IOS_SWIPE_BACK_RESEARCH.md
+          // tab 切换不进历史栈(replace),层级下钻才 push——侧滑返回只走业务层级,见 docs/WEB_INTERACTION.md
           navigate(tab.to, { replace: true })
         })
         if (disposed) {

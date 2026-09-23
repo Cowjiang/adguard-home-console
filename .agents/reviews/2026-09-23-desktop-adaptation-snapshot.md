@@ -1,6 +1,8 @@
 # PC 端适配 — 工作清单与进度(供后续会话恢复)
 
-> 创建:2026-09-20。配套读 `PROJECT_MEMORY.md`(项目概况/坑/用户偏好)。
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
+> 创建:2026-09-20。配套读 `.agents/reviews/2026-09-23-project-memory-snapshot.md`(项目概况/坑/用户偏好)。
 > 改动原则:**只动展示层**,不碰 `api.ts`、`auth.tsx`、`server/`。
 
 ## 核心决策(用户已确认)
@@ -121,7 +123,7 @@
 
 ## 浮层红线:弹窗一律居中 + 动画修复(2026-09-23,用户定稿为项目红线)
 
-- **红线**:**任何弹窗/浮层严禁从底部上升,一律屏幕居中出现**——iOS 原生 tabbar 会挡住底部浮层。已写入 `docs/PROJECT_MEMORY.md` §4。
+- **红线**:**任何弹窗/浮层严禁从底部上升,一律屏幕居中出现**——iOS 原生 tabbar 会挡住底部浮层。已写入 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §4。
 - **落点**:`ui.tsx` 的 `SheetProvider` 是全应用唯一弹窗载体(useConfirm/useSheet 的所有弹层:删除确认、ClientForm、ClientDetail、LogDetail、FiltersPages、Protection、AdvancedSettings 等),容器从移动端 `items-end` 改为固定 `items-center`,底部拖拽指示条与 safe-area padding 一并移除。排查确认代码库无其他 `items-end`/底部入场浮层(Layout 的 `bottom-0` 是 tabbar 本体,Toast 在顶部,均不受影响)。
 - **动画修复**:弹窗原先"闪现无动画"的根因是 `open()` 单层 `requestAnimationFrame`——初始态(透明+位移)与显示态被合并进同一帧绘制,transition 被吞。改为**双 rAF**(先绘制初始态再切 visible),入场 `translateY(16px) scale(0.95) → 0/1` + 250ms cubic-bezier(0.22,1,0.36,1),遮罩同步淡入。改 SheetProvider 时勿退回单层 rAF。
 - **验证**:paw 实测移动端点删除,确认弹窗垂直居中、立即截图捕捉到缩放淡入中间态(动画确实在播)。
