@@ -11,7 +11,10 @@
     "check": "tsc --noEmit",
     "start": "node server/index.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "ios:build": "./scripts/ios-signing.sh tauri build --target aarch64",
+    "ios:clean": "find src-tauri/gen/apple/Externals -name '*.a' -delete && rm -rf ~/Library/Developer/Xcode/DerivedData/adguard-home-console-* ~/Library/Developer/Xcode/DerivedData/AdGuardConsole-* src-tauri/target/aarch64-apple-ios",
+    "ios:deploy": "./scripts/ios-deploy.sh"
   },
   "dependencies": {
     "@sosweetham/tauri-plugin-system-components-api": "^0.1.8",
