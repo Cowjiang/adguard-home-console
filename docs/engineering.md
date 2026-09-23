@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-09-24
 
 ## 实现约束
 
@@ -20,6 +20,10 @@
 - 苹果端的原生 `<select>` 覆盖层（`PickSelect`）必须带 `overflow-hidden`：WebKit 会把 `<option>` 当真实盒子按文字宽度布局，长选项（客户端页的「请求数从多到少」）会溢出被压到 56pt 的控件并**撑宽整个文档**，页面因此能左右拖动。典型症状是文档 `scrollWidth` 大于视口而没有任何元素的 rect 越界。
 - 首屏加载与正常内容共用稳定的根节点，避免数据抵达时重挂载并重播页面入场动画。概览骨架与内容的淡入由 `content-in` 负责。
 - 当前 `server/index.mjs` 的 `express.static` 设置了一小时资源缓存；改动 HTML 缓存策略时需单独检查 `/index.html` 是否被静态中间件先拦截。
+
+- 顶栏原生控件与自定义按钮互斥：原生接管时 CSS 按钮只留 `visibility:hidden` 占位，转场快照克隆里也不补显（否则侧滑揭示的旧页会露出自定义胶囊）。
+- 转场快照克隆会带同一批 `data-*` 属性且在 `#root` 内、文档顺序先于 portal 到 `body` 的实时节点，因此手势/转场查询实时元素必须限定 `document.body.querySelector(':scope > [data-floating-nav]')`，并在克隆上摘掉该属性。
+- Tauri v2 插件新增命令除 `invoke_handler` 外必须登记插件 `build.rs` 的 `COMMANDS` 与 `permissions/default.toml`，否则 `invoke` 被静默拒绝（调用方的 `catch` 会吞掉）。
 
 ## 发布
 

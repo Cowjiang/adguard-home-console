@@ -267,6 +267,27 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {})
     }
     case 'POST /filtering/set_rules': return json(res, 200, {})
+    case 'POST /filtering/add_url': {
+      const list = body.whitelist ? state.filtering.whitelist_filters : state.filtering.filters
+      const nextId = Math.max(0, ...state.filtering.filters.map((f) => f.id), ...state.filtering.whitelist_filters.map((f) => f.id)) + 1
+      list.push({ id: nextId, enabled: true, name: body.name, url: body.url, rules_count: 0, last_updated: new Date().toISOString() })
+      return json(res, 200, {})
+    }
+    case 'POST /filtering/remove_url': {
+      const drop = (f) => !(f.name === body.name && f.url === body.url)
+      state.filtering.filters = state.filtering.filters.filter(drop)
+      state.filtering.whitelist_filters = state.filtering.whitelist_filters.filter(drop)
+      return json(res, 200, {})
+    }
+    case 'POST /filtering/set_url': {
+      const list = body.whitelist ? state.filtering.whitelist_filters : state.filtering.filters
+      const f = list.find((x) => x.url === body.url)
+      if (f) {
+        if (typeof body.data?.name === 'string') f.name = body.data.name
+        if (typeof body.data?.url === 'string') f.url = body.data.url
+      }
+      return json(res, 200, {})
+    }
     case 'POST /filtering/refresh': {
       await new Promise((r) => setTimeout(r, 1500)) // 模拟长任务
       return json(res, 200, { updated: 0 })

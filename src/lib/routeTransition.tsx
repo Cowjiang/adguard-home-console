@@ -64,6 +64,33 @@ export function useTransitionBusy(): boolean {
   )
 }
 
+/* ---------- 转场前半程(模块级 store) ----------
+ * 原生控件悬浮在 WebView 之上、不参与 CSS 平移,等转场**过半**再动作,观感上
+ * 与页面同步:进场过半时淡入、退场过半时淡出。 */
+const HALF_MS = 170
+const halfSubs = new Set<() => void>()
+let halfBusy = false
+
+function setHalfBusy(v: boolean) {
+  if (v === halfBusy) return
+  halfBusy = v
+  halfSubs.forEach((f) => f())
+}
+
+/** 是否处于转场前半程(转场开始 ~170ms 内);非转场期间恒为 false */
+export function useTransitionHalfBusy(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      halfSubs.add(cb)
+      return () => halfSubs.delete(cb)
+    },
+    () => halfBusy
+  )
+}
+
+/** 转场过半的时间点(毫秒),原生控件据此延后出场/退场 */
+export const TRANSITION_HALF_MS = HALF_MS
+
 const TransitionCtx = createContext<TransitionInfo>({ dir: null, exiting: false })
 
 /** 页面内部组件(如 PageHeader、Screen)读取当前转场态 */
@@ -98,12 +125,15 @@ function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null 
   node.querySelectorAll('.page-in,.content-in,.tab-in,.rise-in,.log-flash').forEach((el) => {
     el.classList.remove('page-in', 'content-in', 'tab-in', 'rise-in', 'log-flash')
   })
-  const bar = document.body.querySelector('[data-floating-nav]')
+  // 只在 body 直接子元素里找实时导航条:转场快照克隆的导航条在 #root 内,且下面会
+  // 摘掉它的 data-floating-nav —— 否则手势的 querySelector 会命中快照而不是实时元素
+  const bar = document.body.querySelector(':scope > [data-floating-nav]')
   let barNode: HTMLElement | null = null
   if (bar instanceof HTMLElement) {
     barNode = bar.cloneNode(true) as HTMLElement
-    const backBtn = barNode.querySelector('[data-back-btn]')
-    if (backBtn instanceof HTMLElement) backBtn.style.visibility = 'visible'
+    barNode.removeAttribute('data-floating-nav')
+    // 快照里不补显任何自定义按钮:凡能被原生控件接管的按钮一律不出现自定义版本,
+    // 侧滑揭示时由原生返回胶囊在原位补上(见 nativeBackButton 的手势策略)
   }
   return { node, barNode, y: Math.max(0, Math.round(window.scrollY)) }
 }
@@ -164,7 +194,7 @@ const PARALLAX = 0
 
 /** 自研侧滑只在 iOS 壳内接管:浏览器/桌面有各自的原生历史手势,不该被我们抢 */
 let tauriIOS: boolean | null = null
-function isTauriIOS(): boolean {
+export function isTauriIOS(): boolean {
   if (tauriIOS === null) {
     tauriIOS =
       typeof window !== 'undefined' &&
@@ -221,7 +251,7 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
     if (!s.els || !(s.els.under instanceof HTMLElement)) {
       s.els = {
         page: pageRef.current,
-        bar: document.body.querySelector('[data-floating-nav]'),
+        bar: document.body.querySelector(':scope > [data-floating-nav]'),
         under: document.querySelector('[data-rt-underlay]'),
         underBar: document.querySelector('[data-rt-underlay-bar]'),
       }
@@ -288,11 +318,11 @@ function useEdgeSwipe(pageRef: React.RefObject<HTMLDivElement | null>, enabled: 
     if (!enabled) return
     const onStart = (e: TouchEvent) => {
       const s = st.current
-      if (s.on || s.armed || busy || e.touches.length !== 1) return
+      if (s.on || s.armed || busy || e.touches.length !== 1) { return }
       const t = e.touches[0]
-      if (t.clientX > EDGE_PX) return
+      if (t.clientX > EDGE_PX) { return }
       const u = underlays.get(historyIdx())
-      if (!u) return
+      if (!u) { return }
       s.armed = true
       s.x0 = t.clientX
       s.y0 = t.clientY
@@ -500,11 +530,14 @@ export function TransitionArea() {
       setExit(null)
       setEnterAnim(null)
       setBusy(false)
+      setHalfBusy(false)
       const t = setTimeout(() => setNavDir(null), DURATION_MS + 50)
       return () => clearTimeout(t)
     }
 
     setBusy(true)
+    setHalfBusy(true)
+    const halfTimer = setTimeout(() => setHalfBusy(false), HALF_MS)
     setExit({
       key: cap.key,
       node: cap.node,
@@ -522,7 +555,10 @@ export function TransitionArea() {
       setNavDir(null)
       setBusy(false)
     }, DURATION_MS + 50)
-    return () => clearTimeout(t)
+    return () => {
+      clearTimeout(halfTimer)
+      clearTimeout(t)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, navType, isDesktop])
 

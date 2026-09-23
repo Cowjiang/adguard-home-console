@@ -1,13 +1,13 @@
 # 原生平台现状
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-09-24
 
 ## Tauri 2 壳
 
 `src-tauri/` 为 React 前端提供 Windows、Android、macOS、iOS 壳。`src-tauri/src/lib.rs` 注册 `agh_fetch`；Rust 层复刻 Express 的路径映射、Basic Auth 透传、重定向、超时和错误语义。前端在运行时选择 Rust 命令或同源 Web 代理，见 [架构](architecture/README.md)。
 
-Tauri iOS 使用 WKWebView，并接入原生 TabBar / 返回控件；React 页面负责内容及其路由。Tab 切换和子页返回的历史语义见 [交互约定](web-interaction.md)。
+Tauri iOS 使用 WKWebView，并接入原生 TabBar / 返回胶囊 / 顶栏操作按钮（液态玻璃）；React 页面负责内容及其路由。原生控件悬浮在 WebView 之上、不参与页面平移，故出场为「转场过半后原地淡入」，且其明暗显式跟随**应用主题**（`set_appearance`），不随系统外观。Tab 切换和子页返回的历史语义见 [交互约定](web-interaction.md)。
 
 ## 纯 SwiftUI iOS
 

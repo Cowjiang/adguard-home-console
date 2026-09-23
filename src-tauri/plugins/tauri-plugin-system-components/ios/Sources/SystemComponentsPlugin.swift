@@ -35,6 +35,11 @@ class AccessoryArgs: Decodable {
     let image: String?
 }
 
+class SetAppearanceArgs: Decodable {
+    /// `"light"` or `"dark"` — the app's theme, which may differ from the system.
+    let style: String
+}
+
 class ConfigureTabBarArgs: Decodable {
     let items: [TabItemArgs]
     let selectedId: String?
@@ -97,10 +102,35 @@ class SystemComponentsPlugin: Plugin {
     /// Restores the layout viewport WebKit shrinks for the input accessory bar
     /// and then forgets to give back. See KeyboardViewportGuard.
     private var keyboardGuard: KeyboardViewportGuard?
+    /// Desired appearance for every native overlay (driven by the web app's theme,
+    /// not the system). Applied on set and whenever an overlay is mounted.
+    private var appearanceStyle: UIUserInterfaceStyle = .unspecified
 
     @objc public override func load(webview: WKWebView) {
         self.webView = webview
         self.keyboardGuard = KeyboardViewportGuard(webView: webview)
+    }
+
+    /// Sets the appearance (light/dark) native overlays should use — the web app's
+    /// theme may differ from the system appearance, and UIKit would otherwise follow
+    /// the system. iOS/macOS.
+    @objc public func setAppearance(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(SetAppearanceArgs.self)
+        let style: UIUserInterfaceStyle = args.style == "dark" ? .dark : .light
+        DispatchQueue.main.async { [weak self] in
+            self?.appearanceStyle = style
+            self?.applyAppearance()
+            invoke.resolve()
+        }
+    }
+
+    private func applyAppearance() {
+        overlay?.view.overrideUserInterfaceStyle = appearanceStyle
+        componentsOverlay?.view.overrideUserInterfaceStyle = appearanceStyle
+        for sheet in sheets.values {
+            sheet.overrideUserInterfaceStyle = appearanceStyle
+            sheet.presentedViewController?.overrideUserInterfaceStyle = appearanceStyle
+        }
     }
 
     @objc public func configureTabBar(_ invoke: Invoke) throws {
@@ -400,6 +430,7 @@ class SystemComponentsPlugin: Plugin {
         ])
         overlay.didMove(toParent: host)
         self.overlay = overlay
+        applyAppearance()
         return overlay
     }
 
@@ -425,6 +456,7 @@ class SystemComponentsPlugin: Plugin {
         ])
         overlay.didMove(toParent: host)
         self.componentsOverlay = overlay
+        applyAppearance()
         return overlay
     }
 }

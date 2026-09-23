@@ -21,6 +21,11 @@ class ComponentPropsArgs: Decodable {
     let glass: Bool?
     let prominent: Bool?
     let tint: String?
+    /// Content color of a button (title + icon). `tint` colors the background
+    /// instead, so a glass button keeps its capsule and tints only the glyphs.
+    let foreground: String?
+    /// Opacity (1.0 default) — JS fades a control out before removing it.
+    let alpha: Double?
     let width: Double?
     let height: Double?
     /// Top-left position in CSS points, for `absolute` placement.

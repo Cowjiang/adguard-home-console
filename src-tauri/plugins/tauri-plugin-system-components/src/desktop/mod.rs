@@ -114,6 +114,13 @@ impl<R: Runtime> SystemComponents<R> {
         Err(crate::Error::Unsupported("native sheets are iOS-only"))
     }
 
+    /// macOS follows the system appearance for its native chrome; the web app's
+    /// theme override only applies to the iOS overlays, so this is a no-op here.
+    pub fn set_appearance(&self, options: SetAppearanceOptions) -> crate::Result<()> {
+        let _ = &options;
+        Ok(())
+    }
+
     pub fn create_component(&self, options: CreateComponentOptions) -> crate::Result<()> {
         let _ = &options;
         macos_only!(
