@@ -96,7 +96,7 @@ final class ComponentsOverlayController: UIViewController {
                 container.alpha = 0
                 container.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
                 UIView.animate(
-                    withDuration: 0.32, delay: 0,
+                    withDuration: props?.appearDuration ?? 0.32, delay: 0,
                     usingSpringWithDamping: 0.85, initialSpringVelocity: 0.3,
                     options: [.beginFromCurrentState, .allowUserInteraction]
                 ) {
@@ -150,6 +150,15 @@ final class ComponentsOverlayController: UIViewController {
 
     func update(id: String, props: ComponentPropsArgs) -> Bool {
         guard let entry = components[id] else { return false }
+        // Opacity: JS fades a control out before removing it (removal is instant).
+        if let alpha = props.alpha {
+            UIView.animate(
+                withDuration: props.appearDuration ?? 0.18, delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction]
+            ) {
+                entry.container.alpha = CGFloat(alpha)
+            }
+        }
         // Geometry updates (DOM scroll/resize sync) act on the mounted view.
         if props.x != nil || props.y != nil || props.width != nil || props.height != nil {
             var frame = entry.container.frame

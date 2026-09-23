@@ -101,6 +101,10 @@ impl<R: Runtime> SystemComponents<R> {
         mobile_command!(self, "dismissSheet", options)
     }
 
+    pub fn set_appearance(&self, options: SetAppearanceOptions) -> crate::Result<()> {
+        ios_command!(self, "setAppearance", options)
+    }
+
     pub fn create_component(&self, options: CreateComponentOptions) -> crate::Result<()> {
         ios_command!(self, "createComponent", options)
     }

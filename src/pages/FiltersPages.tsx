@@ -114,7 +114,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   return (
     <Screen>
       <PageHeader back title={whitelist ? '白名单过滤器' : '黑名单过滤器'} subtitle={`${filters.length} 个列表 · 更新间隔 ${data ? hoursLabel(data.interval) : '…'}`} right={
-        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1">
+        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: '更新', sfSymbol: 'arrow.clockwise' }}>
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> 更新
         </HeaderAction>
       } />
@@ -476,7 +476,12 @@ export function RewritesPage() {
   return (
     <Screen>
       <PageHeader back title="DNS 重写" subtitle={`${entries?.length ?? 0} 条记录`} right={
-        <HeaderAction onClick={openAdd} label="添加" className="w-11 text-accent lg:w-10">
+        <HeaderAction
+          onClick={openAdd}
+          label="添加"
+          className="w-11 text-accent lg:w-10"
+          native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+        >
           <Plus size={19} />
         </HeaderAction>
       } />

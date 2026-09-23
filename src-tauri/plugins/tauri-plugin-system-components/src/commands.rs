@@ -64,6 +64,15 @@ pub(crate) async fn dismiss_sheet<R: Runtime>(
     app.system_components().dismiss_sheet(options)
 }
 
+/// Sets light/dark for every native overlay (tab bar, components, sheets).
+#[command]
+pub(crate) async fn set_appearance<R: Runtime>(
+    app: AppHandle<R>,
+    options: SetAppearanceOptions,
+) -> Result<()> {
+    app.system_components().set_appearance(options)
+}
+
 #[command]
 pub(crate) async fn create_component<R: Runtime>(
     app: AppHandle<R>,

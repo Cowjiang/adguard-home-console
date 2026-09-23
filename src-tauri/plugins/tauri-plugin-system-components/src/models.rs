@@ -235,6 +235,13 @@ pub struct ComponentProps {
     pub prominent: Option<bool>,
     /// Hex tint color `#RRGGBB[AA]`.
     pub tint: Option<String>,
+    /// Content color of a button (title + icon), hex `#RRGGBB[AA]`. `tint`
+    /// colors the background instead, so a glass button keeps its capsule and
+    /// tints only its glyphs.
+    pub foreground: Option<String>,
+    /// Opacity of the mounted view (1.0 default). Let JS fade a control out
+    /// before removing it, since removal itself is instant.
+    pub alpha: Option<f64>,
     /// Explicit size in points (defaults to the control's natural size).
     pub width: Option<f64>,
     pub height: Option<f64>,
@@ -270,6 +277,14 @@ pub struct ComponentProps {
     pub items: Option<Vec<TabItem>>,
     /// Initially-selected tab id (defaults to the first).
     pub selected_id: Option<String>,
+}
+
+/// Native overlays follow the web app's theme, not the system appearance.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAppearanceOptions {
+    /// `"light"` or `"dark"`.
+    pub style: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

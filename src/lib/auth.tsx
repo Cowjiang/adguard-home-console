@@ -1,6 +1,7 @@
 /**
  * 全局会话与主题:服务器配置、登录状态、主题切换
  */
+import { applyNativeAppearance } from './nativeAppearance'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { api, type Status } from './api'
 
@@ -55,6 +56,8 @@ function applyTheme(t: ThemeSetting) {
     (t === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
+  // 原生层(玻璃 TabBar/返回按钮/顶栏操作/原生弹层)不吃 CSS,必须显式告知明暗
+  applyNativeAppearance(dark)
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

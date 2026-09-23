@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "get_tab_bar_insets",
     "present_sheet",
     "dismiss_sheet",
+    "set_appearance",
     "create_component",
     "update_component",
     "update_components",

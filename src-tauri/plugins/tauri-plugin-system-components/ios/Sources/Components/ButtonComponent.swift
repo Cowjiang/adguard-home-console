@@ -56,11 +56,21 @@ enum ButtonComponent: ComponentBuilder {
                 config.image = ImageUtil.icon(decoded, side: 20, circular: props?.circular ?? false)
                 config.imagePadding = 6
             } else if let symbol = props?.sfSymbol {
-                config.image = UIImage(systemName: symbol)
+                // 图标着色必须落在符号图本身:iOS 26 的 glass 配置会忽略
+                // baseForegroundColor / imageColorTransformer 对符号的颜色作用,
+                // alwaysOriginal 让图像自带颜色,不被系统按自适应色重绘
+                var image = UIImage(systemName: symbol)
+                if let fg = props?.foreground.flatMap(ColorUtil.from(hex:)) {
+                    image = image?.withTintColor(fg, renderingMode: .alwaysOriginal)
+                }
+                config.image = image
                 config.imagePadding = 6
             }
             if let tint = props?.tint.flatMap(ColorUtil.from(hex:)) {
                 config.baseBackgroundColor = tint
+            }
+            if let fg = props?.foreground.flatMap(ColorUtil.from(hex:)) {
+                config.baseForegroundColor = fg
             }
             let control = UIButton(configuration: config)
             control.addAction(
@@ -79,6 +89,9 @@ enum ButtonComponent: ComponentBuilder {
             if let tint = props?.tint.flatMap(ColorUtil.from(hex:)) {
                 control.backgroundColor = tint
             }
+            if let fg = props?.foreground.flatMap(ColorUtil.from(hex:)) {
+                control.tintColor = fg
+            }
             control.addAction(
                 UIAction { _ in emit(id, "click", nil, nil, nil) }, for: .touchUpInside)
             return control
@@ -92,6 +105,9 @@ enum ButtonComponent: ComponentBuilder {
             if let label = props.label { config?.title = label }
             if let b64 = props.image, let decoded = ImageUtil.decode(b64) {
                 config?.image = ImageUtil.icon(decoded, side: 20, circular: props.circular ?? false)
+            }
+            if let fg = props.foreground.flatMap(ColorUtil.from(hex:)) {
+                config?.baseForegroundColor = fg
             }
             button.configuration = config
         } else {

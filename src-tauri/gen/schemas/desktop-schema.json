@@ -2193,10 +2193,10 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the system-components plugin.\n\n#### Granted Permissions\n\n- Full control of the native tab bar (`configure_tab_bar`,\n  `remove_tab_bar`, `show_tab_bar`, `hide_tab_bar`, `select_tab`,\n  `set_badge`, `get_tab_bar_insets`).\n- Native overlay components (`create_component`, `update_component`,\n  `remove_component`).\n- `register_listener` / `remove_listener` — required for `onTabSelected` /\n  `onComponentEvent` subscriptions.\n- macOS window glass (`is_glass_supported`, `set_window_glass`,\n  `clear_window_glass`).\n\n#### This default permission set includes:\n\n- `allow-configure-tab-bar`\n- `allow-remove-tab-bar`\n- `allow-show-tab-bar`\n- `allow-hide-tab-bar`\n- `allow-select-tab`\n- `allow-set-badge`\n- `allow-get-tab-bar-insets`\n- `allow-present-sheet`\n- `allow-dismiss-sheet`\n- `allow-create-component`\n- `allow-update-component`\n- `allow-update-components`\n- `allow-remove-component`\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-is-glass-supported`\n- `allow-set-window-glass`\n- `allow-clear-window-glass`",
+          "description": "Default permissions for the system-components plugin.\n\n#### Granted Permissions\n\n- Full control of the native tab bar (`configure_tab_bar`,\n  `remove_tab_bar`, `show_tab_bar`, `hide_tab_bar`, `select_tab`,\n  `set_badge`, `get_tab_bar_insets`).\n- Native overlay components (`create_component`, `update_component`,\n  `remove_component`), plus `set_appearance` (light/dark from the app theme).\n- `register_listener` / `remove_listener` — required for `onTabSelected` /\n  `onComponentEvent` subscriptions.\n- macOS window glass (`is_glass_supported`, `set_window_glass`,\n  `clear_window_glass`).\n\n#### This default permission set includes:\n\n- `allow-configure-tab-bar`\n- `allow-remove-tab-bar`\n- `allow-show-tab-bar`\n- `allow-hide-tab-bar`\n- `allow-select-tab`\n- `allow-set-badge`\n- `allow-get-tab-bar-insets`\n- `allow-present-sheet`\n- `allow-dismiss-sheet`\n- `allow-set-appearance`\n- `allow-create-component`\n- `allow-update-component`\n- `allow-update-components`\n- `allow-remove-component`\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-is-glass-supported`\n- `allow-set-window-glass`\n- `allow-clear-window-glass`",
           "type": "string",
           "const": "system-components:default",
-          "markdownDescription": "Default permissions for the system-components plugin.\n\n#### Granted Permissions\n\n- Full control of the native tab bar (`configure_tab_bar`,\n  `remove_tab_bar`, `show_tab_bar`, `hide_tab_bar`, `select_tab`,\n  `set_badge`, `get_tab_bar_insets`).\n- Native overlay components (`create_component`, `update_component`,\n  `remove_component`).\n- `register_listener` / `remove_listener` — required for `onTabSelected` /\n  `onComponentEvent` subscriptions.\n- macOS window glass (`is_glass_supported`, `set_window_glass`,\n  `clear_window_glass`).\n\n#### This default permission set includes:\n\n- `allow-configure-tab-bar`\n- `allow-remove-tab-bar`\n- `allow-show-tab-bar`\n- `allow-hide-tab-bar`\n- `allow-select-tab`\n- `allow-set-badge`\n- `allow-get-tab-bar-insets`\n- `allow-present-sheet`\n- `allow-dismiss-sheet`\n- `allow-create-component`\n- `allow-update-component`\n- `allow-update-components`\n- `allow-remove-component`\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-is-glass-supported`\n- `allow-set-window-glass`\n- `allow-clear-window-glass`"
+          "markdownDescription": "Default permissions for the system-components plugin.\n\n#### Granted Permissions\n\n- Full control of the native tab bar (`configure_tab_bar`,\n  `remove_tab_bar`, `show_tab_bar`, `hide_tab_bar`, `select_tab`,\n  `set_badge`, `get_tab_bar_insets`).\n- Native overlay components (`create_component`, `update_component`,\n  `remove_component`), plus `set_appearance` (light/dark from the app theme).\n- `register_listener` / `remove_listener` — required for `onTabSelected` /\n  `onComponentEvent` subscriptions.\n- macOS window glass (`is_glass_supported`, `set_window_glass`,\n  `clear_window_glass`).\n\n#### This default permission set includes:\n\n- `allow-configure-tab-bar`\n- `allow-remove-tab-bar`\n- `allow-show-tab-bar`\n- `allow-hide-tab-bar`\n- `allow-select-tab`\n- `allow-set-badge`\n- `allow-get-tab-bar-insets`\n- `allow-present-sheet`\n- `allow-dismiss-sheet`\n- `allow-set-appearance`\n- `allow-create-component`\n- `allow-update-component`\n- `allow-update-components`\n- `allow-remove-component`\n- `allow-register-listener`\n- `allow-remove-listener`\n- `allow-is-glass-supported`\n- `allow-set-window-glass`\n- `allow-clear-window-glass`"
         },
         {
           "description": "Enables the clear_window_glass command without any pre-configured scope.",
@@ -2275,6 +2275,12 @@
           "type": "string",
           "const": "system-components:allow-select-tab",
           "markdownDescription": "Enables the select_tab command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_appearance command without any pre-configured scope.",
+          "type": "string",
+          "const": "system-components:allow-set-appearance",
+          "markdownDescription": "Enables the set_appearance command without any pre-configured scope."
         },
         {
           "description": "Enables the set_badge command without any pre-configured scope.",
@@ -2383,6 +2389,12 @@
           "type": "string",
           "const": "system-components:deny-select-tab",
           "markdownDescription": "Denies the select_tab command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_appearance command without any pre-configured scope.",
+          "type": "string",
+          "const": "system-components:deny-set-appearance",
+          "markdownDescription": "Denies the set_appearance command without any pre-configured scope."
         },
         {
           "description": "Denies the set_badge command without any pre-configured scope.",

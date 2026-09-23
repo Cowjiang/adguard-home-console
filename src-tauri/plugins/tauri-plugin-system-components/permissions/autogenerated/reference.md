@@ -8,7 +8,7 @@ Default permissions for the system-components plugin.
   `remove_tab_bar`, `show_tab_bar`, `hide_tab_bar`, `select_tab`,
   `set_badge`, `get_tab_bar_insets`).
 - Native overlay components (`create_component`, `update_component`,
-  `remove_component`).
+  `remove_component`), plus `set_appearance` (light/dark from the app theme).
 - `register_listener` / `remove_listener` — required for `onTabSelected` /
   `onComponentEvent` subscriptions.
 - macOS window glass (`is_glass_supported`, `set_window_glass`,
@@ -25,6 +25,7 @@ Default permissions for the system-components plugin.
 - `allow-get-tab-bar-insets`
 - `allow-present-sheet`
 - `allow-dismiss-sheet`
+- `allow-set-appearance`
 - `allow-create-component`
 - `allow-update-component`
 - `allow-update-components`
@@ -378,6 +379,32 @@ Enables the select_tab command without any pre-configured scope.
 <td>
 
 Denies the select_tab command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`system-components:allow-set-appearance`
+
+</td>
+<td>
+
+Enables the set_appearance command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`system-components:deny-set-appearance`
+
+</td>
+<td>
+
+Denies the set_appearance command without any pre-configured scope.
 
 </td>
 </tr>

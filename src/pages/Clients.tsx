@@ -283,7 +283,12 @@ export default function Clients() {
         title="客户端"
         subtitle={`${clients.length} 个持久 · ${autos.length} 个自动识别`}
         right={
-          <HeaderAction onClick={() => openForm(null)} label="添加客户端" className="w-11 text-accent lg:w-10">
+          <HeaderAction
+            onClick={() => openForm(null)}
+            label="添加客户端"
+            className="w-11 text-accent lg:w-10"
+            native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+          >
             <Plus size={19} />
           </HeaderAction>
         }

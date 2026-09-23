@@ -11,6 +11,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { TAB_ROOT_ROUTES, TOP_LEVEL_ROUTES } from '../lib/routes'
 import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
+import { useNativeHeaderAction, type NativeHeaderSpec } from '../lib/nativeHeaderAction'
 import { navBack } from '../lib/backNav'
 import { copyText } from '../lib/clipboard'
 
@@ -131,18 +132,26 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
  * 顶栏右侧操作按钮(PageHeader 的 right 槽位):移动端高度与返回胶囊一致
  * (h-11 / 44pt,iOS 最小可点面积),图标按钮补 w-11、带文字的补 px-4;
  * 桌面端(lg)回到 h-10。所有顶栏右侧按钮都走这里或 Button 的 size="header"。
+ *
+ * 传 `native` 时,苹果壳内会创建同位的原生液态玻璃按钮接管显示 —— CSS 按钮
+ * 只保留占位(visibility:hidden),转场快照克隆里再补回可见,避免双按钮穿帮。
  */
-export function HeaderAction({ onClick, label, className = '', children }: {
+export function HeaderAction({ onClick, label, className = '', native, children }: {
   onClick?: (e: RMouseEvent<HTMLButtonElement>) => void
   label?: string
   className?: string
+  native?: NativeHeaderSpec
   children: ReactNode
 }) {
+  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), true)
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
+      data-header-action={native ? '1' : undefined}
+      data-native-hidden={nativeHandled ? '1' : undefined}
+      style={nativeHandled ? { visibility: 'hidden' } : undefined}
       className={`press glass flex h-11 flex-none items-center justify-center gap-1.5 rounded-full lg:h-10 ${className}`}
     >
       {children}
@@ -247,11 +256,14 @@ export function Switch({ on, onChange, danger, disabled, loading }: { on: boolea
 /* ---------- 按钮 ---------- */
 
 export function Button({
-  children, onClick, variant = 'primary', size = 'md', loading, disabled, className = '', type, label,
+  children, onClick, variant = 'primary', size = 'md', loading, disabled, className = '', type, label, native,
 }: {
   children: ReactNode; onClick?: (e: RMouseEvent<HTMLButtonElement>) => void; variant?: 'primary' | 'glass' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg' | 'header'; loading?: boolean; disabled?: boolean; className?: string; type?: 'button' | 'submit'; label?: string
+  native?: NativeHeaderSpec
 }) {
+  // size="header"(顶栏右侧槽位)时,苹果壳内交给原生液态玻璃按钮;CSS 只保留占位
+  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
   const base = 'press inline-flex items-center justify-center gap-2 rounded-full font-semibold select-none'
   // header:顶栏右侧槽位专用,移动端与返回胶囊同高(h-11),桌面与 sm 一致
   const sizes = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-[14.5px]', lg: 'h-12 px-6 text-[16px]', header: 'h-11 px-4 text-[13px] lg:h-8 lg:px-3.5' }[size]
@@ -273,8 +285,10 @@ export function Button({
       onClick={onClick}
       disabled={disabled || loading}
       aria-label={label}
-      className={`${base} ${sizes} ${variants} ${disabled || loading ? 'opacity-50' : ''} ${className}`}
-      style={style}
+      data-header-action={native ? '1' : undefined}
+      data-native-hidden={nativeHandled ? '1' : undefined}
+      className={`${base} ${sizes} ${variants} ${disabled || loading ? 'opacity-50' : ''} ${nativeHandled ? 'invisible' : ''} ${className}`}
+      style={nativeHandled ? { ...style, visibility: 'hidden' } : style}
     >
       {loading && <Loader2 size={15} className="animate-spin" />}
       {children}
