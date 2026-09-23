@@ -41,8 +41,6 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 - 新代码按既有分层落位：页面进 `src/pages/`，通用组件与基础控件进 `src/components/`，请求、状态与工具进 `src/lib/`；Swift 按 `Features/`、`Network/`、`State/`、`Models/`、`Design/`、`Support/` 分目录；Rust 保持一文件一件事。
 - 所有 AGH 请求经 `src/lib/api.ts` 的 `api()`；SWR 只用 `swrFetcher`，key 形如 `['<简称>', cfg, path]`。React Hooks 不放在条件返回之后。
 - AGH 时间字段一律毫秒，`stats.top_*` 是单键对象数组、消费前归一；端点、枚举与单位以 `docs/agh-api.md` 为准，其余实现约束见 `docs/engineering.md`。
-- 注释只解释约束和原因，不复述代码；背景与决策落进 `docs/` 或 `.agents/` 的 Markdown。面向用户的文案不写宣传语或口号。
-- 改完按范围跑校验：Web 跑 `npm run check` 与 `npm run build`；Rust 先起 `node scripts/mock-agh.mjs` 再 `cd src-tauri && cargo test`；iOS 走 `scripts/ios-signing.sh`；文档与提案跑 `node scripts/verify-proposals.mjs`。
 - commit message 用英文 conventional commit（`feat(scope):`、`fix(scope):`、`docs:`、`refactor(scope):`、`ci:`）；交流与仓库文档用中文。
 
 ## 分支与发布
