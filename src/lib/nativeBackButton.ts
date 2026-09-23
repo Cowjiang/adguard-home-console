@@ -15,7 +15,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { TAB_ROOT_ROUTES } from './routes'
-import { markBackTap } from './backNav'
+import { navBack } from './backNav'
 import { consumeGestureCommit, useGestureActive } from './routeTransition'
 
 const BTN_ID = 'nav-back'
@@ -69,16 +69,8 @@ export function useNativeBackButton(enabled: boolean) {
       .then(async (p) => {
         const l = await p.onComponentEvent((e) => {
           if (e.id !== BTN_ID || e.event !== 'click') return
-          const idx = (window.history.state as { idx?: number } | null)?.idx
-          if (idx !== undefined && idx <= 0) {
-            // 历史栈为空(AGH_ROUTE 直落二级页)回退父级;replace 语义避免把父级压进栈
-            const seg = pathRef.current.split('/').filter(Boolean)
-            navRef.current(seg.length > 1 ? `/${seg[0]}` : '/', { replace: true })
-            return
-          }
           // WKWebView 对程序化返回无原生动画(实测),返回转场由 CSS 快照层接管
-          markBackTap()
-          navRef.current(-1)
+          navBack(navRef.current, pathRef.current)
         })
         if (disposed) {
           void l.unregister()

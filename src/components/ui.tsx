@@ -11,7 +11,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { TAB_ROOT_ROUTES, TOP_LEVEL_ROUTES } from '../lib/routes'
 import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
-import { markBackTap } from '../lib/backNav'
+import { navBack } from '../lib/backNav'
 import { copyText } from '../lib/clipboard'
 
 /* ---------- 页面容器与标题 ---------- */
@@ -65,19 +65,7 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   // 移动端二级页:返回胶囊 + 居中标题固定在左上角,内容从下方滚过(对齐 iOS 26 液态玻璃导航栏)
   const floating = showBack && !isDesktop
 
-  const goBack = () => {
-    // 历史栈为空(AGH_ROUTE 直落二级页)时回退到父级路由;
-    // replace 语义,避免把父级重新压入历史栈
-    const idx = (window.history.state as { idx?: number } | null)?.idx
-    if (idx !== undefined && idx <= 0) {
-      const seg = pathname.split('/').filter(Boolean)
-      nav(seg.length > 1 ? `/${seg[0]}` : '/', { replace: true })
-      return
-    }
-    // 标记程序化返回,转场层据此区分“点按钮”与“侧滑手势”(后者由原生快照动画接管)
-    markBackTap()
-    nav(-1)
-  }
+  const goBack = () => navBack(nav, pathname)
 
   if (floating) {
     // 固定导航条与页面层做同步平移(push/pop),转场时随页面滑动。

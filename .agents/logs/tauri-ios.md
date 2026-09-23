@@ -315,3 +315,11 @@
 - 改法:`src/lib/routes.ts` 拆出 `TAB_ROOT_ROUTES`(移动端 4 个 tab 根)与 `TOP_LEVEL_ROUTES`(收窄为桌面侧边栏根);返回按钮显隐、TopBar 状态条、转场方向仲裁三处消费方改用前者;概览统计卡入口改 `nav('/clients')` push。push 落地后侧滑快照/滚动恢复/深链回退均由现有机制自动生效,Rust 侧零改动。
 - 坑再确认:重建前必须 `rm -rf src-tauri/gen/apple/build` + `touch src-tauri/src/lib.rs`,否则模拟器跑旧包误判(§13.1 同款,本次主动执行)。
 - 验收:用户模拟器验证通过(push 转场 + 原生按钮 + 侧滑返回、tab 互切不可侧滑跨 tab 回归正常);`npm run check` / `npm run build` 绿。
+
+### 14.1 后续:移动端不得以 replace 进入父级列表页(2026-09-24 同日)
+
+用户复测追加「移动端不能把客户端当成 replace 处理,否则在浏览器没法返回上一页」。残余路径:`ClientFormPage` 保存后 `nav('/clients', { replace: true })` —— 从列表 push 进表单再保存,栈里留下两条 `/clients`,浏览器/系统返回按一次等于没动;另有 `ClientDetailPage` 删除后裸 `nav(-1)`,直落该页时空操作。
+
+- 改法:把「有历史条目就 POP(带 backNav 标记)、栈空才 replace 回父级」抽成 `src/lib/backNav.ts` 的 `navBack(nav, pathname)`,返回胶囊(`ui.tsx`)、原生按钮(`nativeBackButton.ts`)、表单保存/取消、详情删除收尾共用一个实现,三处重复的内联逻辑一并消除。
+- 边界:桌面端添加/编辑与详情走居中弹层(`Clients.openForm`/`openDetail` 的 isDesktop 分支),不经过这两个页面路由,行为不变;`ClientFormPage`/`ClientDetailPage` 的深链场景由 `navBack` 的栈空分支兜底。
+- 验收:`npm run check` / `npm run build` 绿;模拟器包已重建安装(iPhone 18 Pro),等用户复测保存返回与浏览器返回。

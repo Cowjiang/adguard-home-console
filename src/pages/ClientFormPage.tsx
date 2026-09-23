@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useSWRConfig } from 'swr'
 import type { AghClient } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { navBack } from '../lib/backNav'
 import { PageHeader, Screen } from '../components/ui'
 import { ClientForm, emptyClient } from './Clients'
 
@@ -10,8 +11,9 @@ export default function ClientFormPage() {
   const nav = useNavigate()
   const { cfg } = useAuth()
   const { mutate } = useSWRConfig()
-  const { state } = useLocation() as {
+  const { state, pathname } = useLocation() as {
     state?: { initial?: Partial<AghClient>; isNew?: boolean; prefillIp?: string }
+    pathname: string
   }
   const isNew = state?.isNew ?? true
   const initial: Partial<AghClient> = state?.initial
@@ -25,10 +27,10 @@ export default function ClientFormPage() {
           initial={initial}
           isNew={isNew}
           showTitle={false}
-          onClose={() => nav(-1)}
+          onClose={() => navBack(nav, pathname)}
           onSaved={() => {
             if (cfg) mutate(['clients', cfg, '/clients'])
-            nav('/clients', { replace: true })
+            navBack(nav, pathname)
           }}
         />
       </div>
