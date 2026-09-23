@@ -18,6 +18,7 @@
 | 2026-09-23 | bug-fix | [修正客户端排序控件的原生选择器与等高](proposals/bug-fix/2026-09-23-clients-sort-native-select.md) | implemented |
 | 2026-09-23 | bug-fix | [让深色浮层显示玻璃并修复 backdrop-filter 前缀失效](proposals/bug-fix/2026-09-23-glass-popover-blur.md) | implemented |
 | 2026-09-23 | process | [拆分 docs 中的持久事实与工作过程](proposals/process/2026-09-23-separate-durable-docs.md) | implemented |
+| 2026-09-23 | process | [修正 release 工作流的变更列表与历史保留策略](proposals/process/2026-09-23-release-notes-and-history-retention.md) | implemented |
 
 ## 与 docs/ 的分工
 
