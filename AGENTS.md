@@ -43,6 +43,16 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 - AGH 时间字段一律毫秒，`stats.top_*` 是单键对象数组、消费前归一；端点、枚举与单位以 `docs/agh-api.md` 为准，其余实现约束见 `docs/engineering.md`。
 - commit message 用英文 conventional commit（`feat(scope):`、`fix(scope):`、`docs:`、`refactor(scope):`、`ci:`）；交流与仓库文档用中文。
 
+## 检查
+
+改完按改动范围跑对应检查：
+
+- Web 前端：`npm run check`（`tsconfig.json` 开了 `strict`）与 `npm run build`。
+- Rust：先起 `node scripts/mock-agh.mjs`，再 `cd src-tauri && cargo test`；mock 不在时依赖它的用例会静默早退，仍报 ok。
+- iOS：工程生成与构建走 `scripts/ios-signing.sh`，不要绕过脚本直接调 `xcodegen` 或 `tauri ios init`。
+- 文档与提案：`node scripts/verify-proposals.mjs`，改动引用路径时加 `--links`。
+- 纯 `docs/`、`.agents/` 改动不需要跑前端或 Rust 测试。
+
 ## 分支与发布
 
 - Direct 轨的小改动可直接提交到 `dev` 并推送；Noted 轨通过提案与 PR 评审后合入 `dev`。`dev` 的 push 不触发 release。
