@@ -44,6 +44,8 @@ class ComponentPropsArgs: Decodable {
     let itemPositioning: String?
     /// Fade + scale-in the view on creation (native appear affordance).
     let appearAnimation: Bool?
+    let appearOffsetX: Double?
+    let appearDuration: Double?
 }
 
 class CreateComponentArgs: Decodable {
