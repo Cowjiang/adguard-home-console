@@ -1,3 +1,5 @@
+import type { NavigateFunction } from 'react-router-dom'
+
 /**
  * "点击返回按钮"标记:用于区分程序化返回与侧滑手势返回。
  * 两者在 react-router 里都是 POP,但侧滑时 WKWebView 已有原生快照平移动画,
@@ -14,4 +16,22 @@ export function consumeBackTap(): boolean {
   const v = pending
   pending = false
   return v
+}
+
+/**
+ * 统一返回语义:有历史条目就 POP(带标记,供转场层播放返回动画);栈空
+ * (直落子页 / 刷新)才 replace 回父级。
+ *
+ * 返回胶囊、原生返回按钮、表单保存与删除收尾共用此函数 —— 移动端不得用
+ * replace 导航到父级页,那会在栈里留下重复条目,浏览器返回一次看起来"没反应"。
+ */
+export function navBack(nav: NavigateFunction, pathname: string) {
+  const idx = (window.history.state as { idx?: number } | null)?.idx
+  if (idx !== undefined && idx <= 0) {
+    const seg = pathname.split('/').filter(Boolean)
+    nav(seg.length > 1 ? `/${seg[0]}` : '/', { replace: true })
+    return
+  }
+  markBackTap()
+  nav(-1)
 }

@@ -4,6 +4,7 @@ import useSWR from 'swr'
 import { Laptop } from 'lucide-react'
 import { api, swrFetcher, type ClientsData } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { navBack } from '../lib/backNav'
 import { ClientDetail, type ClientDetailData } from '../components/ClientDetail'
 import { PageHeader, EmptyState, useConfirm, toast } from '../components/ui'
 
@@ -11,7 +12,7 @@ export default function ClientDetailPage() {
   const { cfg } = useAuth()
   const nav = useNavigate()
   const confirm = useConfirm()
-  const { state } = useLocation() as { state?: { data?: ClientDetailData } }
+  const { state, pathname } = useLocation() as { state?: { data?: ClientDetailData }; pathname: string }
   const data = state?.data
 
   // 与列表页同 key,增删改后列表自动刷新
@@ -36,7 +37,7 @@ export default function ClientDetailPage() {
       await api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } })
       mutate()
       toast('客户端已删除')
-      nav(-1)
+      navBack(nav, pathname)
     } catch (e: any) {
       toast('删除失败:' + e.message, 'err')
     }
