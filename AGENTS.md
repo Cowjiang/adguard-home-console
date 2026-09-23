@@ -15,6 +15,21 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 
 `docs/` 是当前代码库事实，随实现更新；`.agents/` 管提案、技能和过程材料。历史计划不直接充当当前待办。运行行为以代码为准，发现事实页失准时同步修正。
 
+## 目录
+
+| 路径 | 内容 |
+| --- | --- |
+| `src/` | React 前端：`pages/`、`components/`、`lib/`、`types/` |
+| `server/` | Express 代理与静态托管，单文件 `index.mjs` |
+| `src-tauri/` | Tauri 2 壳、Rust 代理与平台资源；`plugins/` 是本仓 Tauri 插件源码，`gen/`、`target/` 是生成物 |
+| `ios/` | 纯 SwiftUI iOS 应用；`AdGuardConsole.xcodeproj` 由 xcodegen 生成，不入库 |
+| `scripts/` | `mock-agh.mjs` 契约模拟、`verify-proposals.mjs` 提案校验、iOS 签名与部署、`release-notes.sh`、`server-pull.sh` |
+| `docs/` | 当前代码库的持久事实，按主题从 `docs/README.md` 进入 |
+| `.agents/` | 提案、技能与过程记录，按用途从 `.agents/README.md` 进入 |
+| `.github/workflows/` | `release.yml`：`main` 推送时构建产物并发布 Release |
+
+`dist/`、`node_modules/`、`src-tauri/gen/`、`src-tauri/target/` 是构建或生成产物，`_probe/` 是本机忽略材料，都不入库。
+
 ## 始终遵守
 
 - 非平凡变更先按 `.agents/README.md` 指引登记提案，再实施；小改动走 Direct 轨。提案模板和分类以流水线文档为准。
