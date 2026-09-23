@@ -9,7 +9,7 @@ import { useNativeBackButton } from '../lib/nativeBackButton'
 import { TransitionArea } from '../lib/routeTransition'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
-import { TOP_LEVEL_ROUTES, NavScrim } from './ui'
+import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim } from './ui'
 
 type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
 
@@ -37,12 +37,12 @@ export function Ambient() {
   return <div className="ambient" />
 }
 
-/** 顶部悬浮状态条(仅顶级页面:二级页顶部由固定导航栏接管,见 docs/WEB_INTERACTION.md) */
+/** 顶部悬浮状态条(仅移动端 tab 根页面:二级页顶部由固定导航栏接管,见 docs/WEB_INTERACTION.md) */
 function TopBar() {
   const { status } = useAuth()
   const { pathname } = useLocation()
   const protected_ = status?.protection_enabled
-  if (!TOP_LEVEL_ROUTES.includes(pathname)) return null
+  if (!TAB_ROOT_ROUTES.includes(pathname)) return null
   return (
     <header
       className="pointer-events-none fixed left-0 right-0 top-0 z-40 flex justify-center px-4 lg:hidden"

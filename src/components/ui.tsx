@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { TOP_LEVEL_ROUTES } from '../lib/routes'
+import { TAB_ROOT_ROUTES, TOP_LEVEL_ROUTES } from '../lib/routes'
 import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
 import { useNativeBackShown } from '../lib/nativeBackButton'
 import { markBackTap } from '../lib/backNav'
@@ -17,7 +17,7 @@ import { copyText } from '../lib/clipboard'
 /* ---------- 页面容器与标题 ---------- */
 
 /** 顶级路由定义在 lib/routes.ts,此处 re-export 供旧引用方兼容 */
-export { TOP_LEVEL_ROUTES }
+export { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES }
 
 /** page-in 闩:滑动转场进行中跳过 page-in 淡入,避免与平移叠加;闩住一次性,
  *  防止转场结束后 dir 归零时 page-in 类重新补挂导致动画重播。
