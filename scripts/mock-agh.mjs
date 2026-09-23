@@ -2,7 +2,7 @@
  * 本地 Mock AdGuard Home v0.107.79 — 供 iOS 两条线(Tauri 壳 / SwiftUI 原生)离线测试。
  * 用法:node scripts/mock-agh.mjs  → 监听 127.0.0.1:3990
  * 鉴权:任意非空 Basic 凭据即可(缺 Authorization → 401),用于走通 401 分支。
- * 契约依据:src/lib/api.ts + docs/AGH_API.md
+ * 契约依据:src/lib/api.ts + docs/agh-api.md
  *   - interval/duration 单位毫秒;avg_processing_time 与 top_upstreams_avg_time 是秒(浮点)
  *   - stats 的 top_* 为单键对象数组(新格式);reason 为 12 个字符串枚举
  *   - /protection POST {enabled, duration(ms)};状态在内存中可变,供 UI 操作回读

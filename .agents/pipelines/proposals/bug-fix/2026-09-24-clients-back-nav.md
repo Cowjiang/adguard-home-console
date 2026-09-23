@@ -31,5 +31,5 @@ iOS 壳中经概览统计卡进入 `/clients` 后既无原生玻璃返回按钮�
 
 ## Note
 
-- 分支 `fix/clients-back-nav`（自 dev 切出），改动 7 文件 +20/−12，含 `docs/WEB_INTERACTION.md` 路由约定同步。
+- 分支 `fix/clients-back-nav`（自 dev 切出），改动 7 文件 +20/−12，含 `docs/web-interaction.md` 路由约定同步。
 - 施工记录见 `.agents/logs/tauri-ios.md` §14。

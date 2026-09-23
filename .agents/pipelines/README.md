@@ -18,6 +18,10 @@
 | 2026-09-23 | bug-fix | [修正客户端排序控件的原生选择器与等高](proposals/bug-fix/2026-09-23-clients-sort-native-select.md) | implemented |
 | 2026-09-23 | bug-fix | [让深色浮层显示玻璃并修复 backdrop-filter 前缀失效](proposals/bug-fix/2026-09-23-glass-popover-blur.md) | implemented |
 | 2026-09-23 | process | [拆分 docs 中的持久事实与工作过程](proposals/process/2026-09-23-separate-durable-docs.md) | implemented |
+| 2026-09-23 | process | [修正 release 工作流的变更列表与历史保留策略](proposals/process/2026-09-23-release-notes-and-history-retention.md) | implemented |
+| 2026-09-23 | process | [收敛 Agent 入口并按任务逐层披露](proposals/process/2026-09-23-progressive-agent-entrypoints.md) | implemented |
+| 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
+| 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
 
 ## 与 docs/ 的分工
 

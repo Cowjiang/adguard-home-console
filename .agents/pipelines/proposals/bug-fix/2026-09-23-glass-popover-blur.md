@@ -7,7 +7,7 @@
 
 ## Goal
 
-两件事：①`docs/PROJECT_MEMORY.md` §4 原先的"性能红线：大面积 backdrop-filter + 背景动画会发烫、已把卡片全改实色、勿回退"容易被读成全面禁用模糊，与用户真实意图不符；②深色下浮层（下拉选择器 / Sheet / Toast / 图表 tooltip / 登录卡）虽然带 `blur(24)`，但底色 `--glass-strong:#15171d` 完全不透明，玻璃实际看不见。排查过程中还发现模糊在多数引擎上根本没生效。
+两件事：①`.agents/reviews/2026-09-23-project-memory-snapshot.md` §4 原先的"性能红线：大面积 backdrop-filter + 背景动画会发烫、已把卡片全改实色、勿回退"容易被读成全面禁用模糊，与用户真实意图不符；②深色下浮层（下拉选择器 / Sheet / Toast / 图表 tooltip / 登录卡）虽然带 `blur(24)`，但底色 `--glass-strong:#15171d` 完全不透明，玻璃实际看不见。排查过程中还发现模糊在多数引擎上根本没生效。
 
 ## Decision
 
@@ -26,4 +26,4 @@
 
 ## Note
 
-验证环境：playwright + Chrome，390×844 与 1440×900，dist/8787 + mock AGH 3990，13 项断言全绿；排查手法（直接读 `dist/assets/*.css` 看该属性是否只剩前缀版）与结论已写进 `docs/PROJECT_MEMORY.md` §7 坑 19，设计侧表述写进 §4「模糊边界」，过程记录见 `docs/PC_ADAPTATION.md` 同名小节。
+验证环境：playwright + Chrome，390×844 与 1440×900，dist/8787 + mock AGH 3990，13 项断言全绿；排查手法（直接读 `dist/assets/*.css` 看该属性是否只剩前缀版）与结论已写进 `docs/engineering.md`「UI 实现边界」与 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §7 坑 19，设计侧表述写进该快照 §4「模糊边界」，过程记录见 `.agents/reviews/2026-09-23-desktop-adaptation-snapshot.md` 同名小节。
