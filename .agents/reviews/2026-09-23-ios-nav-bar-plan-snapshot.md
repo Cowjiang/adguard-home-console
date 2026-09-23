@@ -1,5 +1,7 @@
 # 顶部标题栏改造方案 —— 对齐 iOS 26 液态玻璃导航栏（固定返回按钮）
 
+> 2026-09-23 迁移快照。本文保留当时的计划、调研或施工过程；当前事实以 docs/README.md 的主题页为准，未完成事项须重新登记提案。
+
 > 2026-09-22。**更新：P1 已在分支 `feat/navbar-glass` 实施并验证通过**（模拟器一级/二级页、滚动穿透、滚动中返回；浏览器移动视口 right 动作；桌面端 ≥lg 无回归）。实施中发现并修复：Tailwind 任意值类名含空格不生成（`h-[calc(env(...) + 72px)]`），NavScrim 高度改用 inline style。桌面端与 P2 未动。下文为方案存档。
 
 ## 1. 现状（问题定位）
@@ -95,4 +97,4 @@ NavBar（fixed，top = env(safe-area-inset-top)，z-40，pointer-events-none 容
 - [Liquid Glass 技术总览](https://developer.apple.com/documentation/technologyoverviews/liquid-glass)
 - [UIKit — Appearance customization（UIGlassEffect / UIScrollEdgeEffect / ScrollEdgeElementContainerInteraction）](https://developer.apple.com/documentation/uikit/appearance-customization)
 - [Landmarks: Building an app with Liquid Glass（官方示例）](https://developer.apple.com/documentation/swiftui/landmarks-building-an-app-with-liquid-glass)
-- 项目内红线：iOS 大面积 backdrop-filter 发烫（见 docs/IOS_NATIVE_LOG.md 相关记录）
+- 项目内红线：iOS 大面积 backdrop-filter 发烫（见 .agents/logs/ios-native.md 相关记录）

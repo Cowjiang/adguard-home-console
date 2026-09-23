@@ -6,7 +6,7 @@
 
 | 目录 | 放什么 | 判据 |
 | --- | --- | --- |
-| `docs/` | 常青规格与知识：项目记忆、施工蓝图、交互定稿 | 会被反复读、随代码演进更新 |
+| `docs/` | 当前代码库的持久事实：架构、契约、交互、平台约定 | 当前仍成立，随代码演进更新 |
 | `.agents/` | agent 能力，以及带时间属性的过程产物：日志、报告、验收、证据 | 一次性产出，记录"当时发生了什么" |
 
 ## 布局
@@ -27,7 +27,7 @@
 
 - **流水类**（持续追加的日志）：不带日期前缀，如 `logs/tauri-ios.md`、`logs/orchestration.md`；日期写在文内。
 - **快照类**（一次性产出的报告 / 验收 / 任务书）：前缀 `YYYY-MM-DD-`，如 `reviews/2026-09-21-ios-visual-acceptance.md`。同一天多份靠主题区分。
-- 引用其他文件一律写**仓库根相对路径**（`docs/PROJECT_MEMORY.md`、`.agents/logs/tauri-ios.md`），不要写相对本文件位置的 `../` 路径。
+- 引用其他文件一律写**仓库根相对路径**（`docs/AGH_API.md`、`.agents/logs/tauri-ios.md`），不要写相对本文件位置的 `../` 路径。
 
 ## skills/
 
@@ -82,4 +82,4 @@ node scripts/verify-proposals.mjs
 ## 维护
 
 - 新增技能或提案后，同步根 `AGENTS.md` 的「必读文档」，让 agent 知道去哪儿找。
-- 本目录随仓库分发：**勿放机器专属配置、路径、凭据或密钥**，也别写某台机器上的工具与装载细节（签名值走 `.env.signing`，见 `docs/PROJECT_MEMORY.md` §12）。
+- 本目录随仓库分发：**勿放机器专属配置、路径、凭据或密钥**。历史快照只记录故障机制与通用复现方式，不能当作当前操作要求；签名值走 `.env.signing`，见 `docs/NATIVE_PLATFORMS.md`。

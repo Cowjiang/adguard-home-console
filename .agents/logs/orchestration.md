@@ -1,7 +1,7 @@
 # iOS 会话施工总日志(编排视角)
 
 > 2026-09-21。本文由编排 agent 维护,汇总两条并行线;各线细节见 `.agents/logs/tauri-ios.md`(Tauri 壳)与 `.agents/logs/ios-native.md`(SwiftUI 原生)。
-> 用户指令:① 优先按 `RUST_PLAN.md` Phase 5.5 用 Tauri + 第三方插件先做一版;② 同时按 `IOS_NATIVE_PLAN.md` 做纯原生版;③ 代码放各自新目录;④ 只用 mock 数据,不访问真实服务;⑤ 过程记录进 md。
+> 用户指令:① 优先按 `.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` Phase 5.5 用 Tauri + 第三方插件先做一版;② 同时按 `.agents/reviews/2026-09-23-ios-native-plan-snapshot.md` 做纯原生版;③ 代码放各自新目录;④ 只用 mock 数据,不访问真实服务;⑤ 过程记录进 md。
 
 ## 1. 环境盘点(已核实)
 
@@ -17,7 +17,7 @@
 ## 2. 共享基础设施(编排层建设,两线共用)
 
 - **mock AGH 服务器**:`scripts/mock-agh.mjs`(Node 内置 http,零依赖),`nohup` 常驻 `127.0.0.1:3990`,日志 `/tmp/mock-agh.log`。
-  - 严格按 `PROJECT_MEMORY.md` §3 契约实现:interval/duration 毫秒;`avg_processing_time`、`top_upstreams_avg_time` 为**秒**(浮点,对齐 Web 版 `fmtMs` 语义);stats `top_*` 为单键对象数组;reason 12 枚举;querylog 支持 search/reason[]/older_than/offset/limit。
+  - 严格按 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §3 契约实现:interval/duration 毫秒;`avg_processing_time`、`top_upstreams_avg_time` 为**秒**(浮点,对齐 Web 版 `fmtMs` 语义);stats `top_*` 为单键对象数组;reason 12 枚举;querylog 支持 search/reason[]/older_than/offset/limit。
   - `POST /protection {enabled, duration}` 修改内存状态,`/status` 立即回读 → 可端到端测试防护开关与倒计时。
   - 鉴权:任意非空 Basic 凭据(推荐 admin/demo);缺 Authorization → 401。
   - 已验证:status/stats(数组形态 KVMap)/querylog/401 全部正常。
@@ -42,6 +42,6 @@
 ## 4. 编排层待办(两线完成后)
 
 - [x] 原生线截图审查(01–09 全部过目,数据与 mock 一致,材质/文案符合用户口味)
-- [x] 回填 `IOS_NATIVE_PLAN.md` §4 勾选与 §7 进度表(N0–N3)
-- [ ] 审查 Tauri 线截图与日志,回填 `RUST_PLAN.md` §7 与 Phase 5.5 结论
+- [x] 回填 `.agents/reviews/2026-09-23-ios-native-plan-snapshot.md` §4 勾选与 §7 进度表(N0–N3)
+- [ ] 审查 Tauri 线截图与日志,回填 `.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` §7 与 Phase 5.5 结论
 - [ ] 汇总 spike 结论:Phase 5.5 决策规则(材质统一/滚动跟手/稳定)→ 继续 Tauri 还是回退纯原生

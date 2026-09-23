@@ -1,6 +1,6 @@
 # Tauri iOS 施工日志(Phase 5.5 混合壳线)
 
-> 2026-09-21。按 `RUST_PLAN.md` Phase 5.5 施工:Tauri 2 壳 + 现有 React 前端 + Rust 代理 + 社区原生液态玻璃 TabBar 插件 spike。
+> 2026-09-21。按 `.agents/reviews/2026-09-23-tauri-platform-plan-snapshot.md` Phase 5.5 施工:Tauri 2 壳 + 现有 React 前端 + Rust 代理 + 社区原生液态玻璃 TabBar 插件 spike。
 > 与 `ios/`(纯 SwiftUI 线)完全独立,本线不触碰 `ios/` 目录。
 
 ## 1. 环境装配
@@ -45,7 +45,7 @@
 
 - **api.ts(计划内,唯一必改)**:探测 `window.__TAURI_INTERNALS__` → `invoke('agh_fetch', { method, target, authHeader, pathWithQuery, bodyJson })`,把返回的 `{status, content_type, body_text}` 按 fetch 语义归一(`!2xx → ApiError(status, data?.error || …)`;IPC 异常归一为 502)。浏览器路径原样保留,`tsc` 零错。AbortSignal 在 Tauri 分支不支持(SWR 可接受)。
 - **tauri ios init(坑 C)**:`gen/apple` 生成成功,但 cargo-mobile2 依赖探测把 `libimobiledevice` 的 bin 名写死为 `idevicesyslog`,缺失就走 `brew install`(macOS 27 必崩)。绕过:在 PATH 前置 stub `/tmp/tauri-stub-bin/idevicesyslog`(exit 0 的空脚本;仅骗过探测,模拟器链路不使用真机 syslog 工具),xcodegen 用 `/tmp/xcodegen/bin/xcodegen`(并行任务下载的 2.46.0),pod 1.12.1 已在本机。产物:`adguard-home-console.xcodeproj`(bundle id `com.adguardhome.console`)。
-  - **2026-09-23 更正(绕过手段已作废)**:本机 brew 恢复可用,`tauri ios init` 会自行 `brew install` 所需依赖(含 xcodegen 2.46.0 → `/opt/homebrew/bin/xcodegen`),**不需要** `idevicesyslog` stub,也不需要 `/tmp/xcodegen`;两个 /tmp 路径均已随临时目录清理。另:签名与 Bundle ID 现由 `project.yml` 占位符 + `.env.signing` 提供,见 `PROJECT_MEMORY.md` §12。
+  - **2026-09-23 更正(绕过手段已作废)**:本机 brew 恢复可用,`tauri ios init` 会自行 `brew install` 所需依赖(含 xcodegen 2.46.0 → `/opt/homebrew/bin/xcodegen`),**不需要** `idevicesyslog` stub,也不需要 `/tmp/xcodegen`;两个 /tmp 路径均已随临时目录清理。另:签名与 Bundle ID 现由 `project.yml` 占位符 + `.env.signing` 提供,见 `.agents/reviews/2026-09-23-project-memory-snapshot.md` §12。
 - **图标**:`npx tauri icon` 生成全套(见 §3)。
 
 ## 5. 插件 spike:tauri-plugin-system-components(主选,v0.1.8)
@@ -215,7 +215,7 @@
 
 ## 11. WKWebView 系统侧滑返回(方案 A-1,2026-09-22)
 
-调研见 `docs/IOS_SWIPE_BACK_RESEARCH.md`(wry 0.55.1 有 `with_back_forward_navigation_gestures` 但 tauri 2.11.6 未透出;经 `with_webview` → `PlatformWebview::inner()` 拿 WKWebView 指针运行时开启,objc2-web-kit 类型绑定仅支持 macOS 故用 objc2 `msg_send!`)。分支 `feat/ios-swipe-back`。
+调研见 `.agents/reviews/2026-09-23-ios-swipe-back-research.md`(wry 0.55.1 有 `with_back_forward_navigation_gestures` 但 tauri 2.11.6 未透出;经 `with_webview` → `PlatformWebview::inner()` 拿 WKWebView 指针运行时开启,objc2-web-kit 类型绑定仅支持 macOS 故用 objc2 `msg_send!`)。分支 `feat/ios-swipe-back`。
 
 ### 实现
 
@@ -223,7 +223,7 @@
 2. `src-tauri/src/lib.rs`:`setup` 钩子里 `enable_back_forward_gestures`——`get_webview_window("main")` + `with_webview`,`msg_send![wk, setAllowsBackForwardNavigationGestures: true]`。
 3. `src/lib/nativeTabbar.ts`:tab 切换/回根全部 `navigate(tab.to, { replace: true })`——tab 导航不进历史栈,侧滑只走业务层级(层级下钻仍 push)。CSS 版 NavLink(浏览器回退)保持 push 属正常网页行为,不动。
 
-### 模拟器验证(iPhone 18 Pro,UDID 1243721C-…,截图 `shots-tauri/verify/swipe-*.png`)
+### 模拟器验证(iPhone 18 Pro,UDID 1243721C-…,截图 `.agents/evidence/tauri/verify/swipe-*.png`)
 
 | 项 | 结果 |
 | --- | --- |
@@ -241,7 +241,7 @@
 
 ## 12. 客户端排序按钮:高度对齐 + 苹果端补原生 select 分支(2026-09-23)
 
-- 触发:用户反馈客户端页排序按钮与同行搜索框不等高,且 iOS 上点开的是自绘下拉。细节与决策见 `docs/PC_ADAPTATION.md` 同名小节。
+- 触发:用户反馈客户端页排序按钮与同行搜索框不等高,且 iOS 上点开的是自绘下拉。细节与决策见 `.agents/reviews/2026-09-23-desktop-adaptation-snapshot.md` 同名小节。
 - 高度:实测 `SearchBar` 43.75px(`py-2.5` + 15px×1.45)vs 按钮写死 `h-[42px]` → 上下各差 0.88px;改 `self-stretch` 跟随行高,复测偏差 0。
 - 原生入口:**§9.1 方案 A 的结论在此收尾**——`showPicker()` 在 WebKit 不存在(MDN BCD 亦记 Safari 为 preview + 开关),`isAppleMobile()` 为真时 `pickViaNativeSelect()` 恒返回 false,故任何"只调 usePick"的新入口在 iPhone 上必然退化成自绘下拉(排序按钮即此)。修复:排序入口补上与其他 5 处一致的 `isAppleMobile() ? <PickSelect/> : usePick` 分支;`nativePickers.ts` 只留 `isAppleMobile()`,`pickViaNativeSelect`/冷却期删除(§9.1 铺开建议里的"方案 A 代码建议删除"至此执行)。
 - 验证(Windows,playwright + Chrome 390×844,dist/8787 + mock 3990):苹果环境伪造 UA+vendor 后——真实 `select[aria-label="排序方式"]` 5 项、文字透明、`elementFromPoint` 命中该 select、无冗余 button;`name-asc`/`name-desc` 排序列与 `localeCompare('zh-Hans-CN')` 正/逆序一致且**全程未出自绘菜单**。非苹果环境——不渲染 select,点击弹自绘锚定下拉、选中生效后关闭。双端高度偏差 0。
