@@ -4,7 +4,7 @@
 
 | 主题 | 文档 | 主要代码来源 |
 | --- | --- | --- |
-| 三条交付线与请求路径 | [架构](ARCHITECTURE.md) | `src/App.tsx`、`src/lib/api.ts`、`server/index.mjs` |
+| 结构与请求路径 | [架构](architecture/README.md) | `src/`、`server/`、`src-tauri/`、`ios/` |
 | AdGuard Home v0.107.79 契约 | [API 契约](AGH_API.md) | `src/lib/api.ts`、`scripts/mock-agh.mjs` |
 | Web 端布局与交互 | [交互约定](WEB_INTERACTION.md) | `src/components/`、`src/pages/`、`src/index.css` |
 | Tauri 与 SwiftUI | [原生平台](NATIVE_PLATFORMS.md) | `src-tauri/`、`ios/`、`scripts/ios-signing.sh` |
