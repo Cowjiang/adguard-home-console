@@ -3,17 +3,17 @@
 **Status:** current
 **Updated:** 2026-09-23
 
-`docs/` 记录当前代码与已定下的持久约定。按任务选一份主题页，再核对对应代码；实现变化时同步修正事实页。本目录不承担待办队列。
+`docs/` 记录当前代码与已定下的持久约定。本页只管本层：列出有哪些主题、入口在哪、怎么维护；点进入口再按需往下读，实现变化时同步修正事实页。本目录不承担待办队列。
 
-| 主题 | 文档 | 主要代码来源 |
+| 主题 | 入口 | 内容 |
 | --- | --- | --- |
-| 结构与请求路径 | [架构](architecture/README.md) | `src/`、`server/`、`src-tauri/`、`ios/` |
-| AdGuard Home v0.107.79 契约 | [API 契约](agh-api.md) | `src/lib/api.ts`、`scripts/mock-agh.mjs` |
-| Web 端布局与交互 | [交互约定](web-interaction.md) | `src/components/`、`src/pages/`、`src/index.css` |
-| Tauri 与 SwiftUI | [原生平台](native-platforms.md) | `src-tauri/`、`ios/`、`scripts/ios-signing.sh` |
-| 当前实现的工程约束 | [工程约束](engineering.md) | `src/`、`server/`、`AGENTS.md` |
+| 结构与接缝 | [architecture/README.md](architecture/README.md) | 三条交付线、请求路径、各端结构与构建发布；该目录自成一册，页面不在此展开 |
+| AdGuard Home v0.107.79 契约 | [agh-api.md](agh-api.md) | `/control/*` 的字段、单位与枚举 |
+| Web 端布局与交互 | [web-interaction.md](web-interaction.md) | 响应式结构、弹层与选择器、页面行为、路由转场 |
+| 原生平台 | [native-platforms.md](native-platforms.md) | Tauri 与 SwiftUI 两条原生线的现状、签名与工程生成 |
+| 工程约束 | [engineering.md](engineering.md) | 实现边界、发布流程、验证入口 |
 
-需要提案、技能、施工历史或验收证据时，从 `.agents/README.md` 进入对应目录；过程快照不作为当前事实来源。
+子目录以自己的 `README.md` 作为入口，本页不展开其下的页面；每个页面各自给出代码入口与元信息。需要提案、技能、施工历史或验收证据时，从 `.agents/README.md` 进入。
 
 ## 维护约定
 
