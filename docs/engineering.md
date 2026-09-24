@@ -37,4 +37,4 @@
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
 - Web 代码：`npm run check`、`npm run build`。
 - Rust 测试：先运行 `node scripts/mock-agh.mjs`，再运行 `cd src-tauri && cargo test`。有三个测试在 mock 不可用时会跳过实际请求。
-- iOS 工程生成与构建使用 `scripts/ios-signing.sh`；机器专属的构建故障与修复记录在 `.agents/reviews/`，不作为通用构建步骤。
+- iOS 工程生成与构建使用 `scripts/ios-signing.sh`：生成后校验 pbxproj 的关键设置（图标、签名、bundle id、部署目标、XcodeGen 预设哨兵），构建前缺工程时自动重建；机器专属的构建故障与修复记录在 `.agents/reviews/`，不作为通用构建步骤。

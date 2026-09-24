@@ -5,6 +5,11 @@
    半透明玻璃材质 · 同心圆角 · 浮动导航 · 高对比可读性
    ============================================================ */
 
+/* 安全区注入点:env() 只能在 CSS 里解析,内联样式/测试经此 var 读取与覆盖 */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
 :root,
 [data-theme='dark'] {
   /* Jinx 式深色:纯黑底 + 近实色深灰卡片;磨砂只给导航与浮层(浮层用 --glass-pop) */
@@ -257,6 +262,25 @@ body {
 .rt-pop-in { animation-name: rt-pop-in; }
 .rt-pop-out { animation-name: rt-pop-out; }
 
+/* pop 返回落地 tab 根页:顶部状态 pill(TopBar,fixed 在转场容器之外、属新页)
+   与页面 rt-pop-in 同步纯淡入。它被 z-50 退场快照盖着、随其滑走逐渐露出,淡入
+   即无硬切;类由 useArrivalPopAnim 只在动画窗口给出,结束摘除(fill both 会一直
+   压住内联 opacity,留着会让下拉刷新的 dimmed 淡出失效) */
+.rt-pill-in {
+  animation: rt-pill-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes rt-pill-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 下拉刷新松手后的收位/回弹过渡(拖拽期间由指令式 transform 跟手,不带过渡) */
+.ptr-anim {
+  transition:
+    transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 200ms ease;
+}
+
 /* 转场层页面底:滑动的两层(新页容器/旧页快照)自身必须不透明,否则对方的
    页面内容会从透明区域整个透出(双重曝光鬼影)。这里复制 body 底色 +
    .ambient 光晕;转场结束摘除后恢复真实背景,径向光晕弥散,滑动中的微小
@@ -284,7 +308,8 @@ body {
   .rt-push-in,
   .rt-push-out,
   .rt-pop-in,
-  .rt-pop-out {
+  .rt-pop-out,
+  .rt-pill-in {
     animation: none;
   }
 }
@@ -407,7 +432,7 @@ body {
   margin-inline: auto;
   width: 100%;
   max-width: 560px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 64px);
+  padding-top: calc(var(--safe-top) + 64px);
   /* --tabbar-space:原生玻璃 TabBar 模式下由 src/lib/nativeTabbar.ts 按 getTabBarInsets 注入;默认值对齐 CSS 标签栏高度 */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-space, 112px));
 }

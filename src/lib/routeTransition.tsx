@@ -26,7 +26,7 @@ import {
   useSyncExternalStore, type ReactNode,
 } from 'react'
 import { useLocation, useNavigate, useNavigationType, useOutlet } from 'react-router-dom'
-import { consumeBackTap, markBackTap } from './backNav'
+import { consumeBackTap, markBackTap, peekBackTap } from './backNav'
 import { consumeNavAnim } from './navMeta'
 import { isAppleMobile } from './nativePickers'
 import { TAB_ROOT_ROUTES } from './routes'
@@ -112,6 +112,7 @@ export const useRouteTransition = () => useContext(TransitionCtx)
 interface Underlay {
   node: HTMLElement
   barNode: HTMLElement | null
+  pillNode: HTMLElement | null
   y: number
 }
 
@@ -135,7 +136,19 @@ function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null 
     // 快照里不补显任何自定义按钮:凡能被原生控件接管的按钮一律不出现自定义版本,
     // 侧滑揭示时由原生返回胶囊在原位补上(见 nativeBackButton 的手势策略)
   }
-  return { node, barNode, y: Math.max(0, Math.round(window.scrollY)) }
+  // 顶部状态 pill(Layout 的 TopBar,挂在页面容器之外):push 离开 tab 根页时随
+  // 退场层/侧滑下层保留,否则转场首帧顶部就是「pill 已消失」的空洞。它是 fixed
+  // 元素,渲染时挂视口容器直接子级(不进 -y 滚动对齐层),与旧页滚动位置无关;
+  // 克隆摘掉标记与入场动画,避免后续捕获命中快照或重播淡入
+  const pill = document.querySelector('[data-status-pill]')
+  let pillNode: HTMLElement | null = null
+  if (pill instanceof HTMLElement) {
+    pillNode = pill.cloneNode(true) as HTMLElement
+    pillNode.removeAttribute('data-status-pill')
+    pillNode.classList.remove('rt-pill-in')
+    pillNode.style.animation = ''
+  }
+  return { node, barNode, pillNode, y: Math.max(0, Math.round(window.scrollY)) }
 }
 
 /** 把快照节点挂进 React 渲染的空壳层(ref 每次提交都会跑,replaceChildren 幂等) */
@@ -171,16 +184,47 @@ export function useGestureActive(): boolean {
 /* 侧滑提交(松手判定返回)后,本次导航不做 CSS 关键帧转场:页面在拖拽结束时
    已经就位,只需要把真实路由换上来。用自增序号让多个消费者各读一次。 */
 let commitSeq = 0
+/** 提交后尚未被 TransitionArea 消费的窗口:peekAnimatedPop 据此把侧滑提交排除在
+ *  「动画返回」之外(它没有 CSS 转场,pill 必须瞬现) */
+let gestureCommitPending = false
 
 function noteGestureCommit() {
   commitSeq++
+  gestureCommitPending = true
 }
 
 /** 本次路由提交是否来自侧滑提交(每个消费者对一次提交只返回一次 true) */
 export function consumeGestureCommit(seen: { current: number }): boolean {
   if (seen.current === commitSeq) return false
   seen.current = commitSeq
+  gestureCommitPending = false
   return true
+}
+
+/** 渲染期窥探:本次提交是否为会播 CSS 动画的返回(back 标记且非侧滑提交)。
+ *  一次性标记仍由 TransitionArea 布局效应正常消费,这里只读不改 */
+function peekAnimatedPop(): boolean {
+  return peekBackTap() && !gestureCommitPending
+}
+
+/** 本次提交是否经由「会播 CSS 动画的返回」落地 tab 根页。顶部状态 pill(TopBar)
+ *  常驻 Layout(二级页只是 return null,不卸载),不能靠挂载初始化判定;按
+ *  pathname 在布局效应里窥探 back 标记 —— TopBar 的效应先于 TransitionArea
+ *  消费一次性标记,且 setState 在首帧绘制前完成,不会闪一帧无动画的 pill。
+ *  动画 fill both 会持续压住内联 opacity(下拉刷新的 dimmed 淡出失效),窗口
+ *  结束必须摘除 */
+export function useArrivalPopAnim(pathname: string): boolean {
+  const [on, setOn] = useState(false)
+  useLayoutEffect(() => {
+    if (!peekAnimatedPop()) {
+      setOn(false)
+      return
+    }
+    setOn(true)
+    const t = setTimeout(() => setOn(false), DURATION_MS + 50)
+    return () => clearTimeout(t)
+  }, [pathname])
+  return on
 }
 
 const EDGE_PX = 24
@@ -409,6 +453,7 @@ interface ExitLayer {
   key: string
   node: HTMLElement
   barNode: HTMLElement | null
+  pillNode: HTMLElement | null
   /** 旧页滚动位置,快照层 top:-y 对齐 */
   y: number
   anim: string
@@ -485,7 +530,7 @@ export function TransitionArea() {
     // 自研侧滑靠它渲染下层(WebKit 同文档手势的下层是空的)
     if (cap) {
       const idx = historyIdx()
-      if (navType === 'PUSH') underlays.set(idx, { node: cap.node, barNode: cap.barNode, y: cap.y })
+      if (navType === 'PUSH') underlays.set(idx, { node: cap.node, barNode: cap.barNode, pillNode: cap.pillNode, y: cap.y })
       else if (navType === 'POP') trimUnderlays(idx)
       else trimUnderlays(idx - 1)
     }
@@ -542,6 +587,7 @@ export function TransitionArea() {
       key: cap.key,
       node: cap.node,
       barNode: cap.barNode,
+      pillNode: cap.pillNode,
       y: cap.y,
       anim: dir === 'push' ? 'rt-push-out' : 'rt-pop-out',
       // pop 退场层必须盖过固定导航条(z-40):旧页连同其导航条从新页(及其
@@ -583,6 +629,8 @@ export function TransitionArea() {
           >
             <div style={{ position: 'absolute', left: 0, right: 0, top: -gestureLayer.y }} ref={attachNode(gestureLayer.node)} />
             {gestureLayer.barNode && <div data-rt-underlay-bar ref={attachNode(gestureLayer.barNode)} />}
+            {/* pill 是 fixed 悬浮件:挂视口容器直接子级、不进 -y 滚动对齐层,旧页滚到多深都在顶位 */}
+            {gestureLayer.pillNode && <div ref={attachNode(gestureLayer.pillNode)} />}
           </div>
         )}
         <div
@@ -616,6 +664,8 @@ export function TransitionArea() {
             {/* 视口锁定 + 内层 -y 对齐旧页滚动:POP 时新页会恢复记忆滚动位,
                 若随文档定位快照会整体错位 y_mem 像素(穿帮) */}
             <div style={{ position: 'absolute', left: 0, right: 0, top: -exit.y }} ref={attachNode(exit.node)} />
+            {/* pill 是 fixed 悬浮件:挂视口容器直接子级、不进 -y 滚动对齐层,旧页滚到多深都在顶位 */}
+            {exit.pillNode && <div ref={attachNode(exit.pillNode)} />}
             {exit.barNode && <div ref={attachNode(exit.barNode)} />}
           </div>
         )}

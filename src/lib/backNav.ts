@@ -18,6 +18,13 @@ export function consumeBackTap(): boolean {
   return v
 }
 
+/** 只读窥探:当前是否带着"点按钮返回"标记(不清除)。供转场层之外的固定件
+ *  (TopBar 状态 pill)在渲染期判定入场动画 —— 挂载后经 store 补挂动画类会
+ *  晚一帧(闪帧);消费仍由 consumeBackTap 完成,这里不改变状态 */
+export function peekBackTap(): boolean {
+  return pending
+}
+
 /**
  * 统一返回语义:有历史条目就 POP(带标记,供转场层播放返回动画);栈空
  * (直落子页 / 刷新)才 replace 回父级。

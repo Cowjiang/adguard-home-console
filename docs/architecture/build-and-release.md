@@ -1,9 +1,9 @@
 # 构建与发布
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-09-24
 
-三条交付线共用一份 Web 构建产物；发布走 GitHub Release，服务器只拉取产物，不在服务器上构建。
+两条交付线共用一份 Web 构建产物；发布走 GitHub Release，服务器只拉取产物，不在服务器上构建。
 
 代码入口：`.github/workflows/release.yml`、`scripts/release-notes.sh`、`scripts/server-pull.sh`、`package.json`。
 
@@ -17,7 +17,7 @@
 | 类型检查 | `npm run check` |
 | Rust 测试 | 先 `node scripts/mock-agh.mjs`，再 `cd src-tauri && cargo test` |
 | 提案校验 | `node scripts/verify-proposals.mjs`（加 `--links` 核对路径） |
-| iOS 工程与构建 | `./scripts/ios-signing.sh generate ios|tauri`、`npm run ios:build` |
+| iOS 工程与构建 | `./scripts/ios-signing.sh generate tauri`、`npm run ios:build`（生成后校验工程，缺工程时构建前自动重建） |
 
 ## 发布产物
 

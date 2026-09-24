@@ -32,7 +32,10 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # libapp.a 只是链接输入(见 dependencies: framework)；不排除的话 xcodegen 会把它
+      # 当资源收进 Resources 阶段，整个静态库(~63MB)被拷进 app 包
       - path: Externals
+        excludes: ["**/*.a"]
       - path: adguard-home-console_iOS
       - path: assets
         buildPhase: resources
