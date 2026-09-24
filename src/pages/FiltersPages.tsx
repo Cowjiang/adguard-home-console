@@ -141,7 +141,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
               <Switch on={f.enabled} onChange={(v) => toggleFilter(f, v)} />
             </div>
             <div className="mt-2.5 flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => confirm({
+              <Button size="sm" variant="ghost" className="!text-danger" onClick={() => confirm({
                 title: `删除「${f.name}」?`,
                 message: '删除后此列表的规则将立即失效。',
                 destructive: true,
@@ -236,12 +236,12 @@ export function RulesPage() {
           placeholder={'||example.com^\n@@||allowed.example.com^$important\n! 注释行'}
           spellCheck={false}
         />
-        <div className="mt-3 flex items-center justify-between">
-          <p className="text-[11.5px] leading-relaxed text-t3">
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="min-w-0 text-[11.5px] leading-relaxed text-t3">
             支持 AdGuard 语法:<code>||domain^</code> 拦截,
             <code>@@</code> 白名单,<code>$important</code> 高优先级
           </p>
-          <Button loading={saving} disabled={draft === null} onClick={save}>
+          <Button loading={saving} disabled={draft === null} onClick={save} className="flex-none whitespace-nowrap">
             保存
           </Button>
         </div>

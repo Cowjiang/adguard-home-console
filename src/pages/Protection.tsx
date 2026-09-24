@@ -203,7 +203,7 @@ export default function Protection() {
           <Row
             icon={<IconBubble color="var(--danger)" bg="var(--danger-soft)"><ListFilter size={17} /></IconBubble>}
             title="黑名单过滤器"
-            subtitle={`广告与跟踪规则库 · ${filterCount} 个列表${ruleCount ? ` · ${ruleCount} 条自定义规则` : ''}`}
+            subtitle={`广告与跟踪规则库 · ${filterCount} 个列表`}
             onClick={() => nav('/protection/filters')}
           />
           <Row
@@ -215,7 +215,7 @@ export default function Protection() {
           <Row
             icon={<IconBubble color="var(--violet)" bg="var(--violet-soft)"><FileCode2 size={17} /></IconBubble>}
             title="自定义过滤规则"
-            subtitle="直接编写 AdGuard 过滤语法"
+            subtitle={`${ruleCount} 条生效规则 · 直接编写 AdGuard 过滤语法`}
             onClick={() => nav('/protection/rules')}
           />
           <Row
