@@ -22,3 +22,6 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 
 # 截图/取证不入库(例外:随应用分发的图标资源,如 Assets.xcassets 与 src-tauri/icons)
 .agents/evidence/
+
+# 本机 agent 工具产物
+.playwright-mcp/

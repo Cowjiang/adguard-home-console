@@ -10,8 +10,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#07090f" />
     <script>
-      // 主题引导:在首帧之前按存储设置应用主题,避免刷新闪浅色/深色
-      // (与 src/lib/auth.tsx 的 THEME_KEY 及色值保持一致)
+      // 首帧引导:按存储设置主题与语言,避免刷新闪浅色/深色或闪错语言
+      // (与 src/lib/auth.tsx 的 THEME_KEY、src/lib/i18n 的 LANG_KEY 及词典保持一致)
       (function () {
         try {
           var t = localStorage.getItem('agh.console.theme.v1') || 'auto';
@@ -22,6 +22,27 @@
         } catch (e) {
           /* 存储不可用时保持 HTML 默认深色 */
         }
+        var lang = 'zh';
+        try {
+          var l = localStorage.getItem('agh.console.lang.v1');
+          if (l === 'zh' || l === 'en') {
+            lang = l;
+          } else {
+            var tags = navigator.languages || [navigator.language];
+            for (var i = 0; i < tags.length; i++) {
+              var tag = String(tags[i] || '').toLowerCase();
+              if (tag.indexOf('zh') === 0) { lang = 'zh'; break; }
+              if (tag.indexOf('en') === 0) { lang = 'en'; break; }
+            }
+          }
+        } catch (e) { /* 存储不可用时保持中文 */ }
+        var zh = lang === 'zh';
+        document.documentElement.lang = zh ? 'zh-CN' : 'en';
+        document.title = zh ? 'AdGuard Home Console · 移动控制台' : 'AdGuard Home Console · Mobile Console';
+        var desc = document.querySelector('meta[name="description"]');
+        if (desc) desc.setAttribute('content', zh
+          ? 'AdGuard Home 移动端控制台 — 现代玻璃质感的多平台 AdGuard Home 管理器'
+          : 'AdGuard Home mobile console — a modern, glassy multi-platform AdGuard Home manager');
       })();
     </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
