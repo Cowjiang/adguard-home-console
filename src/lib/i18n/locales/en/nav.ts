@@ -10,6 +10,7 @@ const enNav = {
   statusOn: 'Protection running',
   statusOff: 'Protection paused',
   statusOffline: 'Offline',
+  offlineHint: 'Connection lost or the server is not responding. Data will refresh automatically once it recovers, or pull down to retry.',
 }
 
 export default enNav

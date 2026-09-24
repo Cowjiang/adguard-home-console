@@ -16,6 +16,7 @@ const enCommon = {
   save: 'Save',
   add: 'Add',
   retry: 'Retry',
+  retryNow: 'Retry now',
   loading: 'Loading…',
   noData: 'No data yet',
   back: 'Back',

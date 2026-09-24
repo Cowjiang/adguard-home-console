@@ -1,6 +1,7 @@
 /** 路由与全局守卫 */
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { SWRConfig, type SWRConfiguration } from 'swr'
 import { AuthProvider, useAuth } from './lib/auth'
 import { SheetProvider, Spinner } from './components/ui'
 import { ToastHost } from './components/ui'
@@ -61,9 +62,19 @@ function DebugAutoLogin() {
   return null
 }
 
+/** SWR 全局配置:refreshWhenOffline 让轮询不被内部在线标志停摆。SWR 不读
+ *  navigator.onLine,只认 offline/online 窗口事件,iOS WKWebView/PWA 里事件
+ *  可能丢失,标志卡在 false 后轮询/focus/reconnect/错误重试会被同一标志全部
+ *  门死(见 .agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md) */
+const SWR_GLOBAL: SWRConfiguration = {
+  revalidateOnReconnect: true,
+  refreshWhenOffline: true,
+}
+
 export default function App() {
   return (
-    <AuthProvider>
+    <SWRConfig value={SWR_GLOBAL}>
+      <AuthProvider>
       <SheetProvider>
         <BrowserRouter>
           <DebugAutoLogin />
@@ -103,6 +114,7 @@ export default function App() {
         </BrowserRouter>
       </SheetProvider>
     </AuthProvider>
+    </SWRConfig>
   )
 }
 

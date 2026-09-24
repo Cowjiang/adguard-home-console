@@ -3,7 +3,8 @@
  */
 import { applyNativeAppearance } from './nativeAppearance'
 import { i18n } from './i18n'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { mutate } from 'swr'
 import { api, type Status } from './api'
 
 export interface SvrConfig {
@@ -14,19 +15,23 @@ export interface SvrConfig {
 
 const CONFIG_KEY = 'agh.console.cfg.v1'
 const THEME_KEY = 'agh.console.theme.v1'
+/** /status 探测 deadline:断网时代理层 25s 才报超时,探测 5s 内必须给结论 */
+const PROBE_TIMEOUT_MS = 5000
 
 export type ThemeSetting = 'auto' | 'dark' | 'light'
 
 interface AuthCtx {
   cfg: SvrConfig | null
   status: Status | null
+  /** 最近一次 /status 探测失败且此后未成功:服务离线,是 TopBar/遮罩的唯一事实源 */
+  offline: boolean
   connecting: boolean
   error: string | null
   theme: ThemeSetting
   setTheme: (t: ThemeSetting) => void
   connect: (cfg: SvrConfig) => Promise<boolean>
   logout: () => void
-  refreshStatus: () => void
+  refreshStatus: () => Promise<Status | null>
 }
 
 const Ctx = createContext<AuthCtx>(null as unknown as AuthCtx)
@@ -64,6 +69,7 @@ function applyTheme(t: ThemeSetting) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [cfg, setCfg] = useState<SvrConfig | null>(loadCfg)
   const [status, setStatus] = useState<Status | null>(null)
+  const [offline, setOffline] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [theme, setThemeState] = useState<ThemeSetting>(loadTheme)
@@ -75,19 +81,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => mq?.removeEventListener('change', () => applyTheme(theme))
   }, [theme])
 
+  // /status 探测快速失败:断网时代理层要 25s 才报超时,探测不等它——下拉刷新、
+  // 离线遮罩与 15s 自愈都依赖它尽快给结论。超时按失败返回 null,后台请求自生自灭
   const fetchStatus = useCallback(async (c: SvrConfig): Promise<Status | null> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      return await api<Status>(c, '/status')
+      return await Promise.race([
+        api<Status>(c, '/status'),
+        new Promise<null>((resolve) => {
+          timer = setTimeout(() => resolve(null), PROBE_TIMEOUT_MS)
+        }),
+      ])
     } catch {
       return null
+    } finally {
+      clearTimeout(timer)
     }
   }, [])
 
-  // 启动时用已存配置探测连接
-  useEffect(() => {
-    if (!cfg) return
-    fetchStatus(cfg).then((s) => setStatus(s))
+  // 启动探测与断网自愈重探合一:浏览器 online/visibility 事件在 WKWebView/PWA
+  // 里可能丢失(轮询冻结的根因,见 proposals/feature/2026-09-25-refresh-triggers),
+  // 所以除事件即时探外保留 15s 低频重探;探测结果维护 offline(离线遮罩与状态条
+  // 的事实源),从失败恢复成功时全局 mutate 一次,解救被 SWR 在线标志冻住的 key,
+  // 并让状态条/防护卡回到真实状态。健康时开销仅为每 15s 一次 /status(对比 stats
+  // 轮询的每 5s 一次)。
+  const lastProbeOk = useRef(false)
+  const probingRef = useRef(false)
+  const probeStatus = useCallback(async () => {
+    if (!cfg || probingRef.current) return
+    probingRef.current = true
+    try {
+      const s = await fetchStatus(cfg)
+      const ok = s !== null
+      const recovered = ok && !lastProbeOk.current
+      lastProbeOk.current = ok
+      setOffline(!ok)
+      if (s) setStatus(s)
+      if (recovered) void mutate(() => true)
+    } finally {
+      probingRef.current = false
+    }
   }, [cfg, fetchStatus])
+
+  useEffect(() => {
+    if (!cfg) {
+      lastProbeOk.current = false
+      setOffline(false)
+      return
+    }
+    void probeStatus()
+    const id = setInterval(() => void probeStatus(), 15000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void probeStatus()
+    }
+    const onOnline = () => void probeStatus()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [probeStatus])
 
   const connect = useCallback(
     async (next: SvrConfig): Promise<boolean> => {
@@ -103,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(CONFIG_KEY, JSON.stringify(clean))
         setCfg(clean)
         setStatus(s)
+        setOffline(false)
         return true
       } catch (e: any) {
         const msg =
@@ -122,11 +178,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(CONFIG_KEY)
     setCfg(null)
     setStatus(null)
+    setOffline(false)
     setError(null)
   }, [])
 
-  const refreshStatus = useCallback(() => {
-    if (cfg) fetchStatus(cfg).then((s) => setStatus(s))
+  const refreshStatus = useCallback((): Promise<Status | null> => {
+    if (!cfg) return Promise.resolve(null)
+    return fetchStatus(cfg).then((s) => {
+      setOffline(s === null)
+      setStatus(s)
+      return s
+    })
   }, [cfg, fetchStatus])
 
   const setTheme = useCallback((t: ThemeSetting) => {
@@ -140,8 +202,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ cfg, status, connecting, error, theme, setTheme, connect, logout, refreshStatus }),
-    [cfg, status, connecting, error, theme, setTheme, connect, logout, refreshStatus]
+    () => ({ cfg, status, offline, connecting, error, theme, setTheme, connect, logout, refreshStatus }),
+    [cfg, status, offline, connecting, error, theme, setTheme, connect, logout, refreshStatus]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
