@@ -43,6 +43,7 @@
 - Tab 之间的程序化跳转使用 `useTabJump`：以 `replace` 保持历史栈的层级语义，同时可以播放前进动画。层级下钻使用 `push`。
 - 「顶级路由」分两个概念：移动端 tab 根（`src/lib/routes.ts` 的 `TAB_ROOT_ROUTES`，4 个 tab）与桌面侧边栏根（`TOP_LEVEL_ROUTES`）。`/clients`、`/stats` 只是桌面根，移动端按二级页处理：push 进入、有原生返回按钮与侧滑返回、顶部状态条不显示。
 - WKWebView 侧滑返回使用原生历史快照；程序化返回由 `src/lib/routeTransition.tsx` 的 CSS 快照层负责。转场中的新旧页面层必须不透明，相关样式为 `.rt-page-bg`。
+- 顶部状态 pill（Layout 的 `TopBar`，fixed 在页面容器之外）不在 `capturePage` 的页面容器克隆里，单独经 `[data-status-pill]` 捕获进退场层与侧滑下层：作为 fixed 元素挂视口容器直接子级（不进 `-y` 滚动对齐层），与旧页滚动位置无关，push 离开 tab 根页时随旧页保留、被新页盖过。pop 落地 tab 根页时真实 pill 属于新页、被 z-50 退场快照盖着，由 `useArrivalPopAnim` 挂 `.rt-pill-in` 与页面同步纯淡入（渲染期一次性判定 back 标记，侧滑提交/无动画返回页面瞬时就位、不淡入）；动画窗口结束必须摘类——`fill: both` 会持续压住内联 opacity，留着会让下拉刷新的 dimmed 淡出失效。
 - 移动端返回统一走 `src/lib/backNav.ts` 的 `navBack`：有历史条目就 POP，栈空（直落子页/刷新）才 replace 回父级。返回胶囊、原生按钮与表单保存/删除收尾共用它；**不得用 replace 导航到父级列表页**——那会在栈里留下重复条目，浏览器按一次返回等于没动（客户端表单保存曾如此）。
 - 页内筛选/搜索状态（日志页的 `?filter=`、`?q=`）要同步进 URL，且用 `replace` 不压历史栈。否则 URL 停留在进入本页时的旧值，从详情页返回或刷新时组件按旧值重建，筛选会被拽回去。
 - 原生控件（返回胶囊、顶栏操作按钮）悬浮在 WebView 之上、不参与 CSS 平移，因此**不跟随页面滑动**：页面就绪（转场过半，`useTransitionHalfBusy`）后原地淡入，离开过半再淡出；侧滑提交没有 CSS 转场时立即。实现见 `src/lib/nativeBackButton.ts` 与 `src/lib/nativeHeaderAction.ts`。
