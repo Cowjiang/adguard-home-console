@@ -5,10 +5,12 @@ import useSWR from 'swr'
 import {
   ScrollText, Network, Lock, Wifi, Wrench,
   Trash, RotateCcw, DownloadCloud, Server, LogOut, SunMoon,
-  Info, Eraser, ShieldQuestion,
+  Info, Eraser, ShieldQuestion, Languages,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
+import { setAppLang, type Lang } from '../lib/i18n'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
   useConfirm, toast, Segmented, Badge, usePick, PickSelect,
@@ -354,28 +356,46 @@ export function SystemPage() {
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useAuth()
+  const { t, i18n } = useTranslation()
+  const lang: Lang = i18n.language === 'en' ? 'en' : 'zh'
   return (
     <Screen>
-      <PageHeader back title="外观" />
+      <PageHeader back title={t('settings.appearance')} />
 
-      <GroupTitle>主题</GroupTitle>
+      <GroupTitle>{t('settings.themeGroup')}</GroupTitle>
       <Card className="p-4">
         <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
-          <SunMoon size={15} className="text-t2" /> 外观模式
+          <SunMoon size={15} className="text-t2" /> {t('settings.appearanceMode')}
         </div>
         <Segmented
           value={theme}
           onChange={(v) => setTheme(v as ThemeSetting)}
           options={[
-            { value: 'auto', label: '跟随系统' },
-            { value: 'light', label: '浅色' },
-            { value: 'dark', label: '深色' },
+            { value: 'auto', label: t('settings.themeAuto') },
+            { value: 'light', label: t('settings.themeLight') },
+            { value: 'dark', label: t('settings.themeDark') },
+          ]}
+        />
+      </Card>
+
+      <GroupTitle>{t('settings.language')}</GroupTitle>
+      <Card className="p-4">
+        <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
+          <Languages size={15} className="text-t2" /> {t('settings.language')}
+        </div>
+        {/* 语言名以各自语言原文展示(中文 / English),不随界面语言翻译 */}
+        <Segmented
+          value={lang}
+          onChange={(v) => setAppLang(v as Lang)}
+          options={[
+            { value: 'zh', label: '中文' },
+            { value: 'en', label: 'English' },
           ]}
         />
       </Card>
 
       <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
-        选择“跟随系统”时,深色模式随操作系统的外观设置自动切换。
+        {t('settings.themeHint')}
       </p>
     </Screen>
   )
