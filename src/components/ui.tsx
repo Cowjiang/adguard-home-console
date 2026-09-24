@@ -3,6 +3,7 @@ import {
   createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Loader2, Search, X,
 } from 'lucide-react'
@@ -29,7 +30,6 @@ export function usePageInClass(): string {
   if (t.dir) noAnim.current = true
   return noAnim.current ? '' : 'page-in'
 }
-
 export function Screen({ children, pad = true }: { children: ReactNode; pad?: boolean }) {
   return (
     <div className={`page-shell mx-auto w-full ${pad ? 'px-4' : ''} ${usePageInClass()}`}>
@@ -55,6 +55,7 @@ export function NavScrim({ className = '' }: { className?: string }) {
 
 export function PageHeader({ title, subtitle, back, right }: { title: string; subtitle?: string; back?: boolean; right?: ReactNode }) {
   const nav = useNavigate()
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const isDesktop = useIsDesktop()
   // iOS 壳内原生液态玻璃返回按钮接管时,CSS 胶囊让位(避免双按钮)
@@ -93,7 +94,7 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
             onClick={goBack}
             style={nativeBack ? { visibility: 'hidden' } : undefined}
             className="press glass specular pointer-events-auto flex h-11 w-11 flex-none items-center justify-center rounded-full text-t2"
-            aria-label="返回"
+            aria-label={t('common.back')}
           >
             <ChevronLeft size={22} />
           </button>
@@ -113,7 +114,7 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
           <button
             onClick={goBack}
             className="press glass flex h-9 w-9 flex-none items-center justify-center rounded-full text-t2"
-            aria-label="返回"
+            aria-label={t('common.back')}
           >
             <ChevronLeft size={20} />
           </button>
@@ -680,21 +681,22 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
 
 /* ---------- 搜索框 ---------- */
 
-export function SearchBar({ value, onChange, placeholder = '搜索', className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+export function SearchBar({ value, onChange, placeholder, className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+  const { t } = useTranslation()
   return (
     <div className={`glass flex items-center gap-2 rounded-full px-4 py-2.5 ${className}`}>
       <Search size={16} className="flex-none text-t3" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('common.searchPlaceholder')}
         className="w-full min-w-0 bg-transparent text-[15px] text-t1 outline-none"
         autoCapitalize="none"
         autoCorrect="off"
         enterKeyHint="search"
       />
       {value && (
-        <button onClick={() => onChange('')} className="press flex-none text-t3" aria-label="清空">
+        <button onClick={() => onChange('')} className="press flex-none text-t3" aria-label={t('common.clear')}>
           <X size={16} />
         </button>
       )}
@@ -706,8 +708,10 @@ export function SearchBar({ value, onChange, placeholder = '搜索', className =
 
 /** 图标复制按钮:点击复制文本,成功后短暂变对勾;用于详情页 IP/WHOIS 等行尾 */
 export function CopyIconButton({ text, label = '', className = '' }: { text?: string; label?: string; className?: string }) {
+  const { t } = useTranslation()
   const [done, setDone] = useState(false)
   if (!text) return null
+  const what = label || t('common.content')
   return (
     <button
       onClick={async (e: any) => {
@@ -715,15 +719,15 @@ export function CopyIconButton({ text, label = '', className = '' }: { text?: st
         const ok = await copyText(text)
         if (ok) {
           setDone(true)
-          toast('已复制' + (label || '内容'))
+          toast(t('common.copiedLabel', { what }))
           setTimeout(() => setDone(false), 1500)
         } else {
-          toast('复制失败', 'err')
+          toast(t('common.copyFailed'), 'err')
         }
       }}
       className={`press flex-none text-t3 transition-colors hover:text-accent ${className}`}
-      aria-label={'复制' + (label || '内容')}
-      title={'复制' + (label || '内容')}
+      aria-label={t('common.copyLabel', { what })}
+      title={t('common.copyLabel', { what })}
     >
       {done ? <Check size={14} style={{ color: 'var(--ok)' }} /> : <Copy size={14} />}
     </button>
@@ -747,11 +751,12 @@ export function Pagination({
   onPageSize?: (n: number) => void
 }) {
   const pick = usePick()
+  const { t } = useTranslation()
   const pagesSafe = Math.max(1, pages)
   return (
     <div className="mt-3 flex flex-wrap items-center justify-center gap-2 lg:justify-between">
       <p className="hidden text-[12px] text-t3 lg:block">
-        共 {total ?? 0} 条{pagesSafe > 1 ? ` · 第 ${page} / ${pagesSafe} 页` : ''}
+        {t('common.totalItems', { n: total ?? 0 })}{pagesSafe > 1 ? ' · ' + t('common.pageXofY', { page, pages: pagesSafe }) : ''}
       </p>
       {pagesSafe > 1 && (
         <div className="glass flex items-center gap-0.5 rounded-full p-1">
@@ -759,7 +764,7 @@ export function Pagination({
             onClick={() => onChange(Math.max(1, page - 1))}
             disabled={page <= 1}
             className="press flex h-7 w-7 items-center justify-center rounded-full text-t2 disabled:opacity-30"
-            aria-label="上一页"
+            aria-label={t('common.prevPage')}
           >
             <ChevronLeft size={15} />
           </button>
@@ -768,7 +773,7 @@ export function Pagination({
             onClick={() => onChange(Math.min(pagesSafe, page + 1))}
             disabled={page >= pagesSafe}
             className="press flex h-7 w-7 items-center justify-center rounded-full text-t2 disabled:opacity-30"
-            aria-label="下一页"
+            aria-label={t('common.nextPage')}
           >
             <ChevronRight size={15} />
           </button>
@@ -778,16 +783,16 @@ export function Pagination({
         <button
           onClick={(e: any) =>
             pick({
-              options: [20, 50, 100].map((n) => ({ value: n, label: `每页 ${n} 条` })),
+              options: [20, 50, 100].map((n) => ({ value: n, label: t('common.perPageOption', { n }) })),
               value: pageSize,
-              title: '每页条数',
+              title: t('common.perPageTitle'),
               anchor: e.currentTarget,
               onPick: onPageSize,
             })
           }
           className="press glass hidden items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-medium text-t2 lg:inline-flex"
         >
-          每页 {pageSize} 条 <ChevronDown size={13} />
+          {t('common.perPageOption', { n: pageSize })} <ChevronDown size={13} />
         </button>
       )}
     </div>
@@ -800,11 +805,12 @@ export function Spinner({ size = 20 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-t2" />
 }
 
-export function Loading({ text = '加载中…' }: { text?: string }) {
+export function Loading({ text }: { text?: string }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-t2">
       <Spinner size={24} />
-      <span className="text-[13px]">{text}</span>
+      <span className="text-[13px]">{text ?? t('common.loading')}</span>
     </div>
   )
 }
@@ -820,12 +826,13 @@ export function EmptyState({ icon, title, subtitle }: { icon?: ReactNode; title:
 }
 
 export function ErrorBox({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="glass flex items-center justify-between gap-3 rounded-2xl border-l-4 px-4 py-3" style={{ borderLeftColor: 'var(--danger)' }}>
       <span className="text-[13.5px] text-t2">{children}</span>
       {onRetry && (
         <button onClick={onRetry} className="press flex-none text-[13px] font-semibold text-accent">
-          重试
+          {t('common.retry')}
         </button>
       )}
     </div>
@@ -875,6 +882,7 @@ export function ToastHost() {
 
 export function useConfirm() {
   const sheet = useSheet()
+  const { t } = useTranslation()
   return (opts: {
     title: string
     message?: string
@@ -889,7 +897,7 @@ export function useConfirm() {
         {opts.message && <p className="mb-4 text-center text-[13.5px] leading-relaxed text-t2">{opts.message}</p>}
         <div className="mt-4 flex gap-2.5">
           <Button variant="glass" className="flex-1" onClick={sheet.close}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             variant={opts.destructive ? 'danger' : 'primary'}
@@ -905,7 +913,7 @@ export function useConfirm() {
               }
             }}
           >
-            {opts.confirmText ?? '确认'}
+            {opts.confirmText ?? t('common.confirm')}
           </Button>
         </div>
       </div>

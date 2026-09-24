@@ -1,5 +1,6 @@
 /** 轻量 SVG 图表:平滑面积图 + 横向条形榜单 */
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { fmtCompact } from '../lib/format'
 
 function smoothPath(pts: [number, number][]): string {
@@ -53,6 +54,7 @@ export function AreaChart({
   const PAD_T = 8
   const PAD_B = 20
   const [hover, setHover] = useState<number | null>(null)
+  const { t } = useTranslation()
 
   const { qPts, bPts, max } = useMemo(() => {
     const q = series.queries ?? []
@@ -212,9 +214,9 @@ export function AreaChart({
           style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, transform: `translateX(${hover > n * 0.7 ? '-105%' : hover < n * 0.2 ? '5%' : '-50%'})` }}
         >
           <div className="text-t2">{labels?.[hover]}</div>
-          <div style={{ color: 'var(--chart-1)' }}>查询 {fmtCompact(series.queries?.[hover] ?? 0)}</div>
+          <div style={{ color: 'var(--chart-1)' }}>{t('charts.hoverQueries', { n: fmtCompact(series.queries?.[hover] ?? 0) })}</div>
           {showBlocked && (
-            <div style={{ color: 'var(--chart-2)' }}>拦截 {fmtCompact(series.blocked?.[hover] ?? 0)}</div>
+            <div style={{ color: 'var(--chart-2)' }}>{t('charts.hoverBlocked', { n: fmtCompact(series.blocked?.[hover] ?? 0) })}</div>
           )}
         </div>
       )}
@@ -223,8 +225,9 @@ export function AreaChart({
 }
 
 export function BarList({ items, color = 'var(--accent)', max: maxProp }: { items: [string, number][]; color?: string; max?: number }) {
+  const { t } = useTranslation()
   const max = maxProp ?? Math.max(1, ...items.map((i) => i[1]))
-  if (!items.length) return <p className="py-4 text-center text-[13px] text-t3">暂无数据</p>
+  if (!items.length) return <p className="py-4 text-center text-[13px] text-t3">{t('charts.empty')}</p>
   return (
     <div className="flex flex-col gap-2">
       {items.map(([label, value]) => (
@@ -313,16 +316,17 @@ export function RankTable({ items, color = 'var(--accent)', resolve }: {
   color?: string
   resolve?: (key: string) => string
 }) {
+  const { t } = useTranslation()
   const max = Math.max(1, ...items.map((i) => i[1]))
   const total = items.reduce((s, i) => s + i[1], 0)
-  if (!items.length) return <p className="py-6 text-center text-[13px] text-t3">暂无数据</p>
+  if (!items.length) return <p className="py-6 text-center text-[13px] text-t3">{t('charts.empty')}</p>
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-3 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-t3">
         <span className="w-6 text-center">#</span>
-        <span className="min-w-0 flex-1">名称</span>
-        <span className="w-20 text-right">次数</span>
-        <span className="w-24 text-right">占比</span>
+        <span className="min-w-0 flex-1">{t('charts.colName')}</span>
+        <span className="w-20 text-right">{t('charts.colCount')}</span>
+        <span className="w-24 text-right">{t('charts.colPct')}</span>
       </div>
       {items.map(([key, value], i) => (
         <div key={key} className="flex items-center gap-3 rounded-lg px-2 py-[7px] transition-colors hover:bg-white/[0.04]">

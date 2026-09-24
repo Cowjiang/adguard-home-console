@@ -1,5 +1,6 @@
 /** 日志详情子页(移动端):从 /log 点入,location.state 携带该条记录 */
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { api, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
@@ -10,6 +11,7 @@ import { LogDetail } from '../components/LogDetail'
 export default function LogDetailPage() {
   const pageIn = usePageInClass()
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const { state } = useLocation() as { state?: { item?: QueryLogItem } }
   const item = state?.item
@@ -22,8 +24,8 @@ export default function LogDetailPage() {
   if (!item) {
     return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
-        <PageHeader title="请求详情" back />
-        <EmptyState icon={<Globe size={30} className="text-t3" />} title="记录不存在" subtitle="请从查询日志列表重新进入" />
+        <PageHeader title={t('querylog.detailTitle')} back />
+        <EmptyState icon={<Globe size={30} className="text-t3" />} title={t('querylog.recordNotFound')} subtitle={t('querylog.recordNotFoundSub')} />
       </div>
     )
   }
@@ -36,16 +38,16 @@ export default function LogDetailPage() {
     try {
       await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
       mutateFiltering()
-      toast(block ? `已拦截 ${current.question.name}` : '已加入白名单规则')
+      toast(block ? t('querylog.blockedToast', { domain: current.question.name }) : t('querylog.whitelistedToast'))
       nav(-1)
     } catch (e: any) {
-      toast('保存规则失败:' + e.message, 'err')
+      toast(t('querylog.ruleSaveFailed', { msg: e.message }), 'err')
     }
   }
 
   return (
     <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
-      <PageHeader title="请求详情" back />
+      <PageHeader title={t('querylog.detailTitle')} back />
       <div className="mt-2">
         <LogDetail item={current} filtering={filtering} onSaveRule={saveRule} />
       </div>

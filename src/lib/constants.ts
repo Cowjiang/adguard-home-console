@@ -1,26 +1,48 @@
 /** AGH API 常量:类型、状态、拦截原因、服务目录等 */
 
-export const REASON_META: Record<string, { label: string; kind: 'blocked' | 'ok' | 'rewrite' | 'warn' }> = {
-  FilteredBlackList: { label: '黑名单', kind: 'blocked' },
-  FilteredBlockedService: { label: '服务拦截', kind: 'blocked' },
-  FilteredSafeBrowsing: { label: '安全浏览', kind: 'blocked' },
-  FilteredParental: { label: '家长控制', kind: 'blocked' },
-  FilteredInvalid: { label: '无效请求', kind: 'warn' },
-  FilteredSafeSearch: { label: '安全搜索', kind: 'rewrite' },
-  NotFilteredWhiteList: { label: '白名单', kind: 'ok' },
-  NotFilteredNotFound: { label: '已放行', kind: 'ok' },
-  NotFilteredError: { label: '上游错误', kind: 'warn' },
-  Rewrite: { label: '重写', kind: 'rewrite' },
-  RewriteEtcHosts: { label: '系统 Hosts', kind: 'rewrite' },
-  RewriteRule: { label: '重写规则', kind: 'rewrite' },
+/** 拦截原因标签的词典 key(LogDetail 展示时经 t() 翻译) */
+export type ReasonLabelKey =
+  | 'agh.reasonBlackList'
+  | 'agh.reasonBlockedService'
+  | 'agh.reasonSafeBrowsing'
+  | 'agh.reasonParental'
+  | 'agh.reasonInvalid'
+  | 'agh.reasonSafeSearch'
+  | 'agh.reasonWhiteList'
+  | 'agh.reasonNotFound'
+  | 'agh.reasonUpstreamError'
+  | 'agh.reasonRewrite'
+  | 'agh.reasonEtcHosts'
+  | 'agh.reasonRewriteRule'
+
+export type FilterLabelKey =
+  | 'agh.filterAll'
+  | 'agh.filterBlocked'
+  | 'agh.filterAllowed'
+  | 'agh.filterWhitelist'
+  | 'agh.filterRewritten'
+
+export const REASON_META: Record<string, { labelKey: ReasonLabelKey; kind: 'blocked' | 'ok' | 'rewrite' | 'warn' }> = {
+  FilteredBlackList: { labelKey: 'agh.reasonBlackList', kind: 'blocked' },
+  FilteredBlockedService: { labelKey: 'agh.reasonBlockedService', kind: 'blocked' },
+  FilteredSafeBrowsing: { labelKey: 'agh.reasonSafeBrowsing', kind: 'blocked' },
+  FilteredParental: { labelKey: 'agh.reasonParental', kind: 'blocked' },
+  FilteredInvalid: { labelKey: 'agh.reasonInvalid', kind: 'warn' },
+  FilteredSafeSearch: { labelKey: 'agh.reasonSafeSearch', kind: 'rewrite' },
+  NotFilteredWhiteList: { labelKey: 'agh.reasonWhiteList', kind: 'ok' },
+  NotFilteredNotFound: { labelKey: 'agh.reasonNotFound', kind: 'ok' },
+  NotFilteredError: { labelKey: 'agh.reasonUpstreamError', kind: 'warn' },
+  Rewrite: { labelKey: 'agh.reasonRewrite', kind: 'rewrite' },
+  RewriteEtcHosts: { labelKey: 'agh.reasonEtcHosts', kind: 'rewrite' },
+  RewriteRule: { labelKey: 'agh.reasonRewriteRule', kind: 'rewrite' },
 }
 
-export const LOG_FILTERS: { key: string; label: string; reasons?: string[] }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'blocked', label: '已拦截', reasons: ['FilteredBlackList', 'FilteredBlockedService', 'FilteredSafeBrowsing', 'FilteredParental', 'FilteredInvalid'] },
-  { key: 'allowed', label: '已放行', reasons: ['NotFilteredNotFound', 'NotFilteredError'] },
-  { key: 'whitelist', label: '白名单', reasons: ['NotFilteredWhiteList'] },
-  { key: 'rewritten', label: '重写', reasons: ['Rewrite', 'RewriteEtcHosts', 'RewriteRule', 'FilteredSafeSearch'] },
+export const LOG_FILTERS: { key: string; labelKey: FilterLabelKey; reasons?: string[] }[] = [
+  { key: 'all', labelKey: 'agh.filterAll' },
+  { key: 'blocked', labelKey: 'agh.filterBlocked', reasons: ['FilteredBlackList', 'FilteredBlockedService', 'FilteredSafeBrowsing', 'FilteredParental', 'FilteredInvalid'] },
+  { key: 'allowed', labelKey: 'agh.filterAllowed', reasons: ['NotFilteredNotFound', 'NotFilteredError'] },
+  { key: 'whitelist', labelKey: 'agh.filterWhitelist', reasons: ['NotFilteredWhiteList'] },
+  { key: 'rewritten', labelKey: 'agh.filterRewritten', reasons: ['Rewrite', 'RewriteEtcHosts', 'RewriteRule', 'FilteredSafeSearch'] },
 ]
 
 export const QTYPE_COLORS: Record<string, string> = {

@@ -4,6 +4,7 @@
  * 无独立编辑按钮,行内改动即时保存并刷新列表缓存)。
  */
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import useSWR, { useSWRConfig } from 'swr'
 import { Laptop, Pencil, Smartphone, UserRound } from 'lucide-react'
 import { api, swrFetcher, type AghClient, type Stats } from '../lib/api'
@@ -35,7 +36,8 @@ export function kvCount(map: Stats['top_clients'] | undefined, keys: (string | u
 
 /** on/off 指示:开启为绿色徽标,关闭为灰色文字(全局设置下的只读展示) */
 function OnOff({ on }: { on: boolean }) {
-  return on ? <Badge kind="ok">开启</Badge> : <span className="flex-none text-[13px] text-t3">关闭</span>
+  const { t } = useTranslation()
+  return on ? <Badge kind="ok">{t('clients.onBadge')}</Badge> : <span className="flex-none text-[13px] text-t3">{t('clients.offText')}</span>
 }
 
 /** 行内文本编辑行(DNS 设置页模式):点行进入编辑,Enter/保存即时提交,Esc 取消 */
@@ -46,14 +48,15 @@ function EditableTextRow({ title, value, placeholder, onSave, extraRight }: {
   onSave: (v: string) => void
   extraRight?: React.ReactNode
 }) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [v, setV] = useState(value)
 
   function commit() {
-    const t = v.trim()
-    if (!t) return
+    const next = v.trim()
+    if (!next) return
     setEditing(false)
-    if (t !== value) onSave(t)
+    if (next !== value) onSave(next)
   }
 
   if (!editing) {
@@ -84,8 +87,8 @@ function EditableTextRow({ title, value, placeholder, onSave, extraRight }: {
           if (e.key === 'Escape') setEditing(false)
         }}
       />
-      <button className="press flex-none text-[13px] font-semibold text-accent" onClick={commit}>保存</button>
-      <button className="press flex-none text-[13px] text-t3" onClick={() => setEditing(false)}>取消</button>
+      <button className="press flex-none text-[13px] font-semibold text-accent" onClick={commit}>{t('common.save')}</button>
+      <button className="press flex-none text-[13px] text-t3" onClick={() => setEditing(false)}>{t('common.cancel')}</button>
     </div>
   )
 }
@@ -97,6 +100,7 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
   /** 跳转查询日志;由调用方注入 nav——桌面弹窗经 SheetProvider 渲染在 Router 之外 */
   onOpenLog?: (key: string) => void
 }) {
+  const { t } = useTranslation()
   const { cfg } = useAuth()
   const { mutate: globalMutate } = useSWRConfig()
   const c = data.persistent
@@ -124,10 +128,10 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
     try {
       await api(cfg, '/clients/update', { method: 'POST', body: { name: prev.name, data: { ...prev, ...patch } } })
       globalMutate(['clients', cfg, '/clients'])
-      toast('已保存')
+      toast(t('common.saved'))
     } catch (e: any) {
       setDraft(prev)
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -143,8 +147,8 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-[17px] font-bold text-t1">{displayName || data.ip}</span>
             {draft
-              ? (independent ? <Badge kind="rewrite">独立设置</Badge> : <Badge kind="info">全局设置</Badge>)
-              : <Badge kind="warn">未配置</Badge>}
+              ? (independent ? <Badge kind="rewrite">{t('clients.independentBadge')}</Badge> : <Badge kind="info">{t('clients.globalBadge')}</Badge>)
+              : <Badge kind="warn">{t('clients.unsetBadge')}</Badge>}
           </div>
           {name && (
             <p className="num mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] text-t2">
@@ -155,81 +159,81 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
         </div>
       </div>
 
-      <GroupTitle className="mt-4">基本信息</GroupTitle>
+      <GroupTitle className="mt-4">{t('clients.basicInfo')}</GroupTitle>
       <Group>
         <Rows>
           {draft ? (
             <>
               <EditableTextRow
-                title="名称"
+                title={t('clients.name')}
                 value={draft.name}
-                placeholder="如 我的手机"
+                placeholder={t('clients.detailNamePlaceholder')}
                 onSave={(v) => saveClient({ name: v })}
               />
               <EditableTextRow
-                title="IP / 标识"
+                title={t('clients.ids')}
                 value={draft.ids.join(', ')}
-                placeholder="IP / MAC / CIDR,逗号分隔"
+                placeholder={t('clients.idsPlaceholder')}
                 onSave={(v) => saveClient({ ids: v.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean) })}
-                extraRight={ids[0] ? <CopyIconButton text={ids[0]} label="IP / 标识" /> : undefined}
+                extraRight={ids[0] ? <CopyIconButton text={ids[0]} label={t('clients.ids')} /> : undefined}
               />
             </>
           ) : (
             <Row
-              title="IP / 标识"
+              title={t('clients.ids')}
               subtitle={ids.join(' · ')}
-              right={ids[0] ? <CopyIconButton text={ids[0]} label="IP / 标识" /> : undefined}
+              right={ids[0] ? <CopyIconButton text={ids[0]} label={t('clients.ids')} /> : undefined}
             />
           )}
-          <Row title="来源" value={data.source ?? '–'} />
+          <Row title={t('clients.source')} value={data.source ?? '–'} />
           <Row
             title="WHOIS"
             subtitle={whoisText || '–'}
-            right={whoisText ? <CopyIconButton text={whoisText} label="WHOIS 信息" /> : undefined}
+            right={whoisText ? <CopyIconButton text={whoisText} label={t('clients.whois')} /> : undefined}
           />
-          {draft?.tags && draft.tags.length > 0 && <Row title="标签" subtitle={draft.tags.join(' · ')} />}
+          {draft?.tags && draft.tags.length > 0 && <Row title={t('clients.tags')} subtitle={draft.tags.join(' · ')} />}
         </Rows>
       </Group>
 
-      <GroupTitle className="mt-3">统计</GroupTitle>
+      <GroupTitle className="mt-3">{t('clients.statsGroup')}</GroupTitle>
       <Group>
         <Rows>
           <Row
-            title="近期查询"
+            title={t('clients.recentQueries')}
             value={queries != null ? fmtCompact(queries) : '–'}
-            subtitle={queries != null ? `${fmtNum(queries)} 次` : '统计周期内无该客户端记录'}
+            subtitle={queries != null ? t('clients.times', { n: fmtNum(queries) }) : t('clients.noClientStats')}
           />
-          <Row title="查看查询记录" onClick={() => onOpenLog?.(displayName || data.ip || '')} />
+          <Row title={t('clients.openLog')} onClick={() => onOpenLog?.(displayName || data.ip || '')} />
         </Rows>
       </Group>
 
       {draft && (
         <>
-          <GroupTitle className="mt-3">防护设置</GroupTitle>
+          <GroupTitle className="mt-3">{t('clients.protectionGroup')}</GroupTitle>
           <Group>
             <Rows>
               <Row
-                title="使用全局设置"
-                subtitle="关闭后可为该设备单独配置过滤策略"
+                title={t('clients.useGlobal')}
+                subtitle={t('clients.useGlobalSub')}
                 right={<Switch on={!independent} onChange={(v) => saveClient({ use_global_settings: v })} />}
               />
               {independent ? (
                 <>
-                  <Row title="过滤广告与跟踪" right={<Switch on={!!draft.filtering_enabled} onChange={(v) => saveClient({ filtering_enabled: v })} />} />
-                  <Row title="浏览安全防护" right={<Switch on={!!draft.safebrowsing_enabled} onChange={(v) => saveClient({ safebrowsing_enabled: v })} />} />
-                  <Row title="家长控制" right={<Switch on={!!draft.parental_enabled} onChange={(v) => saveClient({ parental_enabled: v })} />} />
+                  <Row title={t('clients.filterLabel')} right={<Switch on={!!draft.filtering_enabled} onChange={(v) => saveClient({ filtering_enabled: v })} />} />
+                  <Row title={t('clients.safeBrowsingLabel')} right={<Switch on={!!draft.safebrowsing_enabled} onChange={(v) => saveClient({ safebrowsing_enabled: v })} />} />
+                  <Row title={t('clients.parentalLabel')} right={<Switch on={!!draft.parental_enabled} onChange={(v) => saveClient({ parental_enabled: v })} />} />
                 </>
               ) : (
                 <>
-                  <Row title="过滤广告与跟踪" right={<OnOff on={!!draft.filtering_enabled} />} />
-                  <Row title="浏览安全防护" right={<OnOff on={!!draft.safebrowsing_enabled} />} />
-                  <Row title="家长控制" right={<OnOff on={!!draft.parental_enabled} />} />
+                  <Row title={t('clients.filterLabel')} right={<OnOff on={!!draft.filtering_enabled} />} />
+                  <Row title={t('clients.safeBrowsingLabel')} right={<OnOff on={!!draft.safebrowsing_enabled} />} />
+                  <Row title={t('clients.parentalLabel')} right={<OnOff on={!!draft.parental_enabled} />} />
                 </>
               )}
               {(draft.ignore_querylog || draft.ignore_statistics) && (
                 <>
-                  {draft.ignore_querylog && <Row title="忽略查询日志" right={<Badge kind="warn">已忽略</Badge>} />}
-                  {draft.ignore_statistics && <Row title="忽略统计" right={<Badge kind="warn">已忽略</Badge>} />}
+                  {draft.ignore_querylog && <Row title={t('clients.ignoreQuerylog')} right={<Badge kind="warn">{t('clients.ignoredBadge')}</Badge>} />}
+                  {draft.ignore_statistics && <Row title={t('clients.ignoreStats')} right={<Badge kind="warn">{t('clients.ignoredBadge')}</Badge>} />}
                 </>
               )}
             </Rows>
@@ -241,12 +245,12 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
         <div className="mt-4 flex gap-2.5">
           {draft && onDelete && (
             <Button variant="glass" size="lg" className="flex-1 !text-danger" onClick={onDelete}>
-              删除
+              {t('common.delete')}
             </Button>
           )}
           {!draft && onAdd && (
             <Button size="lg" className="flex-1" onClick={onAdd}>
-              添加为持久客户端
+              {t('clients.addPersistent')}
             </Button>
           )}
         </div>

@@ -2,6 +2,7 @@
  *  移动端卡片/列表 + 同行排序入口,桌面端持久/自动识别双表格,双端排序分页,添加/编辑走独立子页(移动)或居中弹窗(桌面) */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
   Plus, Laptop, Smartphone, Globe, ShieldAlert, Baby,
@@ -37,13 +38,13 @@ export const emptyClient = (): Partial<AghClient> => ({
 /* ---------- 排序 ---------- */
 
 type SortKey = 'requests' | 'name' | 'source'
-const SORT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'requests-desc', label: '请求数从多到少' },
-  { value: 'requests-asc', label: '请求数从少到多' },
-  { value: 'name-asc', label: '名称 A → Z' },
-  { value: 'name-desc', label: '名称 Z → A' },
-  { value: 'source-asc', label: '来源 A → Z' },
-]
+const SORT_OPTIONS = [
+  { value: 'requests-desc', labelKey: 'clients.sortRequestsDesc' },
+  { value: 'requests-asc', labelKey: 'clients.sortRequestsAsc' },
+  { value: 'name-asc', labelKey: 'clients.sortNameAsc' },
+  { value: 'name-desc', labelKey: 'clients.sortNameDesc' },
+  { value: 'source-asc', labelKey: 'clients.sortSourceAsc' },
+] as const
 
 /** 双端共用的行模型:持久客户端与自动识别客户端合并后的展示视图 */
 interface ClientRowModel {
@@ -74,6 +75,7 @@ const whoisLine = (w: Record<string, string> | undefined) =>
 
 export default function Clients() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const sheet = useSheet()
   const confirm = useConfirm()
   const isDesktop = useIsDesktop()
@@ -158,7 +160,7 @@ export default function Clients() {
           data={d}
           onOpenLog={(k) => { sheet.close(); nav('/log?q=' + encodeURIComponent(k)) }}
           onDelete={d.persistent ? () => {
-            confirm({ title: `删除客户端「${d.persistent!.name}」?`, destructive: true, confirmText: '删除', onConfirm: async () => { await remove(d.persistent!); sheet.close() } })
+            confirm({ title: t('clients.deleteConfirmTitle', { name: d.persistent!.name }), destructive: true, confirmText: t('common.delete'), onConfirm: async () => { await remove(d.persistent!); sheet.close() } })
           } : undefined}
           onAdd={d.persistent ? undefined : () => openForm(null, d.ip)}
         />
@@ -191,9 +193,9 @@ export default function Clients() {
     try {
       await api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } })
       mutate()
-      toast('客户端已删除')
+      toast(t('clients.deleted'))
     } catch (e: any) {
-      toast('删除失败:' + e.message, 'err')
+      toast(t('common.deleteFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -222,7 +224,9 @@ export default function Clients() {
   useEffect(() => { setPageAuto(1); setPagePersist(1) }, [search, sortKey, sortAsc, pageSize])
 
   const sortValue = `${sortKey}-${sortAsc ? 'asc' : 'desc'}`
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === sortValue)?.label ?? ''
+  const sortOpt = SORT_OPTIONS.find((o) => o.value === sortValue)
+  const sortLabel = sortOpt ? t(sortOpt.labelKey) : ''
+  const sortOpts = SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))
 
   function applySort(v: string) {
     const [k, d] = v.split('-')
@@ -232,9 +236,9 @@ export default function Clients() {
 
   function pickSort(e: any) {
     pick({
-      options: SORT_OPTIONS.map((o) => ({ ...o })),
+      options: sortOpts,
       value: sortValue,
-      title: '排序方式',
+      title: t('clients.sortTitle'),
       anchor: e.currentTarget,
       onPick: applySort,
     })
@@ -243,15 +247,15 @@ export default function Clients() {
   const sortButton = isAppleMobile() ? (
     <span
       className="press glass relative flex flex-none items-center justify-center gap-1 self-stretch rounded-full px-3 text-t2 lg:hidden"
-      title={`排序:${sortLabel}`}
+      title={t('clients.sortPrefix', { mode: sortLabel })}
     >
       <ArrowDownUp size={15} className="pointer-events-none" />
       <ChevronDown size={13} className="pointer-events-none" />
       <PickSelect
-        ariaLabel="排序方式"
+        ariaLabel={t('clients.sortTitle')}
         className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-transparent"
         value={sortValue}
-        options={SORT_OPTIONS}
+        options={sortOpts}
         onPick={applySort}
       />
     </span>
@@ -259,8 +263,8 @@ export default function Clients() {
     <button
       onClick={pickSort}
       className="press glass flex flex-none items-center gap-1 self-stretch rounded-full px-3 text-t2 lg:hidden"
-      aria-label="排序方式"
-      title={`排序:${sortLabel}`}
+      aria-label={t('clients.sortTitle')}
+      title={t('clients.sortPrefix', { mode: sortLabel })}
     >
       <ArrowDownUp size={15} />
       <ChevronDown size={13} />
@@ -280,12 +284,12 @@ export default function Clients() {
     <Screen>
       <PageHeader
         back
-        title="客户端"
-        subtitle={`${clients.length} 个持久 · ${autos.length} 个自动识别`}
+        title={t('clients.title')}
+        subtitle={t('clients.countSub', { p: clients.length, a: autos.length })}
         right={
           <HeaderAction
             onClick={() => openForm(null)}
-            label="添加客户端"
+            label={t('clients.add')}
             className="w-11 text-accent lg:w-10"
             native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
           >
@@ -295,7 +299,7 @@ export default function Clients() {
       />
 
       <div className="flex items-center gap-2">
-        <SearchBar value={search} onChange={setSearch} placeholder="搜索名称或 IP…" className="min-w-0 flex-1" />
+        <SearchBar value={search} onChange={setSearch} placeholder={t('clients.searchPlaceholder')} className="min-w-0 flex-1" />
         {sortButton}
       </div>
 
@@ -305,7 +309,7 @@ export default function Clients() {
         <>
           {sortedPersist.length > 0 && (
             <>
-              <GroupTitle className="mt-1">持久客户端</GroupTitle>
+              <GroupTitle className="mt-1">{t('clients.persistent')}</GroupTitle>
               <ClientTable
                 rows={pagedPersist}
                 sortKey={sortKey}
@@ -325,7 +329,7 @@ export default function Clients() {
           )}
           {sortedAutos.length > 0 && (
             <>
-              <GroupTitle className="mt-1">自动识别客户端</GroupTitle>
+              <GroupTitle className="mt-1">{t('clients.auto')}</GroupTitle>
               <ClientTable
                 rows={pagedDeskAutos}
                 sortKey={sortKey}
@@ -348,7 +352,7 @@ export default function Clients() {
         <>
           {persistentRows.length > 0 && (
             <>
-              <GroupTitle>持久客户端</GroupTitle>
+              <GroupTitle>{t('clients.persistent')}</GroupTitle>
               <div className="grid gap-2.5">
                 {persistentRows.map((r) => {
                   const c = r.persistent!
@@ -361,7 +365,7 @@ export default function Clients() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="truncate text-[15px] font-semibold text-t1">{r.name}</span>
-                            {c.use_global_settings ? <Badge kind="info">全局设置</Badge> : <Badge kind="rewrite">独立设置</Badge>}
+                            {c.use_global_settings ? <Badge kind="info">{t('clients.globalBadge')}</Badge> : <Badge kind="rewrite">{t('clients.independentBadge')}</Badge>}
                           </div>
                           <p className="mt-0.5 truncate text-[12px] text-t2 num">{r.ids.join(' · ')}</p>
                         </div>
@@ -371,15 +375,15 @@ export default function Clients() {
                             className="num rounded-full px-2 py-0.5 text-[11px] font-semibold"
                             style={{ background: 'var(--glass)', color: 'var(--t2)' }}
                           >
-                            {r.requests != null ? `${fmtNum(r.requests)} 次` : '–'}
+                            {r.requests != null ? t('clients.times', { n: fmtNum(r.requests) }) : '–'}
                           </span>
                         </div>
                       </div>
                       {!c.use_global_settings && (
                         <div className="mt-2.5 flex flex-wrap gap-1.5">
-                          {c.filtering_enabled && <Badge kind="info">过滤</Badge>}
-                          {c.safebrowsing_enabled && <Badge kind="warn">安全防护</Badge>}
-                          {c.parental_enabled && <Badge kind="rewrite">家长控制</Badge>}
+                          {c.filtering_enabled && <Badge kind="info">{t('clients.filterBadge')}</Badge>}
+                          {c.safebrowsing_enabled && <Badge kind="warn">{t('clients.safeBrowsingBadge')}</Badge>}
+                          {c.parental_enabled && <Badge kind="rewrite">{t('clients.parentalBadge')}</Badge>}
                         </div>
                       )}
                     </Card>
@@ -391,7 +395,7 @@ export default function Clients() {
 
           {sortedAutos.length > 0 && (
             <>
-              <GroupTitle>自动识别客户端</GroupTitle>
+              <GroupTitle>{t('clients.auto')}</GroupTitle>
               <Group>
                 <Rows>
                   {pagedAutos.map((r) => (
@@ -413,7 +417,7 @@ export default function Clients() {
                             className="num rounded-full px-2 py-0.5 text-[11px] font-semibold"
                             style={{ background: 'var(--glass)', color: 'var(--t2)' }}
                           >
-                            {r.requests != null ? `${fmtNum(r.requests)} 次` : '–'}
+                            {r.requests != null ? t('clients.times', { n: fmtNum(r.requests) }) : '–'}
                           </span>
                         </div>
                       }
@@ -428,7 +432,7 @@ export default function Clients() {
       )}
 
       {!isLoading && !filteredRows.length && (
-        <EmptyState icon={<Laptop size={30} className="text-t3" />} title="没有客户端" subtitle="添加持久客户端可为不同设备配置独立过滤策略" />
+        <EmptyState icon={<Laptop size={30} className="text-t3" />} title={t('clients.noClientsTitle')} subtitle={t('clients.noClientsSub')} />
       )}
     </Screen>
   )
@@ -469,6 +473,7 @@ function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
   onSort: (k: SortKey) => void
   onRow: (r: ClientRowModel) => void
 }) {
+  const { t } = useTranslation()
   return (
     <Card className="overflow-hidden !rounded-2xl">
       <div className="overflow-x-auto">
@@ -477,12 +482,12 @@ function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
             className={`${TBL_COLS} px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-t3`}
             style={{ borderBottom: '1px solid var(--glass-border)' }}
           >
-            <SortTh label="客户端" k="name" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
-            <span>IP / 标识</span>
-            <SortTh label="源" k="source" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
+            <SortTh label={t('clients.colName')} k="name" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
+            <span>{t('clients.colIds')}</span>
+            <SortTh label={t('clients.colSource')} k="source" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
             <span>WHOIS</span>
-            <SortTh label="请求数" k="requests" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} align="right" />
-            <span className="flex justify-end">状态</span>
+            <SortTh label={t('clients.colRequests')} k="requests" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} align="right" />
+            <span className="flex justify-end">{t('clients.colStatus')}</span>
           </div>
           {rows.map((r) => (
             <button
@@ -507,7 +512,7 @@ function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
               <span className="truncate text-[12.5px] text-t2" title={r.whoisText}>{r.whoisText || '–'}</span>
               <span className="num text-right text-[12.5px] text-t2">{r.requests != null ? fmtNum(r.requests) : '–'}</span>
               <span className="flex justify-end">
-                {r.persistent ? <Badge kind="ok">已配置</Badge> : <Badge kind="warn">未配置</Badge>}
+                {r.persistent ? <Badge kind="ok">{t('clients.configuredBadge')}</Badge> : <Badge kind="warn">{t('clients.unsetBadge')}</Badge>}
               </span>
             </button>
           ))}
@@ -530,6 +535,7 @@ export function ClientForm({
   showTitle?: boolean
 }) {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const [c, setC] = useState<Partial<AghClient>>({ ...initial })
   const [idsText, setIdsText] = useState((initial.ids ?? []).join(', '))
   const [saving, setSaving] = useState(false)
@@ -537,9 +543,9 @@ export function ClientForm({
 
   async function save() {
     if (!cfg) return
-    if (!c.name?.trim()) return toast('请填写客户端名称', 'err')
+    if (!c.name?.trim()) return toast(t('clients.nameRequired'), 'err')
     const ids = idsText.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
-    if (!ids.length) return toast('请至少填写一个 IP 或 MAC', 'err')
+    if (!ids.length) return toast(t('clients.idsRequired'), 'err')
     setSaving(true)
     const payload: AghClient = {
       name: c.name.trim(),
@@ -563,9 +569,9 @@ export function ClientForm({
         await api(cfg, '/clients/update', { method: 'POST', body: { name: initial.name, data: payload } })
       }
       onSaved()
-      toast(isNew ? '客户端已添加' : '已保存')
+      toast(isNew ? t('clients.added') : t('common.saved'))
     } catch (e: any) {
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     } finally {
       setSaving(false)
     }
@@ -573,16 +579,16 @@ export function ClientForm({
 
   return (
     <div style={{ maxHeight: '72vh', overflowY: 'auto' }}>
-      {showTitle && <p className="mb-4 text-center text-[17px] font-bold text-t1">{isNew ? '添加客户端' : '编辑客户端'}</p>}
+      {showTitle && <p className="mb-4 text-center text-[17px] font-bold text-t1">{isNew ? t('clients.formAddTitle') : t('clients.formEditTitle')}</p>}
 
       <div className="flex flex-col gap-3">
-        <input className="field" placeholder="名称,如 我的手机" value={c.name ?? ''} onChange={(e) => set('name', e.target.value)} />
-        <input className="field" placeholder="IP / MAC / CIDR,逗号分隔" value={idsText} onChange={(e) => setIdsText(e.target.value)} autoCapitalize="off" />
+        <input className="field" placeholder={t('clients.namePlaceholder')} value={c.name ?? ''} onChange={(e) => set('name', e.target.value)} />
+        <input className="field" placeholder={t('clients.idsPlaceholder')} value={idsText} onChange={(e) => setIdsText(e.target.value)} autoCapitalize="off" />
 
         <div className="glass flex items-center justify-between rounded-2xl px-4 py-3">
           <div>
-            <p className="text-[14.5px] font-medium text-t1">使用全局设置</p>
-            <p className="text-[11.5px] text-t2">关闭后可为该设备单独配置过滤策略</p>
+            <p className="text-[14.5px] font-medium text-t1">{t('clients.useGlobal')}</p>
+            <p className="text-[11.5px] text-t2">{t('clients.useGlobalSub')}</p>
           </div>
           <Switch on={!!c.use_global_settings} onChange={(v) => set('use_global_settings', v)} />
         </div>
@@ -590,9 +596,9 @@ export function ClientForm({
         {c.use_global_settings === false && (
           <div className="glass rounded-2xl px-4">
             {[
-              { k: 'filtering_enabled' as const, label: '过滤广告与跟踪', icon: <Globe size={15} /> },
-              { k: 'safebrowsing_enabled' as const, label: '浏览安全防护', icon: <ShieldAlert size={15} /> },
-              { k: 'parental_enabled' as const, label: '家长控制', icon: <Baby size={15} /> },
+              { k: 'filtering_enabled' as const, label: t('clients.filterLabel'), icon: <Globe size={15} /> },
+              { k: 'safebrowsing_enabled' as const, label: t('clients.safeBrowsingLabel'), icon: <ShieldAlert size={15} /> },
+              { k: 'parental_enabled' as const, label: t('clients.parentalLabel'), icon: <Baby size={15} /> },
             ].map(({ k, label, icon }, i) => (
               <div key={k}>
                 {i > 0 && <div className="h-px" style={{ background: 'var(--glass-border)' }} />}
@@ -607,18 +613,18 @@ export function ClientForm({
 
         <div className="glass flex items-center justify-between rounded-2xl px-4 py-3">
           <div>
-            <p className="text-[14.5px] font-medium text-t1">使用全局拦截服务</p>
-            <p className="text-[11.5px] text-t2">服务的独立配置可在防护页设置</p>
+            <p className="text-[14.5px] font-medium text-t1">{t('clients.useGlobalServices')}</p>
+            <p className="text-[11.5px] text-t2">{t('clients.useGlobalServicesSub')}</p>
           </div>
           <Switch on={c.use_global_blocked_services !== false} onChange={(v) => set('use_global_blocked_services', v)} />
         </div>
 
         <div className="flex gap-2.5 pt-1">
           <Button variant="glass" size="lg" className="flex-1" onClick={onClose}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button size="lg" className="flex-1" loading={saving} onClick={save}>
-            保存
+            {t('common.save')}
           </Button>
         </div>
       </div>
