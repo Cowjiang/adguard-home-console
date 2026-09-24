@@ -25,7 +25,7 @@
 | 2026-09-24 | bug-fix | [把 Rust 静态库从 app 包的资源阶段摘掉](proposals/bug-fix/2026-09-24-ios-bundle-ships-libapp-archive.md) | implemented |
 | 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
 | 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
-| 2026-09-24 | feature | [为 React UI 引入中英双语](proposals/feature/2026-09-24-ui-i18n.md) | proposed |
+| 2026-09-24 | feature | [为 React UI 引入中英双语](proposals/feature/2026-09-24-ui-i18n.md) | implemented |
 
 ## 与 docs/ 的分工
 
