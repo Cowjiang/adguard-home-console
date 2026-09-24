@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link
@@ -22,7 +22,7 @@
         } catch (e) {
           /* 存储不可用时保持 HTML 默认深色 */
         }
-        var lang = 'zh';
+        var lang = 'en';
         try {
           var l = localStorage.getItem('agh.console.lang.v1');
           if (l === 'zh' || l === 'en') {
@@ -35,7 +35,7 @@
               if (tag.indexOf('en') === 0) { lang = 'en'; break; }
             }
           }
-        } catch (e) { /* 存储不可用时保持中文 */ }
+        } catch (e) { /* 存储不可用时保持英文 */ }
         var zh = lang === 'zh';
         document.documentElement.lang = zh ? 'zh-CN' : 'en';
         document.title = zh ? 'AdGuard Home Console · 移动控制台' : 'AdGuard Home Console · Mobile Console';
@@ -48,8 +48,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="description" content="AdGuard Home 移动端控制台 — 现代玻璃质感的多平台 AdGuard Home 管理器" />
-    <title>AdGuard Home Console · 移动控制台</title>
+    <meta name="description" content="AdGuard Home mobile console — a modern, glassy multi-platform AdGuard Home manager" />
+    <title>AdGuard Home Console · Mobile Console</title>
   </head>
   <body>
     <div id="root"></div>

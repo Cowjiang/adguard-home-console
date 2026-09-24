@@ -3,7 +3,7 @@ import { i18n } from './i18n'
 
 /** 当前界面语言的 BCP-47 标记 */
 function lang(): string {
-  return i18n.language || 'zh'
+  return i18n.language || 'en'
 }
 
 function fmtInt(n: number): string {

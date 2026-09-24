@@ -20,7 +20,7 @@ declare module 'i18next' {
   }
 }
 
-/** 显式设置 > 系统语言顺序匹配 > zh 兜底;存储不可用(隐私模式等)时静默回退 */
+/** 显式设置 > 系统语言顺序匹配 > en 兜底;存储不可用(隐私模式等)时静默回退 */
 export function resolveLang(): Lang {
   try {
     const saved = localStorage.getItem(LANG_KEY)
@@ -32,7 +32,7 @@ export function resolveLang(): Lang {
     if (t.startsWith('zh')) return 'zh'
     if (t.startsWith('en')) return 'en'
   }
-  return 'zh'
+  return 'en'
 }
 
 export const i18n: I18n = i18next.createInstance()
@@ -40,7 +40,7 @@ export const i18n: I18n = i18next.createInstance()
 i18n.use(initReactI18next).init({
   resources,
   lng: resolveLang(),
-  fallbackLng: 'zh',
+  fallbackLng: 'en',
   defaultNS: 'translation',
   interpolation: { escapeValue: false },
   returnNull: false,
