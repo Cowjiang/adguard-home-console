@@ -2,6 +2,7 @@
 import useSWR from 'swr'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowDownRight, ArrowUpRight, ChevronDown, Globe, Laptop, ShieldAlert, Zap, Database, Timer } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
@@ -29,12 +30,11 @@ function topN(obj: unknown, n: number): [string, number][] {
 }
 
 const RANGE_OPTS = [
-  { value: '6h', label: '6 小时' },
-  { value: '12h', label: '12 小时' },
-  { value: '24h', label: '24 小时' },
+  { value: '6h', labelKey: 'dashboard.range6h' },
+  { value: '12h', labelKey: 'dashboard.range12h' },
+  { value: '24h', labelKey: 'dashboard.range24h' },
 ] as const
 type RangeKey = (typeof RANGE_OPTS)[number]['value']
-const RANGE_PICK_OPTS: { label: string; value: RangeKey }[] = RANGE_OPTS.map((o) => ({ label: o.label, value: o.value }))
 
 export default function Dashboard() {
   const pageIn = usePageInClass()
@@ -56,6 +56,7 @@ export default function Dashboard() {
   })
   const [range, setRange] = useState<RangeKey>('24h')
   const pick = usePick()
+  const { t } = useTranslation()
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))
@@ -79,14 +80,16 @@ export default function Dashboard() {
     }
   }, [range, stats])
 
-  const rangeLabel = RANGE_OPTS.find((o) => o.value === range)?.label ?? ''
+  const rangeOpts = RANGE_OPTS.map((o) => ({ label: t(o.labelKey), value: o.value }))
+  const rangeOpt = RANGE_OPTS.find((o) => o.value === range)
+  const rangeLabel = rangeOpt ? t(rangeOpt.labelKey) : ''
   const openRangePicker = (e: React.MouseEvent<HTMLElement>) => {
     pick({
-      title: '时间范围',
+      title: t('dashboard.rangeTitle'),
       anchor: e.currentTarget,
       align: 'right',
       value: range,
-      options: RANGE_OPTS.map((o) => ({ label: o.label, value: o.value })),
+      options: rangeOpts,
       onPick: setRange,
     })
   }
@@ -96,7 +99,7 @@ export default function Dashboard() {
     return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
         <div className="flex min-h-[55vh] items-center justify-center">
-          <Loading text="连接服务器中…" />
+          <Loading text={t('dashboard.loading')} />
         </div>
       </div>
     )
@@ -124,13 +127,13 @@ export default function Dashboard() {
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
         <div className="grid grid-cols-2 gap-3">
-          <StatTile label="今日查询" value={fmtCompact(stats.num_dns_queries)} sub={`${fmtNum(stats.num_dns_queries)} 次`} onClick={() => jump('/log?filter=all')} />
-          <StatTile label="已拦截" value={fmtCompact(stats.num_blocked_filtering)} sub={`拦截率 ${blockedPct}`} accent="var(--danger)" onClick={() => jump('/log?filter=blocked')} />
-          <StatTile label="平均耗时" value={fmtMs(stats.avg_processing_time)} sub="单次解析" accent="var(--accent-2)" />
+          <StatTile label={t('dashboard.queriesToday')} value={fmtCompact(stats.num_dns_queries)} sub={t('dashboard.queriesSub', { n: fmtNum(stats.num_dns_queries) })} onClick={() => jump('/logs?filter=all')} />
+          <StatTile label={t('dashboard.blocked')} value={fmtCompact(stats.num_blocked_filtering)} sub={t('dashboard.blockRateSub', { pct: blockedPct })} accent="var(--danger)" onClick={() => jump('/logs?filter=blocked')} />
+          <StatTile label={t('dashboard.avgLatency')} value={fmtMs(stats.avg_processing_time)} sub={t('dashboard.perQuery')} accent="var(--accent-2)" />
           <StatTile
-            label="客户端"
+            label={t('dashboard.clients')}
             value={fmtCompact((clients?.clients?.length ?? 0) + (clients?.auto_clients?.length ?? 0))}
-            sub={`${clients?.clients?.length ?? 0} 个持久 · ${clients?.auto_clients?.length ?? 0} 个自动`}
+            sub={t('dashboard.clientsSub', { p: clients?.clients?.length ?? 0, a: clients?.auto_clients?.length ?? 0 })}
             accent="var(--accent-2)"
             onClick={() => nav('/clients')}
           />
@@ -141,13 +144,13 @@ export default function Dashboard() {
       <Card className="mt-4 p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <h2 className="text-[15.5px] font-bold text-t1">流量趋势</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.trend')}</h2>
             <div className="flex items-center gap-2 text-[10.5px] text-t2">
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> 查询
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> 拦截
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
               </span>
             </div>
           </div>
@@ -156,7 +159,7 @@ export default function Dashboard() {
               <PickSelect
                 className="absolute inset-0 h-[30px] w-full cursor-pointer appearance-none bg-transparent text-transparent"
                 value={range}
-                options={RANGE_PICK_OPTS}
+                options={rangeOpts}
                 onPick={setRange}
               />
               <span className="pointer-events-none">{rangeLabel}</span>
@@ -177,18 +180,18 @@ export default function Dashboard() {
 
       {/* 请求构成(移动端;桌面完整版在统计页) */}
       <Card className="mt-4 p-4 lg:hidden">
-        <h2 className="mb-3 text-[15.5px] font-bold text-t1">请求构成</h2>
+        <h2 className="mb-3 text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
         <Donut
           size={140}
           thickness={20}
           centerLabel={fmtCompact(stats.num_dns_queries)}
-          centerSub="总请求"
+          centerSub={t('dashboard.totalRequests')}
           segments={[
-            { label: '正常放行', value: passed, color: 'var(--chart-1)' },
-            { label: '已拦截', value: stats.num_blocked_filtering, color: 'var(--danger)' },
-            { label: '安全浏览', value: safeBrowsing, color: 'var(--warn)' },
-            { label: '安全搜索', value: safeSearch, color: 'var(--accent-2)' },
-            { label: '家长控制', value: parental, color: 'var(--violet)' },
+            { label: t('dashboard.passed'), value: passed, color: 'var(--chart-1)' },
+            { label: t('dashboard.blocked'), value: stats.num_blocked_filtering, color: 'var(--danger)' },
+            { label: t('dashboard.safeBrowsing'), value: safeBrowsing, color: 'var(--warn)' },
+            { label: t('dashboard.safeSearch'), value: safeSearch, color: 'var(--accent-2)' },
+            { label: t('dashboard.parental'), value: parental, color: 'var(--violet)' },
           ]}
         />
       </Card>
@@ -200,9 +203,9 @@ export default function Dashboard() {
             value={topTab}
             onChange={setTopTab}
             options={[
-              { value: 'domains', label: '热门域名' },
-              { value: 'blocked', label: '拦截域名' },
-              { value: 'clients', label: '活跃客户端' },
+              { value: 'domains', label: t('dashboard.topDomains') },
+              { value: 'blocked', label: t('dashboard.topBlocked') },
+              { value: 'clients', label: t('dashboard.topClients') },
             ]}
           />
           <TabContent value={topTab} className="mt-4">
@@ -210,7 +213,7 @@ export default function Dashboard() {
               <>
                 <BarList items={topN(stats.top_queried_domains, 10)} />
                 <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/queried')}>
-                  查看更多
+                  {t('dashboard.viewMore')}
                 </Button>
               </>
             )}
@@ -219,11 +222,11 @@ export default function Dashboard() {
                 <>
                   <BarList items={topN(stats.top_blocked_domains, 10)} color="var(--danger)" />
                   <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/blocked')}>
-                    查看更多
+                    {t('dashboard.viewMore')}
                   </Button>
                 </>
               ) : (
-                <EmptyState icon={<ShieldAlert size={30} className="text-t3" />} title="暂无拦截记录" subtitle="你的网络环境非常干净" />
+                <EmptyState icon={<ShieldAlert size={30} className="text-t3" />} title={t('dashboard.noBlockedTitle')} subtitle={t('dashboard.noBlockedSub')} />
               )
             )}
             {topTab === 'clients' && (
@@ -233,7 +236,7 @@ export default function Dashboard() {
                   color="var(--accent-2)"
                 />
                 <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/clients')}>
-                  查看更多
+                  {t('dashboard.viewMore')}
                 </Button>
               </>
             )}
@@ -244,7 +247,7 @@ export default function Dashboard() {
           {/* 上游 DNS */}
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15.5px] font-bold text-t1">上游服务器</h2>
+              <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
               <Database size={16} className="text-t3" />
             </div>
             <div className="flex flex-col gap-3">
@@ -261,7 +264,7 @@ export default function Dashboard() {
                   </div>
                 )
               })}
-              {!topN(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">暂无上游数据</p>}
+              {!topN(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">{t('dashboard.noUpstreams')}</p>}
             </div>
           </Card>
 
@@ -269,9 +272,9 @@ export default function Dashboard() {
           {status && (
             <Card className="p-4">
               <div className="grid grid-cols-3 gap-y-3 text-center">
-                <InfoCell icon={<Zap size={14} />} label="运行状态" value={status.running ? '正常' : '停止'} good={status.running} />
-                <InfoCell icon={<Laptop size={14} />} label="DNS 端口" value={String(status.dns_port)} />
-                <InfoCell icon={<Timer size={14} />} label="已运行" value={fmtUptime(status.start_time)} />
+                <InfoCell icon={<Zap size={14} />} label={t('dashboard.status')} value={status.running ? t('dashboard.running') : t('dashboard.stopped')} good={status.running} />
+                <InfoCell icon={<Laptop size={14} />} label={t('dashboard.dnsPort')} value={String(status.dns_port)} />
+                <InfoCell icon={<Timer size={14} />} label={t('dashboard.uptime')} value={fmtUptime(status.start_time)} />
               </div>
             </Card>
           )}

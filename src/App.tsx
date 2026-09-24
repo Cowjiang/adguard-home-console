@@ -84,8 +84,8 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/top/:kind" element={<TopListPage />} />
-              <Route path="/log" element={<QueryLog />} />
-              <Route path="/log/detail" element={<LogDetailPage />} />
+              <Route path="/logs" element={<QueryLog />} />
+              <Route path="/logs/detail" element={<LogDetailPage />} />
               <Route path="/protection" element={<Protection />} />
               <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
               <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />

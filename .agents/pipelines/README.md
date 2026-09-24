@@ -25,6 +25,7 @@
 | 2026-09-24 | bug-fix | [把 Rust 静态库从 app 包的资源阶段摘掉](proposals/bug-fix/2026-09-24-ios-bundle-ships-libapp-archive.md) | implemented |
 | 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
 | 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
+| 2026-09-24 | feature | [为 React UI 引入中英双语](proposals/feature/2026-09-24-ui-i18n.md) | implemented |
 | 2026-09-25 | feature | [为移动端增加下拉刷新并修复断网后的刷新冻结](proposals/feature/2026-09-25-refresh-triggers.md) | implemented |
 | 2026-09-25 | feature | [收敛下拉刷新触发范围并补上断网后的离线反馈](proposals/feature/2026-09-25-refresh-scope-and-offline-feedback.md) | implemented |
 

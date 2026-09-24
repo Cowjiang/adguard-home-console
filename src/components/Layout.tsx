@@ -1,6 +1,7 @@
 /** 全局布局:环境背景 + 移动端浮动玻璃标签栏 / 桌面端固定侧边栏(≥lg) */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { mutate } from 'swr'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
 import { useAuth } from '../lib/auth'
@@ -13,20 +14,20 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
 import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button } from './ui'
 
-type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
+type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.stats' | 'nav.clients'; icon: typeof Home; match?: string[] }
 
 const TABS: NavItem[] = [
-  { to: '/', label: '概览', icon: Home },
-  { to: '/protection', label: '过滤器', icon: ListFilter },
-  { to: '/log', label: '日志', icon: ScrollText },
-  { to: '/settings', label: '设置', icon: Settings2 },
+  { to: '/', labelKey: 'nav.overview', icon: Home },
+  { to: '/protection', labelKey: 'nav.protection', icon: ListFilter },
+  { to: '/logs', labelKey: 'nav.log', icon: ScrollText },
+  { to: '/settings', labelKey: 'nav.settings', icon: Settings2 },
 ]
 
 const DESK_NAV: NavItem[] = [
   ...TABS.slice(0, 1),
-  { to: '/stats', label: '统计', icon: BarChart3 },
+  { to: '/stats', labelKey: 'nav.stats', icon: BarChart3 },
   ...TABS.slice(1, 3),
-  { to: '/clients', label: '客户端', icon: Users, match: ['/clients', '/rewrites'] },
+  { to: '/clients', labelKey: 'nav.clients', icon: Users, match: ['/clients', '/rewrites'] },
   TABS[3],
 ]
 
@@ -43,6 +44,7 @@ export function Ambient() {
  *  下拉刷新期间淡出:刷新留白带是指示器的位置,pill 留着会与圆圈重叠 */
 function TopBar({ dimmed }: { dimmed?: boolean }) {
   const { status, offline } = useAuth()
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   // CSS 快照转场返回(pop)落地 tab 根页:与页面 rt-pop-in 同步淡入 —— pill 被
   // z-50 退场快照盖着、随其滑走逐渐露出,纯淡入即无硬切;侧滑提交/无动画返回时
@@ -68,7 +70,7 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
           style={{ background: !offlinePill && protected_ ? 'var(--ok)' : 'var(--danger)' }}
         />
         <span className="text-[12px] font-semibold text-t1">
-          {offlinePill ? '服务离线' : protected_ ? '防护运行中' : '防护已暂停'}
+          {offlinePill ? t('nav.statusOffline') : protected_ ? t('nav.statusOn') : t('nav.statusOff')}
         </span>
         <span className="h-3 w-px" style={{ background: 'var(--glass-border-strong)' }} />
         <span className="text-[12px] text-t3">{APP_NAME}</span>
@@ -78,6 +80,7 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
 }
 
 function TabBar() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const activeIdx = Math.max(
     0,
@@ -128,7 +131,7 @@ function TabBar() {
         >
           <div ref={lensRef} className="tab-lens h-full w-full" style={{ transformOrigin: '50% 55%' }} />
         </div>
-        {TABS.map(({ to, label, icon: Icon }) => {
+        {TABS.map(({ to, labelKey, icon: Icon }) => {
           const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to)
           return (
             <NavLink
@@ -150,7 +153,7 @@ function TabBar() {
               {({ isActive }) => (
                 <>
                   <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
-                  <span className="text-[10.5px] font-semibold tracking-wide">{label}</span>
+                  <span className="text-[10.5px] font-semibold tracking-wide">{t(labelKey)}</span>
                 </>
               )}
             </NavLink>
@@ -165,6 +168,7 @@ function TabBar() {
 function Sidebar() {
   const { pathname } = useLocation()
   const { status, offline } = useAuth()
+  const { t } = useTranslation()
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
   return (
@@ -185,7 +189,7 @@ function Sidebar() {
         </div>
       </div>
       <nav className="flex flex-col gap-1">
-        {DESK_NAV.map(({ to, label, icon: Icon, match }) => {
+        {DESK_NAV.map(({ to, labelKey, icon: Icon, match }) => {
           const active = navActive(pathname, to, match)
           return (
             <NavLink
@@ -198,7 +202,7 @@ function Sidebar() {
               style={active ? { background: 'var(--accent-soft)' } : undefined}
             >
               <Icon size={19} strokeWidth={active ? 2.3 : 1.9} />
-              {label}
+              {t(labelKey)}
             </NavLink>
           )
         })}
@@ -211,7 +215,7 @@ function Sidebar() {
         />
         <div className="min-w-0">
           <div className="text-[12.5px] font-semibold text-t1">
-            {offlinePill ? '服务离线' : protected_ ? '防护运行中' : '防护已暂停'}
+            {offlinePill ? t('nav.statusOffline') : protected_ ? t('nav.statusOn') : t('nav.statusOff')}
           </div>
           <div className="num text-[11px] text-t3">{APP_NAME}</div>
         </div>
@@ -238,6 +242,7 @@ const REFRESH_DEADLINE_MS = 8000
  *  表单输入,靠状态条与操作报错感知)。z-20 在下拉指示器(z-30)与 TabBar/
  *  状态条(z-40)之下,断网中下拉刷新仍是可用的重试手段 */
 function OfflineNotice({ onRetry }: { onRetry: () => unknown }) {
+  const { t } = useTranslation()
   const [retrying, setRetrying] = useState(false)
   // 与下拉刷新共用同一条 refreshAll 链(含 8s deadline):按钮转圈到链路收口为止
   const retry = () => {
@@ -253,11 +258,11 @@ function OfflineNotice({ onRetry }: { onRetry: () => unknown }) {
       <div className="flex flex-col items-center">
         <EmptyState
           icon={<WifiOff size={38} className="text-t3" />}
-          title="服务离线"
-          subtitle="网络连接中断或服务器无响应;恢复后数据会自动刷新,也可以下拉重试"
+          title={t('nav.statusOffline')}
+          subtitle={t('nav.offlineHint')}
         />
         <Button variant="glass" size="sm" className="mt-2" loading={retrying} onClick={retry}>
-          立即重试
+          {t('common.retryNow')}
         </Button>
       </div>
     </div>

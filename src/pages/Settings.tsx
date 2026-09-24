@@ -5,10 +5,12 @@ import useSWR from 'swr'
 import {
   ScrollText, Network, Lock, Wifi, Wrench,
   Trash, RotateCcw, DownloadCloud, Server, LogOut, SunMoon,
-  Info, Eraser, ShieldQuestion,
+  Info, Eraser, ShieldQuestion, Languages,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
+import { setAppLang, type Lang } from '../lib/i18n'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
   useConfirm, toast, Segmented, Badge, usePick, PickSelect,
@@ -25,33 +27,34 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 
 export default function Settings() {
   const nav = useNavigate()
+  const { t } = useTranslation()
   const isDesktop = useIsDesktop()
   const { offline } = useAuth()
 
   const serverItems = [
-    { icon: <ScrollText size={17} />, color: 'var(--accent-2)', title: '查询日志与统计', desc: '保留时长、隐私选项', to: '/settings/general' },
-    { icon: <Network size={17} />, color: 'var(--accent)', title: 'DNS 设置', desc: '上游、缓存、DNSSEC、拦截模式', to: '/settings/dns' },
-    { icon: <Wrench size={17} />, color: 'var(--violet)', title: '访问控制', desc: '允许/阻止的客户端与域名', to: '/settings/access' },
-    { icon: <Lock size={17} />, color: 'var(--warn)', title: '加密设置', desc: 'HTTPS、DoH、DoT、DoQ 证书', to: '/settings/encryption' },
-    { icon: <Wifi size={17} />, color: 'var(--ok)', title: 'DHCP 服务器', desc: '地址分配与静态租约', to: '/settings/dhcp' },
-    { icon: <ShieldQuestion size={17} />, color: 'var(--danger)', title: '系统管理', desc: '版本更新、重置数据', to: '/settings/system' },
+    { icon: <ScrollText size={17} />, color: 'var(--accent-2)', title: t('settings.itemQueryStats'), desc: t('settings.itemQueryStatsDesc'), to: '/settings/general' },
+    { icon: <Network size={17} />, color: 'var(--accent)', title: t('settings.itemDns'), desc: t('settings.itemDnsDesc'), to: '/settings/dns' },
+    { icon: <Wrench size={17} />, color: 'var(--violet)', title: t('settings.itemAccess'), desc: t('settings.itemAccessDesc'), to: '/settings/access' },
+    { icon: <Lock size={17} />, color: 'var(--warn)', title: t('settings.itemEncryption'), desc: t('settings.itemEncryptionDesc'), to: '/settings/encryption' },
+    { icon: <Wifi size={17} />, color: 'var(--ok)', title: t('settings.itemDhcp'), desc: t('settings.itemDhcpDesc'), to: '/settings/dhcp' },
+    { icon: <ShieldQuestion size={17} />, color: 'var(--danger)', title: t('settings.itemSystem'), desc: t('settings.itemSystemDesc'), to: '/settings/system' },
   ]
   const appItems = [
-    { icon: <SunMoon size={17} />, color: 'var(--accent-2)', title: '外观', desc: '主题:跟随系统 / 浅色 / 深色', to: '/settings/appearance' },
-    { icon: <Server size={17} />, color: 'var(--accent)', title: '服务器连接', desc: '地址、凭据与重新连接', to: '/settings/server' },
-    { icon: <Info size={17} />, color: 'var(--violet)', title: '关于', desc: `${APP_NAME} v${APP_VERSION}`, to: '/settings/about' },
+    { icon: <SunMoon size={17} />, color: 'var(--accent-2)', title: t('settings.appearance'), desc: t('settings.itemAppearanceDesc'), to: '/settings/appearance' },
+    { icon: <Server size={17} />, color: 'var(--accent)', title: t('settings.itemServer'), desc: t('settings.itemServerDesc'), to: '/settings/server' },
+    { icon: <Info size={17} />, color: 'var(--violet)', title: t('settings.itemAbout'), desc: `${APP_NAME} v${APP_VERSION}`, to: '/settings/about' },
   ]
 
   // 离线时隐藏依赖 AGH 服务器的「服务器设置」组,页面保持可点:用户可能正需要
   // 经「服务器连接」更改服务器地址;连接恢复后该组随 offline 复位自动回来
   const groups = [
-    ...(!offline ? [{ title: '服务器设置', items: serverItems }] : []),
-    { title: '应用设置', items: appItems },
+    ...(!offline ? [{ title: t('settings.groupServer'), items: serverItems }] : []),
+    { title: t('settings.groupApp'), items: appItems },
   ]
 
   return (
     <Screen>
-      <PageHeader title="设置" />
+      <PageHeader title={t('settings.title')} />
 
       <div className={isDesktop ? 'grid grid-cols-2 items-start gap-x-4' : ''}>
         {groups.map((g) => (
@@ -82,6 +85,7 @@ export default function Settings() {
 
 export function GeneralSettings() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const pick = usePick()
   const { data: ql, mutate: mQl } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
   const { data: sc, mutate: mSc } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
@@ -89,28 +93,18 @@ export function GeneralSettings() {
   // v0.107.79 新版 API 的 interval 单位是毫秒(GET 返回 604800000 = 7 天)
   const HOUR = 3_600_000
   const DAY = 86_400_000
-  const QL_RETENTIONS = [
-    { label: '6 小时', value: 6 * HOUR },
-    { label: '1 天', value: DAY },
-    { label: '7 天', value: 7 * DAY },
-    { label: '30 天', value: 30 * DAY },
-    { label: '90 天', value: 90 * DAY },
-  ]
-  const STAT_RETENTIONS = [
-    { label: '1 天', value: DAY },
-    { label: '7 天', value: 7 * DAY },
-    { label: '30 天', value: 30 * DAY },
-    { label: '90 天', value: 90 * DAY },
-  ]
+  // 档位标签直接用 hoursLabel(走 units 词典),与格式化输出保持一致
+  const QL_RETENTIONS = [6, 24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * HOUR }))
+  const STAT_RETENTIONS = [24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * DAY }))
 
   async function saveQl(patch: Partial<QueryLogConfig>) {
     if (!cfg || !ql) return
     try {
       await api(cfg, '/querylog/config/update', { method: 'PUT', body: { ...ql, ...patch } })
       mQl()
-      toast('查询日志设置已保存')
+      toast(t('settings.queryLogSaved'))
     } catch (e: any) {
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     }
   }
   async function saveSc(patch: Partial<StatsConfig>) {
@@ -118,28 +112,28 @@ export function GeneralSettings() {
     try {
       await api(cfg, '/stats/config/update', { method: 'PUT', body: { ...sc, ...patch } })
       mSc()
-      toast('统计设置已保存')
+      toast(t('settings.statsSaved'))
     } catch (e: any) {
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     }
   }
 
   return (
     <Screen>
-      <PageHeader back title="查询日志与统计" />
+      <PageHeader back title={t('settings.itemQueryStats')} />
 
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
         <div>
-          <GroupTitle>查询日志</GroupTitle>
+          <GroupTitle>{t('settings.queryLogGroup')}</GroupTitle>
           <Group>
         <Rows>
           <Row
-            title="启用查询日志"
-            subtitle="记录所有 DNS 请求"
+            title={t('settings.enableQueryLog')}
+            subtitle={t('settings.enableQueryLogSub')}
             right={<Switch on={ql?.enabled ?? false} onChange={(v) => saveQl({ enabled: v })} />}
           />
           <Row
-            title="日志保留时长"
+            title={t('settings.logRetention')}
             value={isAppleMobile() ? undefined : (ql ? hoursLabel(ql.interval / HOUR) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
@@ -153,7 +147,7 @@ export function GeneralSettings() {
             ) : undefined}
             onClick={isAppleMobile() ? undefined : (e) => {
               pick({
-                title: '日志保留时长',
+                title: t('settings.logRetention'),
                 anchor: e.currentTarget,
                 align: 'right',
                 value: ql?.interval,
@@ -163,8 +157,8 @@ export function GeneralSettings() {
             }}
           />
           <Row
-            title="匿名化客户端 IP"
-            subtitle="日志中隐藏客户端 IP 的最后一段"
+            title={t('settings.anonymizeIp')}
+            subtitle={t('settings.anonymizeIpSub')}
             right={<Switch on={ql?.anonymize_client_ip ?? false} onChange={(v) => saveQl({ anonymize_client_ip: v })} />}
             last
           />
@@ -172,16 +166,16 @@ export function GeneralSettings() {
       </Group>
         </div>
         <div>
-          <GroupTitle>统计信息</GroupTitle>
+          <GroupTitle>{t('settings.statsGroupTitle')}</GroupTitle>
           <Group>
         <Rows>
           <Row
-            title="启用统计"
-            subtitle="仪表盘图表与 Top 榜单的数据来源"
+            title={t('settings.enableStats')}
+            subtitle={t('settings.enableStatsSub')}
             right={<Switch on={sc?.enabled ?? true} onChange={(v) => saveSc({ enabled: v })} />}
           />
           <Row
-            title="统计保留时长"
+            title={t('settings.statsRetention')}
             value={isAppleMobile() ? undefined : (sc ? hoursLabel(sc.interval / HOUR) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
@@ -195,7 +189,7 @@ export function GeneralSettings() {
             ) : undefined}
             onClick={isAppleMobile() ? undefined : (e) => {
               pick({
-                title: '统计保留时长',
+                title: t('settings.statsRetention'),
                 anchor: e.currentTarget,
                 align: 'right',
                 value: sc?.interval,
@@ -211,7 +205,7 @@ export function GeneralSettings() {
       </div>
 
       <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
-        缩短保留时长可显著减少磁盘占用。查询日志用于排查问题,统计用于仪表盘展示。
+        {t('settings.retentionHint')}
       </p>
     </Screen>
   )
@@ -221,6 +215,7 @@ export function GeneralSettings() {
 
 export function SystemPage() {
   const { cfg, status } = useAuth()
+  const { t } = useTranslation()
   const confirm = useConfirm()
   const [checking, setChecking] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -232,11 +227,11 @@ export function SystemPage() {
     try {
       const r = await api<VersionInfo>(cfg, '/version.json', { method: 'POST', body: { recheck_now: true } })
       setVersionInfo(r)
-      if (r.disabled) toast('服务器已禁用更新检查')
-      else if (r.new_version && r.new_version !== status?.version) toast('发现新版本 ' + r.new_version)
-      else toast('已是最新版本')
+      if (r.disabled) toast(t('settings.updateDisabled'))
+      else if (r.new_version && r.new_version !== status?.version) toast(t('settings.newVersionFound', { v: r.new_version }))
+      else toast(t('settings.upToDate'))
     } catch (e: any) {
-      toast('检查失败:' + e.message, 'err')
+      toast(t('settings.checkFailed', { msg: e.message }), 'err')
     } finally {
       setChecking(false)
     }
@@ -247,21 +242,22 @@ export function SystemPage() {
     setUpdating(true)
     try {
       await api(cfg, '/update', { method: 'POST', body: {} })
-      toast('自动更新已开始,服务器将自动重启')
+      toast(t('settings.autoUpdateStarted'))
     } catch (e: any) {
-      toast('更新失败:' + e.message, 'err')
+      toast(t('common.updateFailed', { msg: e.message }), 'err')
     } finally {
       setUpdating(false)
     }
   }
 
-  async function maintenance(path: string, title: string) {
+  // doneKey/failKey 指向 settings 域的完成/失败 toast
+  async function maintenance(path: string, doneKey: 'settings.cacheDone' | 'settings.statsDone' | 'settings.logDone', failKey: 'settings.cacheFail' | 'settings.statsFail' | 'settings.logFail') {
     if (!cfg) return
     try {
       await api(cfg, path, { method: 'POST', body: {} })
-      toast(title + '完成')
+      toast(t(doneKey))
     } catch (e: any) {
-      toast(title + '失败:' + e.message, 'err')
+      toast(t(failKey, { msg: e.message }), 'err')
     }
   }
 
@@ -269,35 +265,35 @@ export function SystemPage() {
 
   return (
     <Screen>
-      <PageHeader back title="系统管理" />
+      <PageHeader back title={t('settings.systemTitle')} />
 
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
         <div>
-          <GroupTitle>版本</GroupTitle>
+          <GroupTitle>{t('settings.versionGroup')}</GroupTitle>
           <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[15px] font-semibold text-t1">AdGuard Home</p>
-            <p className="text-[13px] text-t2 num">当前版本 {status?.version ?? '—'}</p>
+            <p className="text-[13px] text-t2 num">{t('settings.currentVersion', { v: status?.version ?? '—' })}</p>
           </div>
           <Button variant="glass" size="sm" loading={checking} onClick={checkUpdate}>
-            <DownloadCloud size={14} /> 检查更新
+            <DownloadCloud size={14} /> {t('settings.checkUpdate')}
           </Button>
         </div>
         {versionInfo && !versionInfo.disabled && (
           <div className="mt-3 rounded-2xl px-4 py-3" style={{ background: 'var(--accent-soft)' }}>
             <div className="flex items-center gap-2">
-              <Badge kind={hasNew ? 'ok' : 'info'}>{hasNew ? `新版本 ${versionInfo.new_version}` : '已是最新'}</Badge>
+              <Badge kind={hasNew ? 'ok' : 'info'}>{hasNew ? t('settings.newVersionBadge', { v: versionInfo.new_version }) : t('settings.upToDateBadge')}</Badge>
             </div>
             {versionInfo.announcement && <p className="mt-1.5 text-[12.5px] leading-relaxed text-t2">{versionInfo.announcement}</p>}
             {hasNew && versionInfo.can_autoupdate && (
               <Button size="sm" className="mt-2.5" loading={updating} onClick={() => confirm({
-                title: '自动更新 AdGuard Home?',
-                message: '更新过程中 DNS 服务会短暂中断,完成后自动恢复。建议在低峰期进行。',
-                confirmText: '开始更新',
+                title: t('settings.autoUpdateConfirmTitle'),
+                message: t('settings.autoUpdateConfirmMsg'),
+                confirmText: t('settings.startUpdate'),
                 onConfirm: autoUpdate,
               })}>
-                一键自动更新
+                {t('settings.autoUpdateAction')}
               </Button>
             )}
           </div>
@@ -305,37 +301,37 @@ export function SystemPage() {
       </Card>
         </div>
         <div>
-          <GroupTitle>维护</GroupTitle>
+          <GroupTitle>{t('settings.maintenanceGroup')}</GroupTitle>
           <Group>
         <Rows>
           <Row
             icon={<IconBubble color="var(--accent-2)" bg="color-mix(in srgb, var(--accent-2) 14%, transparent)"><Eraser size={17} /></IconBubble>}
-            title="清除 DNS 缓存"
-            subtitle="立即丢弃全部缓存记录"
-            onClick={() => maintenance('/cache_clear', '清除缓存')}
+            title={t('settings.clearDnsCache')}
+            subtitle={t('settings.clearDnsCacheSub')}
+            onClick={() => maintenance('/cache_clear', 'settings.cacheDone', 'settings.cacheFail')}
           />
           <Row
             icon={<IconBubble color="var(--warn)" bg="var(--warn-soft)"><RotateCcw size={17} /></IconBubble>}
-            title="重置统计数据"
-            subtitle="清空仪表盘全部历史统计"
+            title={t('settings.resetStats')}
+            subtitle={t('settings.resetStatsSub')}
             onClick={() => confirm({
-              title: '重置全部统计?',
-              message: '仪表盘的图表、Top 榜单将被清空,此操作不可恢复。',
+              title: t('settings.resetStatsConfirmTitle'),
+              message: t('settings.resetStatsConfirmMsg'),
               destructive: true,
-              confirmText: '重置',
-              onConfirm: () => maintenance('/stats_reset', '重置统计'),
+              confirmText: t('settings.resetConfirm'),
+              onConfirm: () => maintenance('/stats_reset', 'settings.statsDone', 'settings.statsFail'),
             })}
           />
           <Row
             icon={<IconBubble color="var(--danger)" bg="var(--danger-soft)"><Trash size={17} /></IconBubble>}
-            title="清空查询日志"
-            subtitle="删除所有已记录的 DNS 查询"
+            title={t('settings.clearQueryLog')}
+            subtitle={t('settings.clearQueryLogSub')}
             onClick={() => confirm({
-              title: '清空查询日志?',
-              message: '所有查询日志将被永久删除。',
+              title: t('settings.clearLogConfirmTitle'),
+              message: t('settings.clearLogConfirmMsg'),
               destructive: true,
-              confirmText: '清空',
-              onConfirm: () => maintenance('/querylog_clear', '清空日志'),
+              confirmText: t('settings.clearConfirm'),
+              onConfirm: () => maintenance('/querylog_clear', 'settings.logDone', 'settings.logFail'),
             })}
             last
           />
@@ -346,7 +342,7 @@ export function SystemPage() {
 
       {status && (
         <p className="mt-4 px-2 text-center text-[11.5px] text-t3 num">
-          启动于 {fmtDate(new Date(status.start_time).toISOString())}
+          {t('settings.startedAt', { time: fmtDate(new Date(status.start_time).toISOString()) })}
         </p>
       )}
     </Screen>
@@ -357,28 +353,46 @@ export function SystemPage() {
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useAuth()
+  const { t, i18n } = useTranslation()
+  const lang: Lang = i18n.language === 'en' ? 'en' : 'zh'
   return (
     <Screen>
-      <PageHeader back title="外观" />
+      <PageHeader back title={t('settings.appearance')} />
 
-      <GroupTitle>主题</GroupTitle>
+      <GroupTitle>{t('settings.themeGroup')}</GroupTitle>
       <Card className="p-4">
         <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
-          <SunMoon size={15} className="text-t2" /> 外观模式
+          <SunMoon size={15} className="text-t2" /> {t('settings.appearanceMode')}
         </div>
         <Segmented
           value={theme}
           onChange={(v) => setTheme(v as ThemeSetting)}
           options={[
-            { value: 'auto', label: '跟随系统' },
-            { value: 'light', label: '浅色' },
-            { value: 'dark', label: '深色' },
+            { value: 'auto', label: t('settings.themeAuto') },
+            { value: 'light', label: t('settings.themeLight') },
+            { value: 'dark', label: t('settings.themeDark') },
+          ]}
+        />
+      </Card>
+
+      <GroupTitle>{t('settings.language')}</GroupTitle>
+      <Card className="p-4">
+        <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
+          <Languages size={15} className="text-t2" /> {t('settings.language')}
+        </div>
+        {/* 语言名以各自语言原文展示(中文 / English),不随界面语言翻译 */}
+        <Segmented
+          value={lang}
+          onChange={(v) => setAppLang(v as Lang)}
+          options={[
+            { value: 'zh', label: '中文' },
+            { value: 'en', label: 'English' },
           ]}
         />
       </Card>
 
       <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
-        选择“跟随系统”时,深色模式随操作系统的外观设置自动切换。
+        {t('settings.themeHint')}
       </p>
     </Screen>
   )
@@ -388,6 +402,7 @@ export function AppearanceSettings() {
 
 export function ServerSettings() {
   const { cfg, connect, logout } = useAuth()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const [url, setUrl] = useState(cfg?.url ?? '')
   const [username, setUsername] = useState(cfg?.username ?? '')
@@ -398,34 +413,34 @@ export function ServerSettings() {
     setSaving(true)
     const ok = await connect({ url: url.trim().replace(/\/+$/, ''), username: username.trim(), password })
     setSaving(false)
-    if (ok) toast('服务器配置已更新')
+    if (ok) toast(t('settings.serverSaved'))
   }
 
   return (
     <Screen>
-      <PageHeader back title="服务器连接" />
+      <PageHeader back title={t('settings.serverTitle')} />
 
-      <GroupTitle>连接</GroupTitle>
+      <GroupTitle>{t('settings.connectionGroup')}</GroupTitle>
       <Card className="p-4">
         <div className="flex flex-col gap-3">
           <input className="field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://192.168.1.2:3000" inputMode="url" autoCapitalize="off" />
           <div className="grid grid-cols-2 gap-3">
-            <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="用户名" autoCapitalize="off" />
-            <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密码" />
+            <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('settings.usernamePlaceholder')} autoCapitalize="off" />
+            <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('settings.passwordPlaceholder')} />
           </div>
           <div className="flex gap-2.5">
             <Button className="flex-1" loading={saving} onClick={saveServer}>
-              <Server size={15} /> 重新连接
+              <Server size={15} /> {t('settings.reconnect')}
             </Button>
             <Button variant="glass" className="flex-1" onClick={() => { logout(); nav('/login', { replace: true }) }}>
-              <LogOut size={15} /> 退出登录
+              <LogOut size={15} /> {t('settings.logout')}
             </Button>
           </div>
         </div>
       </Card>
 
       <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
-        凭据仅保存在本机浏览器中,所有请求经本服务代理转发到 AdGuard Home。
+        {t('settings.serverNote')}
       </p>
     </Screen>
   )
@@ -434,18 +449,19 @@ export function ServerSettings() {
 /* ================= 关于 ================= */
 
 export function AboutSettings() {
+  const { t } = useTranslation()
   return (
     <Screen>
-      <PageHeader back title="关于" />
+      <PageHeader back title={t('settings.aboutTitle')} />
 
-      <GroupTitle>应用</GroupTitle>
+      <GroupTitle>{t('settings.aboutGroup')}</GroupTitle>
       <Group>
         <Rows>
           <Row icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Info size={17} /></IconBubble>} title={APP_NAME} value={'v' + APP_VERSION} />
           <Row
             icon={<IconBubble color="var(--violet)" bg="var(--violet-soft)"><Network size={17} /></IconBubble>}
-            title="兼容性"
-            subtitle="AdGuard Home v0.107.79+ 全新 API"
+            title={t('settings.compatibility')}
+            subtitle={t('settings.compatibilitySub')}
             last
           />
         </Rows>

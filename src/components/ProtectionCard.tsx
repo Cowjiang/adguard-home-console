@@ -1,22 +1,15 @@
 /** 防护总开关卡片(仪表盘/防护页共用) */
 import { useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, ShieldOff, Clock3, RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
 import { Button, Switch, toast, usePick } from './ui'
-import { fmtDuration } from '../lib/format'
-
-const PAUSE_OPTIONS = [
-  { label: '直到手动开启', value: 0 },
-  { label: '30 秒', value: 30 },
-  { label: '5 分钟', value: 300 },
-  { label: '30 分钟', value: 1800 },
-  { label: '1 小时', value: 3600 },
-  { label: '3 小时', value: 10800 },
-]
+import { fmtDuration, fmtTime } from '../lib/format'
 
 export function ProtectionCard() {
   const { cfg, status, refreshStatus } = useAuth()
+  const { t } = useTranslation()
   const pick = usePick()
   const [busy, setBusy] = useState(false)
   const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null)
@@ -66,22 +59,31 @@ export function ProtectionCard() {
     setBusy(true)
     try {
       await api(cfg, '/protection', { method: 'POST', body: { enabled: next, duration: (duration ?? 0) * 1000 } })
-      toast(next ? '防护已开启' : '防护已暂停')
+      toast(next ? t('protection.on') : t('protection.off'))
       refreshStatus()
     } catch (e: any) {
       setPendingEnabled(null)
-      toast('操作失败:' + e.message, 'err')
+      toast(t('common.opFailed', { msg: e.message }), 'err')
     } finally {
       setBusy(false)
     }
   }
 
   function openPausePicker(e: React.MouseEvent<HTMLElement>) {
+    // 时长档位标签复用 units 词典(en 侧自动取复数形式)
+    const options = [
+      { value: 0, label: t('protection.untilManual') },
+      { value: 30, label: t('units.second', { count: 30 }) },
+      { value: 300, label: t('units.minute', { count: 5 }) },
+      { value: 1800, label: t('units.minute', { count: 30 }) },
+      { value: 3600, label: t('units.hour', { count: 1 }) },
+      { value: 10800, label: t('units.hour', { count: 3 }) },
+    ]
     pick({
-      title: '暂停防护',
+      title: t('protection.pauseTitle'),
       anchor: e.currentTarget,
       align: 'right',
-      options: PAUSE_OPTIONS.map((o) => ({ label: o.value === 0 ? o.label : `暂停 ${o.label}`, value: o.value })),
+      options: options.map((o) => ({ label: o.value === 0 ? o.label : t('protection.pauseFor', { label: o.label }), value: o.value })),
       onPick: (v) => setProtection(false, v),
     })
   }
@@ -109,13 +111,13 @@ export function ProtectionCard() {
           {enabled ? <ShieldCheck size={28} /> : <ShieldOff size={28} />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[18px] font-bold leading-snug text-t1">{enabled ? '防护已开启' : '防护已暂停'}</p>
+          <p className="text-[18px] font-bold leading-snug text-t1">{enabled ? t('protection.on') : t('protection.off')}</p>
           <p className="text-[12.5px] text-t2 num">
             {!enabled && resumeAtMs
-              ? `将于 ${new Date(resumeAtMs).toLocaleTimeString('zh-CN', { hour12: false })} 恢复 · 剩 ${fmtDuration(remainingMs / 1000)}`
+              ? t('protection.resumeAt', { time: fmtTime(new Date(resumeAtMs).toISOString()), left: fmtDuration(remainingMs / 1000) })
               : !enabled
-                ? '已暂停,直到手动开启'
-                : '全网拦截广告、跟踪器与恶意域名'}
+                ? t('protection.pausedManual')
+                : t('protection.tagline')}
           </p>
         </div>
         <Switch on={enabled} loading={busy} onChange={(v) => (v ? setProtection(true) : setProtection(false))} />
@@ -123,10 +125,10 @@ export function ProtectionCard() {
 
       <div className="mt-4 flex gap-2">
         <Button variant="glass" size="sm" onClick={(e) => openPausePicker(e)}>
-          <Clock3 size={14} /> 定时暂停
+          <Clock3 size={14} /> {t('protection.pauseAction')}
         </Button>
         <Button variant="glass" size="sm" loading={busy} onClick={() => refreshStatus()}>
-          <RefreshCw size={14} /> 刷新状态
+          <RefreshCw size={14} /> {t('protection.refresh')}
         </Button>
       </div>
     </div>

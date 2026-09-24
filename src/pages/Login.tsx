@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck, Server, User, KeyRound, ArrowRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { Button, ErrorBox } from '../components/ui'
 import { Ambient } from '../components/Layout'
@@ -9,6 +10,7 @@ import { APP_NAME } from '../lib/constants'
 
 export default function Login() {
   const { connect, connecting, error } = useAuth()
+  const { t } = useTranslation()
   const nav = useNavigate()
   const [url, setUrl] = useState('')
   const [username, setUsername] = useState('')
@@ -70,7 +72,7 @@ export default function Login() {
           <div className="flex flex-col gap-3.5">
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-t2">
-                <Server size={13} /> 服务器地址
+                <Server size={13} /> {t('login.serverAddress')}
               </span>
               <input
                 className="field"
@@ -84,7 +86,7 @@ export default function Login() {
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-t2">
-                <User size={13} /> 用户名
+                <User size={13} /> {t('login.username')}
               </span>
               <input
                 className="field"
@@ -97,7 +99,7 @@ export default function Login() {
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-t2">
-                <KeyRound size={13} /> 密码
+                <KeyRound size={13} /> {t('login.password')}
               </span>
               <input
                 className="field"
@@ -111,15 +113,15 @@ export default function Login() {
             {error && <ErrorBox>{error}</ErrorBox>}
 
             <Button type="submit" size="lg" loading={connecting} disabled={!url.trim() || !username.trim()} className="mt-1 w-full">
-              连接 <ArrowRight size={17} />
+              {t('login.connect')} <ArrowRight size={17} />
             </Button>
           </div>
         </form>
 
         <p className="mt-5 text-center text-[12px] leading-relaxed text-t3">
-          凭据仅保存在本机浏览器中,通过本地服务转发请求。
+          {t('login.credentialNote')}
           <br />
-          支持 AdGuard Home v0.107+
+          {t('login.versionNote')}
         </p>
       </div>
     </div>

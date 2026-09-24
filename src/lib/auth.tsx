@@ -2,6 +2,7 @@
  * 全局会话与主题:服务器配置、登录状态、主题切换
  */
 import { applyNativeAppearance } from './nativeAppearance'
+import { i18n } from './i18n'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { mutate } from 'swr'
 import { api, type Status } from './api'
@@ -153,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       try {
         const s = await api<Status>(clean, '/status')
-        if (!s || !s.version) throw new Error('响应不是 AdGuard Home')
+        if (!s || !s.version) throw new Error(i18n.t('login.notAgh'))
         localStorage.setItem(CONFIG_KEY, JSON.stringify(clean))
         setCfg(clean)
         setStatus(s)
@@ -162,8 +163,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e: any) {
         const msg =
           e?.status === 403 || e?.status === 401
-            ? '用户名或密码错误'
-            : e?.message || '无法连接到服务器'
+            ? i18n.t('login.badCredentials')
+            : e?.message || i18n.t('login.cannotConnect')
         setError(msg)
         return false
       } finally {
