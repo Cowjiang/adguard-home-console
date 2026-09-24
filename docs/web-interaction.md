@@ -31,8 +31,9 @@
 
 ## 刷新与连接恢复
 
-- 下拉刷新（`src/lib/pullToRefresh.ts`，接线在 `src/components/Layout.tsx`）只在移动布局 + 粗指针（触摸）设备启用；页面顶部（`window.scrollY <= 0`）的垂直下拉才接管，过阈值（64px）松手触发「status 重探 + SWR 全局 mutate」，未过阈值回弹。松手收位用 `.ptr-anim` 过渡，拖拽期间指令式 transform 跟手。
-- 下拉与边缘侧滑共用 window 触摸监听，让位规则：触点在左缘 24px 条内让给侧滑、水平意图让路；转场（`useTransitionBusy`）、侧滑手势（`useGestureActive`）、刷新中一律不启用。内容位移挂在 `main` 的包裹层、指示器固定于顶部留白，两者都不在 `capturePage` 克隆范围内，转场快照管线不感知刷新。
+- 下拉刷新（`src/lib/pullToRefresh.ts`，接线在 `src/components/Layout.tsx`）只在移动布局 + 粗指针（触摸）设备、且当前在 4 个 tab 根路由（`TAB_ROOT_ROUTES`）时启用，二级页不触发；页面顶部（`window.scrollY <= 0`）的垂直下拉才接管，过阈值（64px）松手触发「status 重探 + SWR 全局 mutate」，未过阈值回弹。刷新整体有 8s deadline（`REFRESH_DEADLINE_MS`）：断网时代理层 25s 才报超时，指示器到点先收回，失败结果自行落地。指示器锚在 `var(--safe-top) + 16px`（状态条 pill 正下方的页面留白带，卡片顶在其下 12px）做 1:1 跟手位移；松手后内容与圈一起回弹，圈停在基位旋转至刷新收口，期间状态条 pill 淡出让位、完成后淡回。松手收位用 `.ptr-anim` 过渡，拖拽期间指令式 transform 跟手。
+- 「服务离线」的唯一事实源是 auth 的 `/status` 探测结果（`useAuth().offline`）：探测失败置 true、成功置 false，`refreshStatus`（下拉刷新 / tab 落地）与 `connect`/`logout` 同步维护；`fetchStatus` 带 5s 前端 deadline，断网时不等代理层 25s 超时。状态条 pill（TopBar/Sidebar）显示「服务离线」的条件是 `offline || !status?.running`；`offline` 且在 tab 根页时 Layout 渲染 `OfflineNotice` 实色遮罩盖住旧数据（带「立即重试」），二级页不遮挡以保护表单输入；设置根页（`/settings`）豁免遮罩——它承载「服务器连接」与应用设置，离线时用户可能正需要改服务器地址，改由 Settings 页隐藏依赖 AGH 服务器的「服务器设置」组，「应用设置」组保持可点（见 `.agents/pipelines/proposals/feature/2026-09-25-refresh-scope-and-offline-feedback.md`）。
+- 下拉与边缘侧滑共用 window 触摸监听，让位规则：触点在左缘 24px 条内让给侧滑、水平意图让路；转场（`useTransitionBusy`）、侧滑手势（`useGestureActive`）、刷新中一律不启用。内容位移挂在 `main` 的包裹层、指示器锚在其上方做跟手位移，两者都不在 `capturePage` 克隆范围内，转场快照管线不感知刷新。
 - SWR 数据在 tab 切换时随页面重挂自动重验证（`revalidate()` 入口不检查在线状态）；status 不归 SWR 管，落地 tab 根页（`TAB_ROOT_ROUTES`）时由 Layout 调一次 `refreshStatus()`。
 - 断网自愈（`.agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md`）：SWR 的在线状态不读 `navigator.onLine`、只认 `offline`/`online` 事件，iOS WKWebView/PWA 里事件可能丢失，丢失后轮询/focus/reconnect/错误重试被同一标志全部门死。全局 `SWRConfig` 设 `refreshWhenOffline: true` 让轮询不停摆；auth 以 15s 重探 `/status`（外加 `visibilitychange`/`online` 即时探），从失败恢复成功时全局 `mutate` 一次解救冻结的 key——15s 是恢复上界，事件可靠时仍是即时。
 - body 的 `overscroll-behavior-y: none` 压掉浏览器原生下拉刷新（整页 reload）与橡皮筋，是自研下拉接管的前提；删除它会导致双重刷新。
