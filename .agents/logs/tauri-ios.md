@@ -382,3 +382,13 @@
 ### 验收
 
 模拟器（iPhone 18 Pro / iOS 27）逐页截图核对 7 处按钮与返回胶囊；侧滑逐帧（拖拽中无任何自定义按钮、取消后原生按钮淡入、标题栏居中）；主题两向（应用浅+系统深、应用深+系统浅）截图核对 TabBar 与按钮；浏览器移动端实测无 `data-native-hidden` / `.invisible` 元素，按钮与胶囊均 `visible`。`npm run check`、`npm run build`、`cargo check` 全绿。
+
+## 19. SwiftUI 线退役与本线工程生成门禁(2026-09-24)
+
+用户决定：纯 SwiftUI iOS 线弃用，Tauri 壳是最终 iOS 方案。
+
+- **退役方式**：Swift 线不删历史，完整保留在 `archive/ios-native-swift` 分支（tip = 退役前的 `dev`）；`dev` 与 `main` 移除 `ios/`，同步清理文档、脚本、`.gitignore`、`package.json` 里的引用。提案：`.agents/pipelines/proposals/simplification/2026-09-24-retire-swift-ios-line.md`。
+- **顺带消除的历史风险**：本线曾与 SwiftUI 线共用 bundle id `com.adguardhome.console`（§14 记为遗留风险）；线退役后不再存在，`.env.signing` 的 `AGH_BUNDLE_ID` 由本线独占。
+- **生成门禁**：根因是 XcodeGen 缺 `share/xcodegen/SettingPresets` 时会静默产出缺平台默认设置的工程（本次表现为 ipa 里没有图标）。现在 `scripts/ios-signing.sh` 在生成后断言 pbxproj 含 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`、`DEVELOPMENT_TEAM`、`PRODUCT_BUNDLE_IDENTIFIER`、`IPHONEOS_DEPLOYMENT_TARGET = 15.0` 与哨兵 `CLANG_ENABLE_OBJC_ARC = YES`，并对 xcodegen 输出里的 `No "…" settings found` 直接判失败；构建路径同样先校验，pbxproj 缺失时按 `project.yml` 自动重建后继续（`tauri ios build` 自己不会重跑 xcodegen，缺文件只会报 `failed to read pbxproj file`）。提案：`.agents/pipelines/proposals/process/2026-09-24-ios-project-generation-gate.md`。
+- **配置化与不再走 init**：`scripts/ios-signing.sh generate tauri` 现在只跑 `xcodegen generate` + 校验，不再调用 `tauri ios init`——init 会用 CLI 模板重写 `project.yml`，把 `{{apple.development-team}}` 渲染成明文 team id 写进被跟踪文件（与 9-23 的 `.env.signing` 占位符设计冲突），还会触发 `brew install` 依赖探测（本机 macOS 27 上必崩）。部署目标仍以 `project.yml` 的 15.0 为准，`tauri.conf.json` 的 `bundle.iOS.minimumSystemVersion = "15.0"` 与之同步，避免万一跑 init 时退回被 Xcode 27 拒绝的 14.0。`bundle.iOS` 没有恢复图标的键——图标由 Asset Catalog + `ASSETCATALOG_COMPILER_APPICON_NAME` 决定，属工程规格层。
+- **留存的未决问题**：`gen/apple/project.yml` 的 `sources: - path: Externals` 会把 release 构建后的 `libapp.a`（约 63 MB）当资源复制进 app 包 Resources 阶段，ipa 由 ~16 MB 涨到 ~22 MB；链接走 `dependencies: framework: libapp.a`，该复制冗余。修法：给该 source 加 `excludes: ["**/*.a"]` 或 `buildPhase: none`，待用户确认后实施。
