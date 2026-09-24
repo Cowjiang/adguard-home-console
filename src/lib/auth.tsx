@@ -2,7 +2,8 @@
  * 全局会话与主题:服务器配置、登录状态、主题切换
  */
 import { applyNativeAppearance } from './nativeAppearance'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { mutate } from 'swr'
 import { api, type Status } from './api'
 
 export interface SvrConfig {
@@ -25,7 +26,7 @@ interface AuthCtx {
   setTheme: (t: ThemeSetting) => void
   connect: (cfg: SvrConfig) => Promise<boolean>
   logout: () => void
-  refreshStatus: () => void
+  refreshStatus: () => Promise<Status | null>
 }
 
 const Ctx = createContext<AuthCtx>(null as unknown as AuthCtx)
@@ -82,11 +83,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // 启动时用已存配置探测连接
-  useEffect(() => {
-    if (!cfg) return
-    fetchStatus(cfg).then((s) => setStatus(s))
+  // 启动探测与断网自愈重探合一:浏览器 online/visibility 事件在 WKWebView/PWA
+  // 里可能丢失(轮询冻结的根因,见 proposals/feature/2026-09-25-refresh-triggers),
+  // 所以除事件即时探外保留 15s 低频重探;从失败恢复成功时全局 mutate 一次,
+  // 解救被 SWR 在线标志冻住的 key,并让状态条/防护卡回到真实状态。
+  // 健康时开销仅为每 15s 一次 /status(对比 stats 轮询的每 5s 一次)。
+  const lastProbeOk = useRef(false)
+  const probingRef = useRef(false)
+  const probeStatus = useCallback(async () => {
+    if (!cfg || probingRef.current) return
+    probingRef.current = true
+    try {
+      const s = await fetchStatus(cfg)
+      const ok = s !== null
+      const recovered = ok && !lastProbeOk.current
+      lastProbeOk.current = ok
+      if (s) setStatus(s)
+      if (recovered) void mutate(() => true)
+    } finally {
+      probingRef.current = false
+    }
   }, [cfg, fetchStatus])
+
+  useEffect(() => {
+    if (!cfg) {
+      lastProbeOk.current = false
+      return
+    }
+    void probeStatus()
+    const id = setInterval(() => void probeStatus(), 15000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void probeStatus()
+    }
+    const onOnline = () => void probeStatus()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [probeStatus])
 
   const connect = useCallback(
     async (next: SvrConfig): Promise<boolean> => {
@@ -124,8 +161,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null)
   }, [])
 
-  const refreshStatus = useCallback(() => {
-    if (cfg) fetchStatus(cfg).then((s) => setStatus(s))
+  const refreshStatus = useCallback((): Promise<Status | null> => {
+    if (!cfg) return Promise.resolve(null)
+    return fetchStatus(cfg).then((s) => {
+      setStatus(s)
+      return s
+    })
   }, [cfg, fetchStatus])
 
   const setTheme = useCallback((t: ThemeSetting) => {

@@ -257,6 +257,13 @@ body {
 .rt-pop-in { animation-name: rt-pop-in; }
 .rt-pop-out { animation-name: rt-pop-out; }
 
+/* 下拉刷新松手后的收位/回弹过渡(拖拽期间由指令式 transform 跟手,不带过渡) */
+.ptr-anim {
+  transition:
+    transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 200ms ease;
+}
+
 /* 转场层页面底:滑动的两层(新页容器/旧页快照)自身必须不透明,否则对方的
    页面内容会从透明区域整个透出(双重曝光鬼影)。这里复制 body 底色 +
    .ambient 光晕;转场结束摘除后恢复真实背景,径向光晕弥散,滑动中的微小
