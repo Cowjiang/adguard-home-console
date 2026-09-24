@@ -22,6 +22,7 @@
 | 2026-09-23 | process | [收敛 Agent 入口并按任务逐层披露](proposals/process/2026-09-23-progressive-agent-entrypoints.md) | implemented |
 | 2026-09-24 | simplification | [弃用并移除 SwiftUI 原生 iOS 线](proposals/simplification/2026-09-24-retire-swift-ios-line.md) | implemented |
 | 2026-09-24 | process | [给 iOS 工程生成加门禁，并把可控项移进 tauri 配置](proposals/process/2026-09-24-ios-project-generation-gate.md) | implemented |
+| 2026-09-24 | bug-fix | [把 Rust 静态库从 app 包的资源阶段摘掉](proposals/bug-fix/2026-09-24-ios-bundle-ships-libapp-archive.md) | implemented |
 | 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
 | 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
 
