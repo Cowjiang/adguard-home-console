@@ -7,6 +7,9 @@ const zhLogin = {
   connect: '连接',
   credentialNote: '凭据仅保存在本机浏览器中,通过本地服务转发请求。',
   versionNote: '支持 AdGuard Home v0.107+',
+  badCredentials: '用户名或密码错误',
+  cannotConnect: '无法连接到服务器',
+  notAgh: '响应不是 AdGuard Home',
 }
 
 export default zhLogin
