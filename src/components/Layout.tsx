@@ -1,15 +1,17 @@
 /** 全局布局:环境背景 + 移动端浮动玻璃标签栏 / 桌面端固定侧边栏(≥lg) */
-import { useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { mutate } from 'swr'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth'
+import { usePullToRefresh } from '../lib/pullToRefresh'
 import { scrollToTop } from '../lib/scrollToTop'
 import { useNativeTabBar } from '../lib/nativeTabbar'
 import { useNativeBackButton } from '../lib/nativeBackButton'
 import { TransitionArea } from '../lib/routeTransition'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
-import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim } from './ui'
+import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner } from './ui'
 
 type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
 
@@ -206,20 +208,52 @@ function Sidebar() {
   )
 }
 
+/** 落地 tab 根页时刷新一次服务器状态:SWR 数据随页面重挂本就会重验证,
+ *  status 不归 SWR 管(只在启动与自愈探针时更新),这里补上导航时机 */
+function useTabLandStatusRefresh() {
+  const { pathname } = useLocation()
+  const { refreshStatus } = useAuth()
+  useEffect(() => {
+    if (TAB_ROOT_ROUTES.includes(pathname)) refreshStatus()
+  }, [pathname, refreshStatus])
+}
+
 export default function Layout() {
   // iOS Tauri 壳:原生液态玻璃 UITabBar 接管导航,CSS 标签栏让位
   const nativeBar = useNativeTabBar()
   // 移动布局且原生 TabBar 可用时:左上角返回按钮交给原生玻璃胶囊(createComponent glass)
   const isDesktop = useIsDesktop()
   useNativeBackButton(nativeBar && !isDesktop)
+  useTabLandStatusRefresh()
+  // 下拉刷新:status 重探 + SWR 全量重验证;仅移动布局且粗指针(触摸)设备。
+  // mutate 用全局绑定(默认缓存),不依赖 SWRConfig 上下文
+  const { refreshStatus } = useAuth()
+  const [coarse] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
+  const refreshAll = useCallback(
+    () => Promise.allSettled([refreshStatus(), mutate(() => true)]),
+    [refreshStatus]
+  )
+  const { contentRef, indicatorRef, refreshing } = usePullToRefresh(refreshAll, !isDesktop && coarse)
   return (
     <div className="min-h-dvh lg:pl-60">
       <Ambient />
       <Sidebar />
       <TopBar />
       <main>
-        <TransitionArea />
+        <div ref={contentRef}>
+          <TransitionArea />
+        </div>
       </main>
+      {/* 下拉刷新指示器:固定于顶部留白(tab 根页在状态条下方、子页在导航条下方),
+          不进转场快照管线;transform 留给跟手位移,水平居中用负 margin */}
+      <div
+        ref={indicatorRef}
+        aria-hidden
+        className="glass pointer-events-none fixed left-1/2 z-30 grid h-9 w-9 place-items-center rounded-full opacity-0"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 52px)', marginLeft: '-18px' }}
+      >
+        <Spinner size={18} />
+      </div>
       {!nativeBar && <TabBar />}
     </div>
   )
