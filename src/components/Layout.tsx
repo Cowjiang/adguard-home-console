@@ -8,7 +8,7 @@ import { usePullToRefresh } from '../lib/pullToRefresh'
 import { scrollToTop } from '../lib/scrollToTop'
 import { useNativeTabBar } from '../lib/nativeTabbar'
 import { useNativeBackButton } from '../lib/nativeBackButton'
-import { TransitionArea } from '../lib/routeTransition'
+import { TransitionArea, useArrivalPopAnim } from '../lib/routeTransition'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
 import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button } from './ui'
@@ -44,12 +44,17 @@ export function Ambient() {
 function TopBar({ dimmed }: { dimmed?: boolean }) {
   const { status, offline } = useAuth()
   const { pathname } = useLocation()
+  // CSS 快照转场返回(pop)落地 tab 根页:与页面 rt-pop-in 同步淡入 —— pill 被
+  // z-50 退场快照盖着、随其滑走逐渐露出,纯淡入即无硬切;侧滑提交/无动画返回时
+  // 页面瞬时就位,pill 瞬现才不穿帮,故不淡入。data-status-pill 供转场快照捕获
+  const popIn = useArrivalPopAnim(pathname)
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
   if (!TAB_ROOT_ROUTES.includes(pathname)) return null
   return (
     <header
-      className="pointer-events-none fixed left-0 right-0 top-0 z-40 flex justify-center px-4 lg:hidden"
+      data-status-pill
+      className={`pointer-events-none fixed left-0 right-0 top-0 z-40 flex justify-center px-4 lg:hidden ${popIn ? 'rt-pill-in' : ''}`}
       style={{
         paddingTop: 'calc(var(--safe-top) + 6px)',
         opacity: dimmed ? 0 : 1,
