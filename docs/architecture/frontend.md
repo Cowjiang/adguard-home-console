@@ -1,7 +1,7 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-09-24
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
@@ -16,7 +16,7 @@
 ## 路由
 
 - `/login` 公开；其余路由挂在 `<Protected><Layout/></Protected>` 下，未配置连接时重定向登录页。
-- 顶级页：`/`（概览）、`/stats`、`/top/:kind`、`/log`、`/log/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及九个子页；`*` 兜底回概览。
+- 顶级页：`/`（概览）、`/stats`、`/top/:kind`、`/logs`、`/logs/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及九个子页；`*` 兜底回概览。
 - 顶级路由白名单在 `src/lib/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
 - 移动端的详情与表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。
 

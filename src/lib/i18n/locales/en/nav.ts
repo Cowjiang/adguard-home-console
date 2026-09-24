@@ -3,7 +3,7 @@
 const enNav = {
   overview: 'Overview',
   protection: 'Filters',
-  log: 'Log',
+  log: 'Logs',
   settings: 'Settings',
   stats: 'Stats',
   clients: 'Clients',

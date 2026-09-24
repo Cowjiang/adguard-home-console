@@ -1,4 +1,4 @@
-/** 日志详情子页(移动端):从 /log 点入,location.state 携带该条记录 */
+/** 日志详情子页(移动端):从 /logs 点入,location.state 携带该条记录 */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
