@@ -1,5 +1,5 @@
 /**
- * 本地 Mock AdGuard Home v0.107.79 — 供 iOS 两条线(Tauri 壳 / SwiftUI 原生)离线测试。
+ * 本地 Mock AdGuard Home v0.107.79 — 供 iOS 线(Tauri 壳)与本地联调离线测试。
  * 用法:node scripts/mock-agh.mjs  → 监听 127.0.0.1:3990
  * 鉴权:任意非空 Basic 凭据即可(缺 Authorization → 401),用于走通 401 分支。
  * 契约依据:src/lib/api.ts + docs/agh-api.md
