@@ -1,6 +1,6 @@
 # AGENTS.md
 
-AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 SwiftUI iOS 共处一仓。
+AdGuard Home v0.107.79 跨端管理控制台：Web/PWA 与 Tauri 2 壳（桌面与 iOS/Android 移动端）共处一仓。
 
 ## 按任务逐层读取
 
@@ -22,7 +22,6 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 | `src/` | React 前端：`pages/`、`components/`、`lib/`、`types/` |
 | `server/` | Express 代理与静态托管，单文件 `index.mjs` |
 | `src-tauri/` | Tauri 2 壳、Rust 代理与平台资源；`plugins/` 是本仓 Tauri 插件源码，`gen/`、`target/` 是生成物 |
-| `ios/` | 纯 SwiftUI iOS 应用；`AdGuardConsole.xcodeproj` 由 xcodegen 生成，不入库 |
 | `scripts/` | `mock-agh.mjs` 契约模拟、`verify-proposals.mjs` 提案校验、iOS 签名与部署、`release-notes.sh`、`server-pull.sh` |
 | `docs/` | 当前代码库的持久事实，按主题从 `docs/README.md` 进入 |
 | `.agents/` | 提案、技能与过程记录，按用途从 `.agents/README.md` 进入 |
@@ -37,8 +36,8 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 
 ## 代码规范
 
-- 仓库不配 linter / formatter，风格靠约定加 `npm run check`（`tsconfig.json` 开了 `strict`）：TS/TSX 用 2 空格缩进、单引号、不写行尾分号，Rust 与 Swift 保持 4 空格。
-- 新代码按既有分层落位：页面进 `src/pages/`，通用组件与基础控件进 `src/components/`，请求、状态与工具进 `src/lib/`；Swift 按 `Features/`、`Network/`、`State/`、`Models/`、`Design/`、`Support/` 分目录；Rust 保持一文件一件事。
+- 仓库不配 linter / formatter，风格靠约定加 `npm run check`（`tsconfig.json` 开了 `strict`）：TS/TSX 用 2 空格缩进、单引号、不写行尾分号，Rust 保持 4 空格。
+- 新代码按既有分层落位：页面进 `src/pages/`，通用组件与基础控件进 `src/components/`，请求、状态与工具进 `src/lib/`；Rust 保持一文件一件事。
 - 所有 AGH 请求经 `src/lib/api.ts` 的 `api()`；SWR 只用 `swrFetcher`，key 形如 `['<简称>', cfg, path]`。React Hooks 不放在条件返回之后。
 - AGH 时间字段一律毫秒，`stats.top_*` 是单键对象数组、消费前归一；端点、枚举与单位以 `docs/agh-api.md` 为准，其余实现约束见 `docs/engineering.md`。
 - commit message 用英文 conventional commit（`feat(scope):`、`fix(scope):`、`docs:`、`refactor(scope):`、`ci:`）；交流与仓库文档用中文。
@@ -49,7 +48,7 @@ AdGuard Home v0.107.79 跨端管理控制台：Web/PWA、Tauri 2 壳和纯 Swift
 
 - Web 前端：`npm run check`（`tsconfig.json` 开了 `strict`）与 `npm run build`。
 - Rust：先起 `node scripts/mock-agh.mjs`，再 `cd src-tauri && cargo test`；mock 不在时依赖它的用例会静默早退，仍报 ok。
-- iOS：工程生成与构建走 `scripts/ios-signing.sh`，不要绕过脚本直接调 `xcodegen` 或 `tauri ios init`。
+- iOS：工程生成与构建走 `scripts/ios-signing.sh`（生成后校验工程设置，构建前缺工程会自动重建），不要绕过脚本直接调 `xcodegen` 或 `tauri ios init`。
 - 文档与提案：`node scripts/verify-proposals.mjs`，改动引用路径时加 `--links`。
 - 纯 `docs/`、`.agents/` 改动不需要跑前端或 Rust 测试。
 

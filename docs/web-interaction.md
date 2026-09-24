@@ -18,7 +18,7 @@
 - 单选项：苹果移动设备渲染真实的 `<select>` 覆盖层（`PickSelect`）；其余设备使用 `usePick` 的锚定菜单。`showPicker()` 不能作为 iOS 的唤起路径。`isAppleMobile()` 同时判断设备 UA 与 Apple vendor，以免桌面设备模拟误判。
 - 防护卡“定时暂停”使用锚定菜单；关闭总开关直接执行，不弹时间选择。
 - 设置页的表单标题不包裹 `<label>`，避免点击说明文字聚焦输入框；登录页保留常规 label 行为。触屏 `<select>` 的焦点环由 `selectAfterChange()` 处理，不在 `change` 中同步 `blur()`。
-- 长按系统复制菜单在 Web 页面禁用，复制通过显式按钮。原生 SwiftUI 不受这一 Web 限制。
+- 长按系统复制菜单在 Web 页面禁用，复制通过显式按钮。
 
 ## 页面行为
 

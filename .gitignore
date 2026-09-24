@@ -10,8 +10,6 @@ _probe
 _p*.cjs
 
 # Xcode / iOS / Tauri(2026-09-21 iOS 施工追加)
-ios/DerivedData/
-ios/**/xcuserdata/
 *.xcuserstate
 *.xcresult
 src-tauri/target/
@@ -19,8 +17,7 @@ src-tauri/gen/ios/DerivedData/
 src-tauri/gen/apple/build/
 src-tauri/gen/apple/**/*.xcarchive/
 
-# XcodeGen 生成产物不入库(改 project.yml 后跑 scripts/ios-signing.sh generate)
-ios/AdGuardConsole.xcodeproj/
+# XcodeGen 生成产物不入库(改 project.yml 后跑 scripts/ios-signing.sh generate tauri)
 src-tauri/gen/apple/adguard-home-console.xcodeproj/
 
 # 截图/取证不入库(例外:随应用分发的图标资源,如 Assets.xcassets 与 src-tauri/icons)
