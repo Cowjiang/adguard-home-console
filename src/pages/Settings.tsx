@@ -29,6 +29,7 @@ export default function Settings() {
   const nav = useNavigate()
   const { t } = useTranslation()
   const isDesktop = useIsDesktop()
+  const { offline } = useAuth()
 
   const serverItems = [
     { icon: <ScrollText size={17} />, color: 'var(--accent-2)', title: t('settings.itemQueryStats'), desc: t('settings.itemQueryStatsDesc'), to: '/settings/general' },
@@ -44,8 +45,10 @@ export default function Settings() {
     { icon: <Info size={17} />, color: 'var(--violet)', title: t('settings.itemAbout'), desc: `${APP_NAME} v${APP_VERSION}`, to: '/settings/about' },
   ]
 
+  // 离线时隐藏依赖 AGH 服务器的「服务器设置」组,页面保持可点:用户可能正需要
+  // 经「服务器连接」更改服务器地址;连接恢复后该组随 offline 复位自动回来
   const groups = [
-    { title: t('settings.groupServer'), items: serverItems },
+    ...(!offline ? [{ title: t('settings.groupServer'), items: serverItems }] : []),
     { title: t('settings.groupApp'), items: appItems },
   ]
 

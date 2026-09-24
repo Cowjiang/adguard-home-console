@@ -16,6 +16,7 @@ const zhCommon = {
   save: '保存',
   add: '添加',
   retry: '重试',
+  retryNow: '立即重试',
   loading: '加载中…',
   noData: '暂无数据',
   back: '返回',

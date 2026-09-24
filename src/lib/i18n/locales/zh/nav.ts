@@ -10,6 +10,7 @@ const zhNav = {
   statusOn: '防护运行中',
   statusOff: '防护已暂停',
   statusOffline: '服务离线',
+  offlineHint: '网络连接中断或服务器无响应;恢复后数据会自动刷新,也可以下拉重试',
 }
 
 export default zhNav
