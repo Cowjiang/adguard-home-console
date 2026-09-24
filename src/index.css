@@ -5,6 +5,11 @@
    半透明玻璃材质 · 同心圆角 · 浮动导航 · 高对比可读性
    ============================================================ */
 
+/* 安全区注入点:env() 只能在 CSS 里解析,内联样式/测试经此 var 读取与覆盖 */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
 :root,
 [data-theme='dark'] {
   /* Jinx 式深色:纯黑底 + 近实色深灰卡片;磨砂只给导航与浮层(浮层用 --glass-pop) */
@@ -414,7 +419,7 @@ body {
   margin-inline: auto;
   width: 100%;
   max-width: 560px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 64px);
+  padding-top: calc(var(--safe-top) + 64px);
   /* --tabbar-space:原生玻璃 TabBar 模式下由 src/lib/nativeTabbar.ts 按 getTabBarInsets 注入;默认值对齐 CSS 标签栏高度 */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-space, 112px));
 }
