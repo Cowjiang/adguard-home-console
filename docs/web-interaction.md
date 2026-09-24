@@ -1,7 +1,7 @@
 # Web 端布局与交互约定
 
 **Status:** current
-**Updated:** 2026-09-24
+**Updated:** 2026-09-25
 
 ## 视觉与响应式结构
 
@@ -28,6 +28,14 @@
 - 客户端移动端列表使用卡片，桌面把持久和自动识别客户端分成两张表。排序、搜索和分页独立于服务器查询；移动端添加/编辑进入 `/clients/form`，桌面使用居中弹层。
 - 图表触摸层使用 `touch-action: pan-y`，让纵向滑动交给页面；横向 scrub 保留。长按 350ms 可以唤出数据预览，移动超过 8px 取消长按。
 - Tab/筛选内容切换使用 `TabContent`，其 `value` 只随切换项变化；`Segmented` 通过滑动指示块表现当前项。
+
+## 刷新与连接恢复
+
+- 下拉刷新（`src/lib/pullToRefresh.ts`，接线在 `src/components/Layout.tsx`）只在移动布局 + 粗指针（触摸）设备启用；页面顶部（`window.scrollY <= 0`）的垂直下拉才接管，过阈值（64px）松手触发「status 重探 + SWR 全局 mutate」，未过阈值回弹。松手收位用 `.ptr-anim` 过渡，拖拽期间指令式 transform 跟手。
+- 下拉与边缘侧滑共用 window 触摸监听，让位规则：触点在左缘 24px 条内让给侧滑、水平意图让路；转场（`useTransitionBusy`）、侧滑手势（`useGestureActive`）、刷新中一律不启用。内容位移挂在 `main` 的包裹层、指示器固定于顶部留白，两者都不在 `capturePage` 克隆范围内，转场快照管线不感知刷新。
+- SWR 数据在 tab 切换时随页面重挂自动重验证（`revalidate()` 入口不检查在线状态）；status 不归 SWR 管，落地 tab 根页（`TAB_ROOT_ROUTES`）时由 Layout 调一次 `refreshStatus()`。
+- 断网自愈（`.agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md`）：SWR 的在线状态不读 `navigator.onLine`、只认 `offline`/`online` 事件，iOS WKWebView/PWA 里事件可能丢失，丢失后轮询/focus/reconnect/错误重试被同一标志全部门死。全局 `SWRConfig` 设 `refreshWhenOffline: true` 让轮询不停摆；auth 以 15s 重探 `/status`（外加 `visibilitychange`/`online` 即时探），从失败恢复成功时全局 `mutate` 一次解救冻结的 key——15s 是恢复上界，事件可靠时仍是即时。
+- body 的 `overscroll-behavior-y: none` 压掉浏览器原生下拉刷新（整页 reload）与橡皮筋，是自研下拉接管的前提；删除它会导致双重刷新。
 
 ## 路由与转场
 
