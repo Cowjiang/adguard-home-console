@@ -24,8 +24,6 @@ const ENGAGE_PX = 12
 const THRESHOLD_PX = 64
 /** 跟手位移上限,超出部分做阻尼 */
 const MAX_PX = 96
-/** 刷新期间的停留位 */
-const SETTLE_PX = 52
 
 export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boolean) {
   const busy = useTransitionBusy()
@@ -51,7 +49,8 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
       if (indicator) {
         const p = Math.min(1, pull / THRESHOLD_PX)
         indicator.style.opacity = pull > 4 ? String(Math.min(1, p * 1.5)) : '0'
-        indicator.style.transform = `translate3d(0, ${Math.round(Math.min(pull, THRESHOLD_PX) * 0.55)}px, 0) scale(${(0.55 + 0.45 * p).toFixed(3)})`
+        // 指示器 1:1 跟手(LAYOUT 锚在 safe+16、卡片顶在 safe+64),与卡片顶恒差 12px
+        indicator.style.transform = `translate3d(0, ${Math.round(pull)}px, 0) scale(${(0.55 + 0.45 * p).toFixed(3)})`
       }
     }
     // 松手后的收位/回弹交给 CSS transition,拖拽期间保持指令式跟手
@@ -105,11 +104,18 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
         apply(0)
         return
       }
-      // 刷新中停在阈值下方一点,完成后回弹归位;期间禁止再次下拉
+      // 刷新中:内容与圈一起回弹到基位(iOS 原生手感),圈停在 pill 下方留白带
+      // (safe+16,卡片顶 safe+64,间距 12px)持续旋转至 refreshAll 收口,pill 已
+      // 由 Layout 淡出让位;期间禁止再次下拉
       refreshingRef.current = true
       setRefreshing(true)
-      st.pull = SETTLE_PX
-      apply(SETTLE_PX)
+      st.pull = 0
+      apply(0)
+      const indicator = indicatorRef.current
+      if (indicator) {
+        indicator.style.opacity = '1'
+        indicator.style.transform = 'translate3d(0, 0px, 0) scale(1)'
+      }
       Promise.resolve(refreshRef.current())
         .catch(() => {})
         .then(() => {
