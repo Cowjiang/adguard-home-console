@@ -4,16 +4,23 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { scrollToTop } from './scrollToTop'
 
 type TabId = 'home' | 'protection' | 'log' | 'settings'
 
-const TABS: { id: TabId; to: string; title: string; sfSymbol: string }[] = [
-  { id: 'home', to: '/', title: '概览', sfSymbol: 'house.fill' },
-  { id: 'protection', to: '/protection', title: '过滤器', sfSymbol: 'shield.lefthalf.filled' },
-  { id: 'log', to: '/log', title: '日志', sfSymbol: 'doc.text.fill' },
-  { id: 'settings', to: '/settings', title: '设置', sfSymbol: 'gearshape.fill' },
+const TABS: { id: TabId; to: string; titleKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings'; sfSymbol: string }[] = [
+  { id: 'home', to: '/', titleKey: 'nav.overview', sfSymbol: 'house.fill' },
+  { id: 'protection', to: '/protection', titleKey: 'nav.protection', sfSymbol: 'shield.lefthalf.filled' },
+  { id: 'log', to: '/log', titleKey: 'nav.log', sfSymbol: 'doc.text.fill' },
+  { id: 'settings', to: '/settings', titleKey: 'nav.settings', sfSymbol: 'gearshape.fill' },
 ]
+
+type TFn = (key: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings') => string
+
+function tabItems(t: TFn) {
+  return TABS.map(({ id, titleKey, sfSymbol }) => ({ id, title: t(titleKey), sfSymbol }))
+}
 
 function routeToId(pathname: string): TabId | null {
   if (pathname === '/') return 'home'
@@ -27,6 +34,7 @@ export function isTauriShell(): boolean {
 /** 在 Layout(受保护路由)挂载期间配置原生 TabBar;返回是否成功(决定是否隐藏 CSS 版) */
 export function useNativeTabBar(): boolean {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const [active, setActive] = useState(false)
   // onTabSelected 监听仅注册一次,闭包里的 pathname 会陈旧;用 ref 供 handler 读最新路由
@@ -45,7 +53,7 @@ export function useNativeTabBar(): boolean {
       try {
         const p = await import('@sosweetham/tauri-plugin-system-components-api')
         await p.configureTabBar({
-          items: TABS.map(({ id, title, sfSymbol }) => ({ id, title, sfSymbol })),
+          items: tabItems(t),
           selectedId: routeToId(pathname) ?? 'home',
           tint: '#34d399',
         })
@@ -93,6 +101,16 @@ export function useNativeTabBar(): boolean {
     // 仅挂载时配置一次;初始选中项即当前路由,后续由路由同步 effect 维护
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 语言切换 → 重新下发原生 tab 标题(重复 configureTabBar 幂等)
+  useEffect(() => {
+    if (!active) return
+    import('@sosweetham/tauri-plugin-system-components-api')
+      .then((p) => p.configureTabBar({ items: tabItems(t), selectedId: routeToId(pathnameRef.current) ?? 'home', tint: '#34d399' }))
+      .catch(() => {})
+    // 仅随语言变化触发;pathname 由上方 effect 处理
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t])
 
   // 路由变化 → 原生 bar 选中态同步(原生点击 → navigate → 此处 selectTab 为无害回环,不触发事件)
   useEffect(() => {

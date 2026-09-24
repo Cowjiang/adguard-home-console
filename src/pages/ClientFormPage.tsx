@@ -1,5 +1,6 @@
 /** 添加/编辑客户端独立子页(移动端;桌面端仍用居中弹窗,见 Clients.openForm) */
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useSWRConfig } from 'swr'
 import type { AghClient } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -9,6 +10,7 @@ import { ClientForm, emptyClient } from './Clients'
 
 export default function ClientFormPage() {
   const nav = useNavigate()
+  const { t } = useTranslation()
   const { cfg } = useAuth()
   const { mutate } = useSWRConfig()
   const { state, pathname } = useLocation() as {
@@ -21,7 +23,7 @@ export default function ClientFormPage() {
 
   return (
     <Screen>
-      <PageHeader back title={isNew ? '添加客户端' : '编辑客户端'} />
+      <PageHeader back title={isNew ? t('clients.formAddTitle') : t('clients.formEditTitle')} />
       <div className="mt-3">
         <ClientForm
           initial={initial}

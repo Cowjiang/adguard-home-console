@@ -1,5 +1,6 @@
 /** 过滤器管理:黑/白名单列表、自定义规则、拦截服务 */
 import { useMemo, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
   Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink,
@@ -20,6 +21,7 @@ import { SERVICE_CACHE_KEY } from '../lib/constants'
 
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const sheet = useSheet()
   const pick = usePick()
   const confirm = useConfirm()
@@ -40,7 +42,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
       })
       mutate()
     } catch (e: any) {
-      toast('操作失败:' + e.message, 'err')
+      toast(t('common.opFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -49,9 +51,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
     try {
       await api(cfg, '/filtering/remove_url', { method: 'POST', body: { url: f.url, whitelist } })
       mutate()
-      toast('已删除过滤器')
+      toast(t('filters.deleted'))
     } catch (e: any) {
-      toast('删除失败:' + e.message, 'err')
+      toast(t('common.deleteFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -61,9 +63,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
     try {
       await api(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist } })
       mutate()
-      toast('过滤器更新完成')
+      toast(t('filters.refreshed'))
     } catch (e: any) {
-      toast('更新失败:' + e.message, 'err')
+      toast(t('common.updateFailed', { msg: e.message }), 'err')
     } finally {
       setRefreshing(false)
     }
@@ -74,9 +76,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
     try {
       await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: data.enabled, interval: hours } })
       mutate()
-      toast('更新间隔已保存')
+      toast(t('filters.intervalSaved'))
     } catch (e: any) {
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -85,26 +87,26 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
     let url = ''
     sheet.open(
       <div>
-        <p className="mb-4 text-center text-[17px] font-bold text-t1">添加过滤器</p>
+        <p className="mb-4 text-center text-[17px] font-bold text-t1">{t('filters.addTitle')}</p>
         <div className="flex flex-col gap-3">
-          <input className="field" placeholder="名称(可选,如 anti-AD)" onChange={(e) => (name = e.target.value)} />
+          <input className="field" placeholder={t('filters.namePlaceholder')} onChange={(e) => (name = e.target.value)} />
           <input className="field" placeholder="https://example.com/list.txt" inputMode="url" onChange={(e) => (url = e.target.value)} />
           <Button
             size="lg"
             className="mt-1"
             onClick={async () => {
-              if (!url.trim()) return toast('请输入 URL', 'err')
+              if (!url.trim()) return toast(t('filters.urlRequired'), 'err')
               try {
                 await api(cfg!, '/filtering/add_url', { method: 'POST', body: { name: name.trim(), url: url.trim(), whitelist } })
                 mutate()
                 sheet.close()
-                toast('过滤器已添加')
+                toast(t('filters.added'))
               } catch (e: any) {
-                toast('添加失败:' + e.message, 'err')
+                toast(t('common.addFailed', { msg: e.message }), 'err')
               }
             }}
           >
-            添加
+            {t('common.add')}
           </Button>
         </div>
       </div>
@@ -113,15 +115,15 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 
   return (
     <Screen>
-      <PageHeader back title={whitelist ? '白名单过滤器' : '黑名单过滤器'} subtitle={`${filters.length} 个列表 · 更新间隔 ${data ? hoursLabel(data.interval) : '…'}`} right={
-        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: '更新', sfSymbol: 'arrow.clockwise' }}>
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> 更新
+      <PageHeader back title={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')} subtitle={t('filters.listCountSub', { n: filters.length, interval: data ? hoursLabel(data.interval) : '…' })} right={
+        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
         </HeaderAction>
       } />
 
       {isLoading && <Loading />}
       {!isLoading && filters.length === 0 && (
-        <EmptyState icon={<Globe2 size={30} className="text-t3" />} title="还没有过滤器" subtitle="添加一个规则列表开始工作,例如 https://anti-ad.net/adguard.txt" />
+        <EmptyState icon={<Globe2 size={30} className="text-t3" />} title={t('filters.emptyTitle')} subtitle={t('filters.emptySub')} />
       )}
 
       <div className="grid gap-2.5 lg:grid-cols-2 lg:items-start">
@@ -130,36 +132,36 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-[15px] font-semibold text-t1">{f.name || '未命名过滤器'}</span>
-                  {!f.enabled && <Badge kind="warn">已停用</Badge>}
+                  <span className="truncate text-[15px] font-semibold text-t1">{f.name || t('filters.unnamed')}</span>
+                  {!f.enabled && <Badge kind="warn">{t('filters.disabledBadge')}</Badge>}
                 </div>
                 <p className="mt-0.5 truncate text-[11.5px] text-t3">{f.url}</p>
                 <p className="mt-0.5 text-[11.5px] text-t2 num">
-                  {fmtNum(f.rules_count)} 条规则 · 更新于 {relTime(f.last_updated ?? '')}
+                  {t('filters.rulesInfo', { n: fmtNum(f.rules_count), time: relTime(f.last_updated ?? '') })}
                 </p>
               </div>
               <Switch on={f.enabled} onChange={(v) => toggleFilter(f, v)} />
             </div>
             <div className="mt-2.5 flex justify-end gap-2">
               <Button size="sm" variant="ghost" className="!text-danger" onClick={() => confirm({
-                title: `删除「${f.name}」?`,
-                message: '删除后此列表的规则将立即失效。',
+                title: t('filters.deleteTitle', { name: f.name }),
+                message: t('filters.deleteMsg'),
                 destructive: true,
-                confirmText: '删除',
+                confirmText: t('common.delete'),
                 onConfirm: () => removeFilter(f),
               })}>
-                <Trash2 size={13} /> 删除
+                <Trash2 size={13} /> {t('common.delete')}
               </Button>
             </div>
           </Card>
         ))}
       </div>
 
-      <GroupTitle>常规设置</GroupTitle>
+      <GroupTitle>{t('filters.generalGroup')}</GroupTitle>
       <Group>
         <Rows>
           <Row
-            title="过滤器更新间隔"
+            title={t('filters.intervalTitle')}
             value={isAppleMobile() ? undefined : (data ? hoursLabel(data.interval) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
@@ -173,7 +175,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
             ) : undefined}
             onClick={isAppleMobile() ? undefined : (e) => {
               pick({
-                title: '过滤器更新间隔',
+                title: t('filters.intervalTitle'),
                 anchor: e.currentTarget,
                 align: 'right',
                 value: data?.interval,
@@ -184,7 +186,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
           />
           <Row
             icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Plus size={16} /></IconBubble>}
-            title="添加过滤器"
+            title={t('filters.addTitle')}
             onClick={openAddSheet}
             last
           />
@@ -198,6 +200,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 
 export function RulesPage() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -216,9 +219,9 @@ export function RulesPage() {
       await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
       setDraft(null)
       mutate()
-      toast('规则已保存')
+      toast(t('filters.rulesSaved'))
     } catch (e: any) {
-      toast('保存失败:' + e.message, 'err')
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     } finally {
       setSaving(false)
     }
@@ -226,23 +229,22 @@ export function RulesPage() {
 
   return (
     <Screen>
-      <PageHeader back title="自定义过滤规则" subtitle={`${activeCount} 条生效规则`} />
+      <PageHeader back title={t('filters.customTitle')} subtitle={t('filters.customSub', { n: activeCount })} />
       <Card className="p-4">
         <textarea
           className="field"
           style={{ minHeight: 300 }}
           value={text}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={'||example.com^\n@@||allowed.example.com^$important\n! 注释行'}
+          placeholder={t('filters.customPlaceholder')}
           spellCheck={false}
         />
         <div className="mt-3 flex items-center justify-between gap-3">
           <p className="min-w-0 text-[11.5px] leading-relaxed text-t3">
-            支持 AdGuard 语法:<code>||domain^</code> 拦截,
-            <code>@@</code> 白名单,<code>$important</code> 高优先级
+            <Trans i18nKey="filters.customHint" components={[<code key="0" />, <code key="1" />, <code key="2" />]} />
           </p>
           <Button loading={saving} disabled={draft === null} onClick={save} className="flex-none whitespace-nowrap">
-            保存
+            {t('common.save')}
           </Button>
         </div>
       </Card>
@@ -253,23 +255,24 @@ export function RulesPage() {
 /* ================= 拦截服务 ================= */
 
 /** 拦截服务分类(group_id 来自 /blocked_services/all 目录) */
-const SERVICE_GROUPS: { id: string; label: string }[] = [
-  { id: 'streaming', label: '流媒体' },
-  { id: 'social_network', label: '社交网络' },
-  { id: 'gaming', label: '游戏' },
-  { id: 'messenger', label: '即时通讯' },
-  { id: 'ai', label: '人工智能' },
-  { id: 'shopping', label: '购物' },
-  { id: 'gambling', label: '博彩' },
-  { id: 'dating', label: '交友' },
-  { id: 'privacy', label: '隐私' },
-  { id: 'hosting', label: '网站托管' },
-  { id: 'software', label: '软件' },
-  { id: 'cdn', label: '内容分发' },
+const SERVICE_GROUPS: { id: string; labelKey: 'filters.svcStreaming' | 'filters.svcSocial' | 'filters.svcGaming' | 'filters.svcMessenger' | 'filters.svcAi' | 'filters.svcShopping' | 'filters.svcGambling' | 'filters.svcDating' | 'filters.svcPrivacy' | 'filters.svcHosting' | 'filters.svcSoftware' | 'filters.svcCdn' | 'filters.svcOther' }[] = [
+  { id: 'streaming', labelKey: 'filters.svcStreaming' },
+  { id: 'social_network', labelKey: 'filters.svcSocial' },
+  { id: 'gaming', labelKey: 'filters.svcGaming' },
+  { id: 'messenger', labelKey: 'filters.svcMessenger' },
+  { id: 'ai', labelKey: 'filters.svcAi' },
+  { id: 'shopping', labelKey: 'filters.svcShopping' },
+  { id: 'gambling', labelKey: 'filters.svcGambling' },
+  { id: 'dating', labelKey: 'filters.svcDating' },
+  { id: 'privacy', labelKey: 'filters.svcPrivacy' },
+  { id: 'hosting', labelKey: 'filters.svcHosting' },
+  { id: 'software', labelKey: 'filters.svcSoftware' },
+  { id: 'cdn', labelKey: 'filters.svcCdn' },
 ]
 
 export function ServicesPage() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState<string>('all')
   const [pending, setPending] = useState<Set<string> | null>(null)
@@ -317,10 +320,10 @@ export function ServicesPage() {
         if (current?.schedule) body.schedule = current.schedule
         await api(cfg, '/blocked_services/update', { method: 'PUT', body })
         await mutateCurrent({ ids: Array.from(next), schedule: current?.schedule }, { revalidate: false })
-        toast(on ? `已取消拦截 ${id}` : `已拦截 ${id}`)
+        toast(on ? t('filters.svcUnblockedToast', { id }) : t('filters.svcBlockedToast', { id }))
       } catch (e: any) {
         mutateCurrent()
-        toast('保存失败:' + e.message, 'err')
+        toast(t('common.saveFailed', { msg: e.message }), 'err')
       } finally {
         if (latestIdsRef.current === next) {
           latestIdsRef.current = null
@@ -336,7 +339,7 @@ export function ServicesPage() {
     .filter((s) => s.items.length)
   // 无分类归属的服务归入"其他"
   const otherItems = visible.filter((x) => !SERVICE_GROUPS.some((g) => g.id === x.group_id))
-  if (otherItems.length) sections.push({ group: { id: 'other', label: '其他' }, items: otherItems })
+  if (otherItems.length) sections.push({ group: { id: 'other', labelKey: 'filters.svcOther' as const }, items: otherItems })
 
   const renderTile = (svc: BlockedService) => {
     const on = ids.has(svc.id)
@@ -367,24 +370,24 @@ export function ServicesPage() {
 
   return (
     <Screen>
-      <PageHeader back title="拦截服务" subtitle={`已选 ${ids.size} / ${catalog?.blocked_services?.length ?? 0} 个服务`} />
+      <PageHeader back title={t('filters.svcTitle')} subtitle={t('filters.svcSub', { n: ids.size, total: catalog?.blocked_services?.length ?? 0 })} />
       {/* 吸顶容器自身不拦截指针;吸附位置让出移动端悬浮顶栏,自然位置不留空行 */}
       <div
         className="pointer-events-none sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-10 -mx-4 px-4 pb-2 lg:top-0"
         style={{ background: 'linear-gradient(var(--bg) 55%, transparent)' }}
       >
         <div className="pointer-events-auto">
-          <SearchBar value={search} onChange={setSearch} placeholder="搜索服务,如 YouTube…" />
+          <SearchBar value={search} onChange={setSearch} placeholder={t('filters.svcSearchPlaceholder')} />
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             <Chip active={group === 'all'} onClick={() => setGroup('all')}>
-              全部{ids.size > 0 ? ` ${ids.size}` : ''}
+              {t('filters.svcAll')}{ids.size > 0 ? ` ${ids.size}` : ''}
             </Chip>
             {SERVICE_GROUPS.map((g) => {
               const selCount = (catalog?.blocked_services ?? [])
                 .filter((x) => x.group_id === g.id && ids.has(x.id)).length
               return (
                 <Chip key={g.id} active={group === g.id} onClick={() => setGroup(g.id)}>
-                  {g.label}{selCount > 0 ? ` ${selCount}` : ''}
+                  {t(g.labelKey)}{selCount > 0 ? ` ${selCount}` : ''}
                 </Chip>
               )
             })}
@@ -397,7 +400,7 @@ export function ServicesPage() {
         {sections.map(({ group: g, items }) => (
         <div key={g.id} className="mb-3">
           <div className="mb-1.5 mt-3 flex items-baseline gap-2 px-1">
-            <span className="text-[13px] font-semibold uppercase tracking-wide text-t3">{g.label}</span>
+            <span className="text-[13px] font-semibold uppercase tracking-wide text-t3">{t(g.labelKey)}</span>
             <span className="text-[11px] num text-t3">{items.length}</span>
           </div>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-10 xl:grid-cols-12">
@@ -405,7 +408,7 @@ export function ServicesPage() {
           </div>
         </div>
         ))}
-        {catalog && !sections.length && <EmptyState icon={<Search size={28} className="text-t3" />} title="没有匹配的服务" />}
+        {catalog && !sections.length && <EmptyState icon={<Search size={28} className="text-t3" />} title={t('filters.svcNoMatch')} />}
       </TabContent>
     </Screen>
   )
@@ -415,6 +418,7 @@ export function ServicesPage() {
 
 export function RewritesPage() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const sheet = useSheet()
   const confirm = useConfirm()
   const { data: entries, mutate } = useSWR<any[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
@@ -426,9 +430,9 @@ export function RewritesPage() {
       await api(cfg, '/rewrite/add', { method: 'POST', body: { domain: domain.trim(), answer: answer.trim() } })
       mutate()
       sheet.close()
-      toast('重写记录已添加')
+      toast(t('filters.rwAdded'))
     } catch (e: any) {
-      toast('添加失败:' + e.message, 'err')
+      toast(t('common.addFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -437,9 +441,9 @@ export function RewritesPage() {
     try {
       await api(cfg, '/rewrite/delete', { method: 'POST', body: { domain: entry.domain, answer: entry.answer } })
       mutate()
-      toast('已删除')
+      toast(t('filters.rwDeleted'))
     } catch (e: any) {
-      toast('删除失败:' + e.message, 'err')
+      toast(t('common.deleteFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -452,7 +456,7 @@ export function RewritesPage() {
       })
       mutate()
     } catch (e: any) {
-      toast('操作失败:' + e.message, 'err')
+      toast(t('common.opFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -461,12 +465,12 @@ export function RewritesPage() {
     let answer = ''
     sheet.open(
       <div>
-        <p className="mb-4 text-center text-[17px] font-bold text-t1">添加 DNS 重写</p>
+        <p className="mb-4 text-center text-[17px] font-bold text-t1">{t('filters.rwAddTitle')}</p>
         <div className="flex flex-col gap-3">
-          <input className="field" placeholder="域名,如 nas.home.lan" autoCapitalize="off" onChange={(e) => (domain = e.target.value)} />
-          <input className="field" placeholder="解析到,如 192.168.1.10" autoCapitalize="off" onChange={(e) => (answer = e.target.value)} />
-          <Button size="lg" className="mt-1" onClick={() => (domain.trim() && answer.trim() ? add(domain, answer) : toast('请填写完整', 'err'))}>
-            添加
+          <input className="field" placeholder={t('filters.rwDomainPlaceholder')} autoCapitalize="off" onChange={(e) => (domain = e.target.value)} />
+          <input className="field" placeholder={t('filters.rwAnswerPlaceholder')} autoCapitalize="off" onChange={(e) => (answer = e.target.value)} />
+          <Button size="lg" className="mt-1" onClick={() => (domain.trim() && answer.trim() ? add(domain, answer) : toast(t('filters.rwIncomplete'), 'err'))}>
+            {t('common.add')}
           </Button>
         </div>
       </div>
@@ -475,10 +479,10 @@ export function RewritesPage() {
 
   return (
     <Screen>
-      <PageHeader back title="DNS 重写" subtitle={`${entries?.length ?? 0} 条记录`} right={
+      <PageHeader back title={t('filters.rwTitle')} subtitle={t('filters.rwCountSub', { n: entries?.length ?? 0 })} right={
         <HeaderAction
           onClick={openAdd}
-          label="添加"
+          label={t('common.add')}
           className="w-11 text-accent lg:w-10"
           native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
         >
@@ -489,14 +493,14 @@ export function RewritesPage() {
       <Group>
         <Rows>
           <Row
-            title="启用 DNS 重写"
-            subtitle="关闭后所有重写记录不再生效"
+            title={t('filters.rwEnable')}
+            subtitle={t('filters.rwEnableSub')}
             right={<Switch on={!!settings?.enabled} onChange={async (v) => {
               try {
                 await api(cfg!, '/rewrite/settings/update', { method: 'PUT', body: { enabled: v } })
                 mSettings()
               } catch (e: any) {
-                toast('操作失败:' + e.message, 'err')
+                toast(t('common.opFailed', { msg: e.message }), 'err')
               }
             }} />}
             last
@@ -511,18 +515,18 @@ export function RewritesPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14.5px] font-semibold text-t1">{e.domain}</p>
                 <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-t2 num">
-                  → {e.answer || '<A> 按请求 IP 响应'}
+                  → {e.answer || t('filters.rwByRequestIp')}
                 </p>
               </div>
               <Switch on={e.enabled !== false} onChange={(v) => toggle(e, v)} />
-              <button onClick={() => confirm({ title: `删除 ${e.domain}?`, destructive: true, confirmText: '删除', onConfirm: () => remove(e) })} className="press flex-none text-t3" aria-label="删除">
+              <button onClick={() => confirm({ title: t('filters.rwDeleteTitle', { domain: e.domain }), destructive: true, confirmText: t('common.delete'), onConfirm: () => remove(e) })} className="press flex-none text-t3" aria-label={t('common.delete')}>
                 <Trash2 size={16} />
               </button>
             </div>
           </Card>
         ))}
         {entries && entries.length === 0 && (
-          <EmptyState icon={<ExternalLink size={28} className="text-t3" />} title="暂无重写记录" subtitle="把内网域名指向自定义 IP,例如 nas.home.lan → 192.168.1.10" />
+          <EmptyState icon={<ExternalLink size={28} className="text-t3" />} title={t('filters.rwEmptyTitle')} subtitle={t('filters.rwEmptySub')} />
         )}
       </div>
     </Screen>
@@ -533,6 +537,7 @@ export function RewritesPage() {
 
 export function CheckHostPage() {
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const [domain, setDomain] = useState('')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -545,7 +550,7 @@ export function CheckHostPage() {
       const r = await api<any>(cfg, '/filtering/check_host' + '?name=' + encodeURIComponent(domain.trim()))
       setResult(r)
     } catch (e: any) {
-      toast('检测失败:' + e.message, 'err')
+      toast(t('filters.checkFailed', { msg: e.message }), 'err')
     } finally {
       setLoading(false)
     }
@@ -553,19 +558,19 @@ export function CheckHostPage() {
 
   return (
     <Screen>
-      <PageHeader back title="规则检测" subtitle="查询域名会命中哪条过滤规则" />
+      <PageHeader back title={t('filters.checkTitle')} subtitle={t('filters.checkSub')} />
       <Card className="p-4">
         <div className="flex gap-2.5">
           <input
             className="field flex-1"
-            placeholder="输入域名,如 ads.example.com"
+            placeholder={t('filters.checkPlaceholder')}
             autoCapitalize="off"
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && check()}
           />
           <Button loading={loading} disabled={!domain.trim()} onClick={check}>
-            检测
+            {t('filters.checkAction')}
           </Button>
         </div>
       </Card>
@@ -574,17 +579,17 @@ export function CheckHostPage() {
         <Card className="mt-4 p-4 rise-in">
           <div className="mb-3 flex items-center gap-2">
             {result.reason === 'NotFilteredNotFound' ? (
-              <Badge kind="ok">不会被拦截</Badge>
+              <Badge kind="ok">{t('filters.checkNotBlocked')}</Badge>
             ) : result.reason?.startsWith('Filtered') ? (
-              <Badge kind="blocked">将被拦截</Badge>
+              <Badge kind="blocked">{t('filters.checkBlocked')}</Badge>
             ) : (
-              <Badge kind="rewrite">重写 / 其他</Badge>
+              <Badge kind="rewrite">{t('filters.checkOther')}</Badge>
             )}
             <span className="text-[12.5px] text-t2 num">{result.reason}</span>
           </div>
-          {result.service_name && <p className="mb-2 text-[13px] text-t1">匹配服务:{result.service_name}</p>}
+          {result.service_name && <p className="mb-2 text-[13px] text-t1">{t('filters.checkMatchedService', { name: result.service_name })}</p>}
           {result.ip_addrs?.length ? (
-            <p className="mb-2 break-all text-[13px] text-t1 num">重写到:{result.ip_addrs.join(', ')}</p>
+            <p className="mb-2 break-all text-[13px] text-t1 num">{t('filters.checkRewrittenTo', { ip: result.ip_addrs.join(', ') })}</p>
           ) : null}
           {result.rules?.length ? (
             <div className="glass rounded-xl px-3.5 py-3">
@@ -595,14 +600,14 @@ export function CheckHostPage() {
               ))}
             </div>
           ) : (
-            <p className="text-[13px] text-t3">没有命中任何规则</p>
+            <p className="text-[13px] text-t3">{t('filters.checkNoMatch')}</p>
           )}
         </Card>
       )}
 
       <div className="mt-4 flex items-start gap-2 px-2 text-[12px] leading-relaxed text-t3">
         <Ban size={14} className="mt-0.5 flex-none" />
-        直接调用 AdGuard Home 的过滤引擎,结果与真实 DNS 查询一致,支持通配符与自定义规则匹配。
+        {t('filters.checkHint')}
       </div>
     </Screen>
   )

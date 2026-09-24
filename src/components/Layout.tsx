@@ -1,6 +1,7 @@
 /** 全局布局:环境背景 + 移动端浮动玻璃标签栏 / 桌面端固定侧边栏(≥lg) */
 import { useRef } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { scrollToTop } from '../lib/scrollToTop'
@@ -11,20 +12,20 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
 import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim } from './ui'
 
-type NavItem = { to: string; label: string; icon: typeof Home; match?: string[] }
+type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.stats' | 'nav.clients'; icon: typeof Home; match?: string[] }
 
 const TABS: NavItem[] = [
-  { to: '/', label: '概览', icon: Home },
-  { to: '/protection', label: '过滤器', icon: ListFilter },
-  { to: '/log', label: '日志', icon: ScrollText },
-  { to: '/settings', label: '设置', icon: Settings2 },
+  { to: '/', labelKey: 'nav.overview', icon: Home },
+  { to: '/protection', labelKey: 'nav.protection', icon: ListFilter },
+  { to: '/log', labelKey: 'nav.log', icon: ScrollText },
+  { to: '/settings', labelKey: 'nav.settings', icon: Settings2 },
 ]
 
 const DESK_NAV: NavItem[] = [
   ...TABS.slice(0, 1),
-  { to: '/stats', label: '统计', icon: BarChart3 },
+  { to: '/stats', labelKey: 'nav.stats', icon: BarChart3 },
   ...TABS.slice(1, 3),
-  { to: '/clients', label: '客户端', icon: Users, match: ['/clients', '/rewrites'] },
+  { to: '/clients', labelKey: 'nav.clients', icon: Users, match: ['/clients', '/rewrites'] },
   TABS[3],
 ]
 
@@ -40,6 +41,7 @@ export function Ambient() {
 /** 顶部悬浮状态条(仅移动端 tab 根页面:二级页顶部由固定导航栏接管,见 docs/web-interaction.md) */
 function TopBar() {
   const { status } = useAuth()
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const protected_ = status?.protection_enabled
   if (!TAB_ROOT_ROUTES.includes(pathname)) return null
@@ -55,7 +57,7 @@ function TopBar() {
           style={{ background: protected_ ? 'var(--ok)' : 'var(--danger)' }}
         />
         <span className="text-[12px] font-semibold text-t1">
-          {status?.running ? (protected_ ? '防护运行中' : '防护已暂停') : '服务离线'}
+          {status?.running ? (protected_ ? t('nav.statusOn') : t('nav.statusOff')) : t('nav.statusOffline')}
         </span>
         <span className="h-3 w-px" style={{ background: 'var(--glass-border-strong)' }} />
         <span className="text-[12px] text-t3">{APP_NAME}</span>
@@ -65,6 +67,7 @@ function TopBar() {
 }
 
 function TabBar() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const activeIdx = Math.max(
     0,
@@ -115,7 +118,7 @@ function TabBar() {
         >
           <div ref={lensRef} className="tab-lens h-full w-full" style={{ transformOrigin: '50% 55%' }} />
         </div>
-        {TABS.map(({ to, label, icon: Icon }) => {
+        {TABS.map(({ to, labelKey, icon: Icon }) => {
           const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to)
           return (
             <NavLink
@@ -137,7 +140,7 @@ function TabBar() {
               {({ isActive }) => (
                 <>
                   <Icon size={21} strokeWidth={isActive ? 2.3 : 1.9} />
-                  <span className="text-[10.5px] font-semibold tracking-wide">{label}</span>
+                  <span className="text-[10.5px] font-semibold tracking-wide">{t(labelKey)}</span>
                 </>
               )}
             </NavLink>
@@ -152,6 +155,7 @@ function TabBar() {
 function Sidebar() {
   const { pathname } = useLocation()
   const { status } = useAuth()
+  const { t } = useTranslation()
   const protected_ = status?.protection_enabled
   return (
     <aside
@@ -171,7 +175,7 @@ function Sidebar() {
         </div>
       </div>
       <nav className="flex flex-col gap-1">
-        {DESK_NAV.map(({ to, label, icon: Icon, match }) => {
+        {DESK_NAV.map(({ to, labelKey, icon: Icon, match }) => {
           const active = navActive(pathname, to, match)
           return (
             <NavLink
@@ -184,7 +188,7 @@ function Sidebar() {
               style={active ? { background: 'var(--accent-soft)' } : undefined}
             >
               <Icon size={19} strokeWidth={active ? 2.3 : 1.9} />
-              {label}
+              {t(labelKey)}
             </NavLink>
           )
         })}
@@ -197,7 +201,7 @@ function Sidebar() {
         />
         <div className="min-w-0">
           <div className="text-[12.5px] font-semibold text-t1">
-            {status?.running ? (protected_ ? '防护运行中' : '防护已暂停') : '服务离线'}
+            {status?.running ? (protected_ ? t('nav.statusOn') : t('nav.statusOff')) : t('nav.statusOffline')}
           </div>
           <div className="num text-[11px] text-t3">{APP_NAME}</div>
         </div>
