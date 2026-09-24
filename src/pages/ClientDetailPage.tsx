@@ -51,7 +51,7 @@ export default function ClientDetailPage() {
       <div className="mt-2">
         <ClientDetail
           data={data}
-          onOpenLog={(k) => nav('/log?q=' + encodeURIComponent(k))}
+          onOpenLog={(k) => nav('/logs?q=' + encodeURIComponent(k))}
           onDelete={c ? () => confirm({ title: t('clients.deleteConfirmTitle', { name: c.name }), destructive: true, confirmText: t('common.delete'), onConfirm: remove }) : undefined}
           onAdd={c ? undefined : () => nav('/clients/form', { state: { isNew: true, prefillIp: data.ip } })}
         />

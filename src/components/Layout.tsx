@@ -17,7 +17,7 @@ type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.
 const TABS: NavItem[] = [
   { to: '/', labelKey: 'nav.overview', icon: Home },
   { to: '/protection', labelKey: 'nav.protection', icon: ListFilter },
-  { to: '/log', labelKey: 'nav.log', icon: ScrollText },
+  { to: '/logs', labelKey: 'nav.log', icon: ScrollText },
   { to: '/settings', labelKey: 'nav.settings', icon: Settings2 },
 ]
 

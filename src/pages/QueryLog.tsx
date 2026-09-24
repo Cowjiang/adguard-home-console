@@ -155,7 +155,7 @@ export default function QueryLog() {
     if (isDesktop) {
       sheet.open(<LogDetail item={item} filtering={filtering} onSaveRule={saveRule} />)
     } else {
-      nav('/log/detail', { state: { item } })
+      nav('/logs/detail', { state: { item } })
     }
   }
 

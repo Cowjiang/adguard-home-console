@@ -158,7 +158,7 @@ export default function Clients() {
       sheet.open(
         <ClientDetail
           data={d}
-          onOpenLog={(k) => { sheet.close(); nav('/log?q=' + encodeURIComponent(k)) }}
+          onOpenLog={(k) => { sheet.close(); nav('/logs?q=' + encodeURIComponent(k)) }}
           onDelete={d.persistent ? () => {
             confirm({ title: t('clients.deleteConfirmTitle', { name: d.persistent!.name }), destructive: true, confirmText: t('common.delete'), onConfirm: async () => { await remove(d.persistent!); sheet.close() } })
           } : undefined}

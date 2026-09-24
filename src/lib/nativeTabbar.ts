@@ -7,12 +7,12 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { scrollToTop } from './scrollToTop'
 
-type TabId = 'home' | 'protection' | 'log' | 'settings'
+type TabId = 'home' | 'protection' | 'logs' | 'settings'
 
 const TABS: { id: TabId; to: string; titleKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings'; sfSymbol: string }[] = [
   { id: 'home', to: '/', titleKey: 'nav.overview', sfSymbol: 'house.fill' },
   { id: 'protection', to: '/protection', titleKey: 'nav.protection', sfSymbol: 'shield.lefthalf.filled' },
-  { id: 'log', to: '/log', titleKey: 'nav.log', sfSymbol: 'doc.text.fill' },
+  { id: 'logs', to: '/logs', titleKey: 'nav.log', sfSymbol: 'doc.text.fill' },
   { id: 'settings', to: '/settings', titleKey: 'nav.settings', sfSymbol: 'gearshape.fill' },
 ]
 
