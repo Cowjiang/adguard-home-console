@@ -37,6 +37,7 @@ Take the global constraints from this file; open only the next layer relevant to
 ## Code conventions
 
 - The repo has no linter/formatter; style relies on convention plus `npm run check` (`tsconfig.json` has `strict` on): TS/TSX uses 2-space indent, single quotes, and no trailing semicolons; Rust keeps 4 spaces.
+- Code comments are in English and kept concise: state what the code does, the constraints it works under, and the motivation behind it; no lengthy explanations unless they are genuinely needed.
 - Place new code in the existing layers: pages go in `src/pages/`, shared components and base controls in `src/components/`, requests, state, and utilities in `src/lib/`; Rust keeps one concern per file.
 - All AGH requests go through `api()` in `src/lib/api.ts`; SWR uses only `swrFetcher` with keys shaped like `['<short-name>', cfg, path]`. Never place React Hooks after a conditional return.
 - AGH time fields are milliseconds throughout; `stats.top_*` are single-key object arrays — normalize before consuming. Endpoints, enums, and units follow `docs/agh-api.md`; other implementation constraints live in `docs/engineering.md`.
