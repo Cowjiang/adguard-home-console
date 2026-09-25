@@ -346,7 +346,17 @@ const server = http.createServer(async (req, res) => {
     case 'POST /tls/configure': return json(res, 200, {})
     case 'GET /tls/status': return json(res, 200, { enabled: false, server_name: '', force_https: false, serve_plain_dns: true, port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 853, valid_cert: false, valid_chain: false, valid_key: false, valid_pair: false })
     case 'GET /dhcp/status': return json(res, 200, { enabled: false, interface_name: '', v4: { gateway_ip: '', subnet_mask: '', range_start: '', range_end: '', lease_duration: 0 }, v6: { range_start: '', lease_duration: 0 }, leases: [], static_leases: [] })
-    case 'GET /dhcp/interfaces': return json(res, 200, { interfaces: [] })
+    // 与真实 v0.107.79 一致：以接口名为键的裸对象，无 interfaces 包裹
+    case 'GET /dhcp/interfaces': return json(res, 200, {
+      eth0: {
+        name: 'eth0',
+        hardware_address: '00:11:22:33:44:55',
+        flags: 'up|broadcast|multicast|running',
+        gateway_ip: '192.168.1.1',
+        ipv4_addresses: ['192.168.1.2'],
+        ipv6_addresses: null,
+      },
+    })
     case 'POST /dhcp/set_config': return json(res, 200, {})
     case 'POST /dhcp/find_active_dhcp': return json(res, 200, { v4: null, v6: null })
     case 'POST /dhcp/add_static_lease': return json(res, 200, {})

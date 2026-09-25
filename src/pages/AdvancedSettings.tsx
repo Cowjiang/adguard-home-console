@@ -679,13 +679,18 @@ export function DhcpSettings() {
             title={t('advanced.interface')}
             value={cur.interface_name || t('advanced.choose')}
             onClick={(e) => {
-              const ifs = interfaces?.interfaces ?? {}
+              // /dhcp/interfaces 是以接口名为键的裸对象，地址在
+              // ipv4_addresses/ipv6_addresses（无 interfaces 包裹，v6 可为 null）
+              const ifs = interfaces ?? {}
               pick({
                 title: t('advanced.chooseInterface'),
                 anchor: e.currentTarget,
                 align: 'right',
                 value: cur.interface_name,
-                options: Object.keys(ifs).map((n) => ({ label: `${n}(${ifs[n].addresses?.join(', ')})`, value: n })),
+                options: Object.keys(ifs).map((n) => {
+                  const addrs = [...(ifs[n].ipv4_addresses ?? []), ...(ifs[n].ipv6_addresses ?? [])]
+                  return { label: addrs.length ? `${n}(${addrs.join(', ')})` : n, value: n }
+                }),
                 onPick: (v) => setD({ interface_name: v }),
               })
             }}

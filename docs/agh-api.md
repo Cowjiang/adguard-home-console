@@ -1,7 +1,7 @@
 # AdGuard Home v0.107.79 API 契约
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-09-25
 
 本项目按 AGH v0.107.79 的 `/control/*` 契约实现。类型与调用点在 `src/lib/api.ts`；可执行模拟在 `scripts/mock-agh.mjs`。`_probe/` 中的 OpenAPI 与真实响应样本是本机探查材料，被 Git 忽略，克隆后不能假定存在。
 
@@ -16,7 +16,7 @@
 | 客户端 | `POST /clients/add`；`POST /clients/update` 使用 `{name, data}`；`POST /clients/delete` 使用 `{name}` |
 | DNS 重写 | `PUT /rewrite/update` 使用 `{target, update}`；`/rewrite/settings` 与 `/rewrite/settings/update` 管开关 |
 | 安全搜索 | `PUT /safesearch/settings` 使用总开关及七个引擎布尔值 |
-| DHCP | `/dhcp/set_config`、`/dhcp/find_active_dhcp`（`{interface}`）、`/dhcp/add_static_lease` 等使用 snake_case |
+| DHCP | `/dhcp/set_config`、`/dhcp/find_active_dhcp`（`{interface}`）、`/dhcp/add_static_lease` 等使用 snake_case；`GET /dhcp/interfaces` 返回以接口名为键的裸对象（无 `interfaces` 包裹），每项含 `name`、`hardware_address`、`flags`、`gateway_ip`、`ipv4_addresses[]`、`ipv6_addresses[]`（可为 null） |
 | 其他操作 | `POST /cache_clear`、`POST /version.json`（`{recheck_now}`）、`POST /update`、`GET /filtering/check_host?name=...` |
 
 `reason` 是字符串枚举，当前使用的值为 `FilteredBlackList`、`FilteredBlockedService`、`FilteredSafeBrowsing`、`FilteredParental`、`FilteredInvalid`、`FilteredSafeSearch`、`NotFilteredWhiteList`、`NotFilteredNotFound`、`NotFilteredError`、`Rewrite`、`RewriteEtcHosts`、`RewriteRule`。
