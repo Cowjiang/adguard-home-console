@@ -16,7 +16,7 @@
 | 客户端 | `POST /clients/add`；`POST /clients/update` 使用 `{name, data}`；`POST /clients/delete` 使用 `{name}` |
 | DNS 重写 | `PUT /rewrite/update` 使用 `{target, update}`；`/rewrite/settings` 与 `/rewrite/settings/update` 管开关 |
 | 安全搜索 | `PUT /safesearch/settings` 使用总开关及七个引擎布尔值 |
-| DHCP | `/dhcp/set_config`、`/dhcp/find_active_dhcp`（`{interface}`）、`/dhcp/add_static_lease` 等使用 snake_case；`GET /dhcp/interfaces` 返回以接口名为键的裸对象（无 `interfaces` 包裹），每项含 `name`、`hardware_address`、`flags`、`gateway_ip`、`ipv4_addresses[]`、`ipv6_addresses[]`（可为 null） |
+| DHCP | snake_case 端点：`/dhcp/set_config`（`{enabled, interface_name, v4, v6}`，`v4` 含 gateway/subnet/range/lease_duration，`v6` 仅 `range_start` + `lease_duration`）、`/dhcp/find_active_dhcp`（请求 `{interface}`，响应在 `v4.other_server.found`（yes/no/error）与 `v4.static_ip.static/ip`、`v6.other_server`，无 server_ip 字段）、`/dhcp/add_static_lease`、`/dhcp/update_static_lease`（以 MAC 定位改 IP/主机名）、`/dhcp/remove_static_lease`、`/dhcp/reset`（恢复默认配置）、`/dhcp/reset_leases`（清空动态租约）；`GET /dhcp/status` 含 `leases[]`（mac/ip/hostname/expires RFC3339）与 `static_leases[]`；`GET /dhcp/interfaces` 返回以接口名为键的裸对象（无 `interfaces` 包裹），每项含 `name`、`hardware_address`、`flags`、`gateway_ip`、`ipv4_addresses[]`、`ipv6_addresses[]`（可为 null） |
 | 其他操作 | `POST /cache_clear`、`POST /version.json`（`{recheck_now}`）、`POST /update`、`GET /filtering/check_host?name=...` |
 
 `reason` 是字符串枚举，当前使用的值为 `FilteredBlackList`、`FilteredBlockedService`、`FilteredSafeBrowsing`、`FilteredParental`、`FilteredInvalid`、`FilteredSafeSearch`、`NotFilteredWhiteList`、`NotFilteredNotFound`、`NotFilteredError`、`Rewrite`、`RewriteEtcHosts`、`RewriteRule`。

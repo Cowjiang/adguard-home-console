@@ -16,6 +16,16 @@ import http from 'node:http'
 const PORT = 3990
 const startedAt = Date.now() - 3 * 3600_000 - 42 * 60_000
 
+// DHCP 默认配置(/dhcp/reset 也恢复到这里);expires 为 RFC3339
+const DHCP_DEFAULT_STATUS = {
+  enabled: false,
+  interface_name: '',
+  v4: { gateway_ip: '', subnet_mask: '', range_start: '', range_end: '', lease_duration: 0 },
+  v6: { range_start: '', lease_duration: 0 },
+  leases: [],
+  static_leases: [],
+}
+
 // ---------- In-memory state ----------
 const state = {
   protectionEnabled: true,
@@ -79,6 +89,16 @@ const state = {
     },
   ],
   accessList: { allowed_clients: [], disallowed_clients: [], blocked_hosts: ['mail spamhaus org'] },
+  dhcp: {
+    status: {
+      ...DHCP_DEFAULT_STATUS,
+      leases: [
+        { mac: 'AA:BB:CC:01:10:01', ip: '192.168.1.101', hostname: 'android-phone', expires: new Date(Date.now() + 3600_000).toISOString() },
+        { mac: 'AA:BB:CC:01:10:02', ip: '192.168.1.102', hostname: 'smart-tv', expires: new Date(Date.now() + 86_400_000).toISOString() },
+      ],
+      static_leases: [{ mac: 'AA:BB:CC:00:00:07', ip: '192.168.1.7', hostname: 'nas' }],
+    },
+  },
 }
 
 // ---------- Deterministic sample data ----------
@@ -345,8 +365,9 @@ const server = http.createServer(async (req, res) => {
     case 'POST /tls/validate': return json(res, 200, { valid_pair: true, warning_validation: '' })
     case 'POST /tls/configure': return json(res, 200, {})
     case 'GET /tls/status': return json(res, 200, { enabled: false, server_name: '', force_https: false, serve_plain_dns: true, port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 853, valid_cert: false, valid_chain: false, valid_key: false, valid_pair: false })
-    case 'GET /dhcp/status': return json(res, 200, { enabled: false, interface_name: '', v4: { gateway_ip: '', subnet_mask: '', range_start: '', range_end: '', lease_duration: 0 }, v6: { range_start: '', lease_duration: 0 }, leases: [], static_leases: [] })
-    // 与真实 v0.107.79 一致：以接口名为键的裸对象，无 interfaces 包裹
+    case 'GET /dhcp/status': return json(res, 200, state.dhcp.status)
+    // 与真实 v0.107.79 一致：以接口名为键的裸对象，无 interfaces 包裹；
+    // eth0 无 v6 地址、eth1 有,用于验证 IPv6 表单的可用性提示
     case 'GET /dhcp/interfaces': return json(res, 200, {
       eth0: {
         name: 'eth0',
@@ -356,11 +377,49 @@ const server = http.createServer(async (req, res) => {
         ipv4_addresses: ['192.168.1.2'],
         ipv6_addresses: null,
       },
+      eth1: {
+        name: 'eth1',
+        hardware_address: '00:11:22:33:44:66',
+        flags: 'up|broadcast|multicast|running',
+        gateway_ip: 'fe80::1',
+        ipv4_addresses: ['192.168.2.2'],
+        ipv6_addresses: ['fd00::2'],
+      },
     })
-    case 'POST /dhcp/set_config': return json(res, 200, {})
-    case 'POST /dhcp/find_active_dhcp': return json(res, 200, { v4: null, v6: null })
-    case 'POST /dhcp/add_static_lease': return json(res, 200, {})
-    case 'POST /dhcp/remove_static_lease': return json(res, 200, {})
+    case 'POST /dhcp/set_config':
+      state.dhcp.status = {
+        ...state.dhcp.status,
+        enabled: !!body.enabled,
+        interface_name: body.interface_name || '',
+        v4: body.v4 ?? state.dhcp.status.v4,
+        v6: body.v6 ?? state.dhcp.status.v6,
+      }
+      return json(res, 200, {})
+    // v0.107.79 契约:结果在 other_server.found(yes/no/error)与 v4.static_ip
+    case 'POST /dhcp/find_active_dhcp': return json(res, 200, { v4: { other_server: { found: 'no' }, static_ip: { static: 'yes', ip: '' } }, v6: { other_server: { found: 'no' } } })
+    case 'POST /dhcp/add_static_lease':
+      if (!body.mac || !body.ip) return json(res, 400, { error: 'mac and ip are required' })
+      state.dhcp.status.static_leases = [
+        ...state.dhcp.status.static_leases.filter((l) => l.mac !== body.mac),
+        { mac: body.mac, ip: body.ip, hostname: body.hostname || '' },
+      ]
+      return json(res, 200, {})
+    case 'POST /dhcp/update_static_lease': {
+      const leases = state.dhcp.status.static_leases
+      const i = leases.findIndex((l) => l.mac === body.mac)
+      if (i === -1) return json(res, 404, { error: 'lease not found' })
+      leases[i] = { mac: body.mac, ip: body.ip || leases[i].ip, hostname: body.hostname || '' }
+      return json(res, 200, {})
+    }
+    case 'POST /dhcp/remove_static_lease':
+      state.dhcp.status.static_leases = state.dhcp.status.static_leases.filter((l) => l.mac !== body.mac)
+      return json(res, 200, {})
+    case 'POST /dhcp/reset_leases':
+      state.dhcp.status.leases = []
+      return json(res, 200, {})
+    case 'POST /dhcp/reset':
+      state.dhcp.status = { ...DHCP_DEFAULT_STATUS, static_leases: state.dhcp.status.static_leases }
+      return json(res, 200, {})
     case 'GET /parental/status': return json(res, 200, { enabled: false })
     case 'POST /parental/update': return json(res, 200, {})
     case 'GET /safebrowsing/status': return json(res, 200, { enabled: false })
