@@ -26,3 +26,4 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 # 本机 agent 工具产物
 .playwright-mcp/
 .zcodeignore
+.impeccable/
