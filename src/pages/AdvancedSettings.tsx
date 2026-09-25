@@ -759,14 +759,16 @@ export function DhcpSettings() {
   return (
     <Screen>
       <PageHeader back title={t('advanced.titleDhcp')} right={<Button size="header" loading={saving} onClick={() => saveConfig(cur)} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button>} />
-      {/* 官方页的两条说明合并为一个提示块;mt-5 对齐其他设置页 GroupTitle 的节奏 */}
-      <Card className="mt-5 mb-1.5 p-4 text-[12.5px] leading-relaxed">
+      {/* 官方说明与启用警告:不用卡片包裹,mt-5/mb-1.5 对齐其他设置页的间距节奏;警告句仅在停用态有意义 */}
+      <div className="mt-5 mb-1.5 px-2 text-[12.5px] leading-relaxed">
         <p className="text-t2">{t('advanced.dhcpDesc')}</p>
-        <p className="mt-1.5 flex items-start gap-1.5" style={{ color: 'var(--warn)' }}>
-          <AlertTriangle size={14} className="mt-0.5 flex-none" />
-          <span>{t('advanced.dhcpWarn')}</span>
-        </p>
-      </Card>
+        {!cur.enabled && (
+          <p className="mt-1.5 flex items-start gap-1.5" style={{ color: 'var(--warn)' }}>
+            <AlertTriangle size={14} className="mt-0.5 flex-none" />
+            <span>{t('advanced.dhcpWarn')}</span>
+          </p>
+        )}
+      </div>
 
       <Group>
         <Rows>
