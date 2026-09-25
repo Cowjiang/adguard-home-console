@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
-  Play, ShieldCheck, Plus, Trash2, Wifi, Pencil,
+  Play, ShieldCheck, Plus, Trash2, Wifi, Pencil, AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type DnsInfo, type TlsStatus, type DhcpStatus } from '../lib/api'
@@ -590,6 +590,7 @@ export function DhcpSettings() {
   // /dhcp/interfaces 的裸键值对象,v4/v6 地址分别在 ipv4_addresses/ipv6_addresses
   const ifInfo = cur.interface_name ? interfaces?.[cur.interface_name] : null
   const ifHasV6 = (ifInfo?.ipv6_addresses ?? []).length > 0
+  const ifAllAddrs = [...(ifInfo?.ipv4_addresses ?? []), ...(ifInfo?.ipv6_addresses ?? [])]
 
   // v4/v6 任一字段填过即视为该组启用,启用组必须填全才允许开启/保存
   const v4Fields = [cur.v4.gateway_ip, cur.v4.subnet_mask, cur.v4.range_start, cur.v4.range_end] as (string | undefined)[]
@@ -711,7 +712,7 @@ export function DhcpSettings() {
       <div>
         <p className="mb-4 text-center text-[17px] font-bold text-t1">{t('advanced.editLeaseTitle')}</p>
         <div className="flex flex-col gap-3">
-          <input className="field opacity-60" value={l.mac} disabled />
+          <input className="field opacity-50 cursor-not-allowed" value={l.mac} disabled />
           <input className="field" placeholder={t('advanced.ipPlaceholder')} defaultValue={l.ip} onChange={(e) => (ip = e.target.value)} />
           <input className="field" placeholder={t('advanced.hostnamePlaceholder')} defaultValue={l.hostname} onChange={(e) => (hostname = e.target.value)} />
           <Button size="lg" className="mt-1" onClick={async () => {
@@ -758,10 +759,16 @@ export function DhcpSettings() {
   return (
     <Screen>
       <PageHeader back title={t('advanced.titleDhcp')} right={<Button size="header" loading={saving} onClick={() => saveConfig(cur)} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button>} />
+      {/* 官方页的两条说明合并为一个提示块;mt-5 对齐其他设置页 GroupTitle 的节奏 */}
+      <Card className="mt-5 mb-1.5 p-4 text-[12.5px] leading-relaxed">
+        <p className="text-t2">{t('advanced.dhcpDesc')}</p>
+        <p className="mt-1.5 flex items-start gap-1.5" style={{ color: 'var(--warn)' }}>
+          <AlertTriangle size={14} className="mt-0.5 flex-none" />
+          <span>{t('advanced.dhcpWarn')}</span>
+        </p>
+      </Card>
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <Group>
+      <Group>
         <Rows>
           <Row
             title={t('advanced.enableDhcp')}
@@ -807,17 +814,30 @@ export function DhcpSettings() {
             last
           />
         </Rows>
+      </Group>
+
+      {cur.interface_name && ifInfo && (
+        <div className="mt-2.5">
+          <GroupTitle>{t('advanced.ifDetails')}</GroupTitle>
+          <Group>
+            <Rows>
+              <Row title={t('advanced.ifGateway')} value={ifInfo.gateway_ip || '—'} />
+              <Row title={t('advanced.ifHwAddr')} value={ifInfo.hardware_address || '—'} />
+              <Row title={t('advanced.ifAddrs')} value={ifAllAddrs.length ? ifAllAddrs.join(', ') : '—'} last />
+            </Rows>
           </Group>
-          {detectResult && detectResult.length > 0 && (
-            <div className="mt-2 px-2">
-              {detectResult.map((line, i) => (
-                <p key={i} className="text-[12.5px] leading-relaxed text-t2">{line}</p>
-              ))}
-            </div>
-          )}
         </div>
-        {cur.enabled ? (
-          <div>
+      )}
+      {detectResult && detectResult.length > 0 && (
+        <div className="mt-2 px-2">
+          {detectResult.map((line, i) => (
+            <p key={i} className="text-[12.5px] leading-relaxed text-t2">{line}</p>
+          ))}
+        </div>
+      )}
+
+      {cur.enabled && (
+        <div>
             <GroupTitle>{t('advanced.v4Group')}</GroupTitle>
             <Group>
             <Rows>
@@ -839,13 +859,10 @@ export function DhcpSettings() {
             {cur.interface_name && !ifHasV6 && (
               <p className="mt-2 px-2 text-[12px] leading-relaxed text-t3">{t('advanced.v6NoIface')}</p>
             )}
-          </div>
-        ) : (
-          <div />
-        )}
-      </div>
+        </div>
+      )}
 
-      {cur.enabled && (
+      {cur.enabled && d.leases.length > 0 && (
         <div className="mt-4">
           <GroupTitle>{t('advanced.leases', { n: d.leases.length })}</GroupTitle>
           {d.leases.length > 0 ? (
