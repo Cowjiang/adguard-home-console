@@ -6,7 +6,6 @@ const enNav = {
   protection: 'Filters',
   log: 'Logs',
   settings: 'Settings',
-  stats: 'Stats',
   clients: 'Clients',
   statusOn: 'Protection running',
   statusOff: 'Protection paused',

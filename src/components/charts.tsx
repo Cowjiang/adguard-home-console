@@ -1,5 +1,5 @@
 /** Lightweight SVG charts: smoothed area chart + horizontal bar ranking list */
-import { useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fmtCompact } from '../lib/format'
 
@@ -43,12 +43,18 @@ function smoothPath(pts: [number, number][]): string {
   return d
 }
 export function AreaChart({
-  series, height = 150, labels, showBlocked = true,
+  series, extra = [], height = 150, labels, showBlocked = true, tooltipLabels,
 }: {
   series: { queries: number[]; blocked: number[] }
+  /** Additional series sharing the queries scale (merged mobile traffic
+   *  chart); values must be pre-sliced to the same length as queries */
+  extra?: { values: number[]; label: string; color: string }[]
   height?: number
   labels?: string[]
   showBlocked?: boolean
+  /** Hover tooltip wording for the two series; defaults to 查询/拦截. Series
+   *  colors are themed by overriding --chart-1/--chart-2 on a wrapper */
+  tooltipLabels?: [string, string?]
 }) {
   const W = 340
   const H = height
@@ -57,15 +63,18 @@ export function AreaChart({
   const [hover, setHover] = useState<number | null>(null)
   const { t } = useTranslation()
 
-  const { qPts, bPts, max } = useMemo(() => {
+  const { qPts, bPts, max, ePts } = useMemo(() => {
     const q = series.queries ?? []
     const b = series.blocked ?? []
     const max = Math.max(1, ...q)
     const n = q.length
     const toPts = (arr: number[]): [number, number][] =>
       arr.map((v, i) => [(i / Math.max(1, n - 1)) * W, PAD_T + (1 - v / max) * (H - PAD_T - PAD_B)])
-    return { qPts: toPts(q), bPts: toPts(b), max }
-  }, [series, H])
+    return { qPts: toPts(q), bPts: toPts(b), max, ePts: extra.map((e) => toPts(e.values ?? [])) }
+  }, [series, extra, H])
+
+  // useId carries colons that break url(#…) references; strip them
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
 
   const n = qPts.length
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -133,14 +142,20 @@ export function AreaChart({
         preserveAspectRatio="none"
       >
         <defs>
-          <linearGradient id="ag-fill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`${uid}-gq`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.34" />
             <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0.02" />
           </linearGradient>
-          <linearGradient id="ab-fill" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`${uid}-gb`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--chart-2)" stopOpacity="0.3" />
             <stop offset="100%" stopColor="var(--chart-2)" stopOpacity="0.02" />
           </linearGradient>
+          {extra.map((e, i) => (
+            <linearGradient key={e.label} id={`${uid}-ge${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={e.color} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={e.color} stopOpacity="0.02" />
+            </linearGradient>
+          ))}
         </defs>
 
         {/* Grid */}
@@ -157,14 +172,20 @@ export function AreaChart({
           />
         ))}
 
-        <path d={`${smoothPath(qPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill="url(#ag-fill)" />
+        <path d={`${smoothPath(qPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill={`url(#${uid}-gq)`} />
         {showBlocked && (
-          <path d={`${smoothPath(bPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill="url(#ab-fill)" opacity={0.8} />
+          <path d={`${smoothPath(bPts)} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill={`url(#${uid}-gb)`} opacity={0.8} />
         )}
         <path d={smoothPath(qPts)} fill="none" stroke="var(--chart-1)" strokeWidth={2.2} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {showBlocked && (
           <path d={smoothPath(bPts)} fill="none" stroke="var(--chart-2)" strokeWidth={1.8} strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity={0.85} />
         )}
+        {extra.map((e, i) => (
+          <g key={e.label}>
+            <path d={`${smoothPath(ePts[i])} L${W},${H - PAD_B} L0,${H - PAD_B} Z`} fill={`url(#${uid}-ge${i})`} opacity={0.8} />
+            <path d={smoothPath(ePts[i])} fill="none" stroke={e.color} strokeWidth={1.8} strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity={0.9} />
+          </g>
+        ))}
 
         {hover != null && (
           <line x1={hoverX} x2={hoverX} y1={PAD_T} y2={H - PAD_B} stroke="var(--t3)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
@@ -209,19 +230,37 @@ export function AreaChart({
               <span className="block rounded-full" style={{ width: 7, height: 7, background: 'var(--chart-2)', border: '1.5px solid var(--bg)' }} />
             </div>
           )}
+          {extra.map((e, i) => (
+            <div
+              key={e.label}
+              className="pointer-events-none absolute"
+              style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, top: ePts[i][hover][1], transform: 'translate(-50%, -50%)' }}
+            >
+              <span className="block rounded-full" style={{ width: 7, height: 7, background: e.color, border: '1.5px solid var(--bg)' }} />
+            </div>
+          ))}
         </>
       )}
 
       {hover != null && (
         <div
-          className="glass-strong pointer-events-none absolute top-0 rounded-xl px-2.5 py-1.5 text-[11px] leading-tight num"
-          style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, transform: `translateX(${hover > n * 0.7 ? '-105%' : hover < n * 0.2 ? '5%' : '-50%'})` }}
+          className="glass-strong pointer-events-none absolute top-0 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[11px] leading-tight num"
+          style={{ left: `${(hover / (n - 1)) * 100}%`, transform: `translateX(${hover > n * 0.7 ? '-105%' : hover < n * 0.2 ? '5%' : '-50%'})` }}
         >
           <div className="text-t2">{labels?.[hover]}</div>
-          <div style={{ color: 'var(--chart-1)' }}>{t('charts.hoverQueries', { n: fmtCompact(series.queries?.[hover] ?? 0) })}</div>
+          <div style={{ color: 'var(--chart-1)' }}>
+            {tooltipLabels?.[0] ?? t('dashboard.legendQueries')} {fmtCompact(series.queries?.[hover] ?? 0)}
+          </div>
           {showBlocked && (
-            <div style={{ color: 'var(--chart-2)' }}>{t('charts.hoverBlocked', { n: fmtCompact(series.blocked?.[hover] ?? 0) })}</div>
+            <div style={{ color: 'var(--chart-2)' }}>
+              {tooltipLabels?.[1] ?? t('dashboard.legendBlocked')} {fmtCompact(series.blocked?.[hover] ?? 0)}
+            </div>
           )}
+          {extra.map((e) => (
+            <div key={e.label} style={{ color: e.color }}>
+              {e.label} {fmtCompact(e.values?.[hover] ?? 0)}
+            </div>
+          ))}
         </div>
       )}
     </div>

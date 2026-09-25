@@ -5,7 +5,6 @@ const zhNav = {
   protection: '过滤器',
   log: '日志',
   settings: '设置',
-  stats: '统计',
   clients: '客户端',
   statusOn: '防护运行中',
   statusOff: '防护已暂停',

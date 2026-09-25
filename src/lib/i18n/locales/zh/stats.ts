@@ -1,12 +1,9 @@
-/** 统计分析页与榜单全量子页 */
+/** 概览排行卡片(原统计分析页合并而来)与榜单全量子页 */
 
 const zhStats = {
-  title: '统计分析',
-  totalQueries: '总查询',
-  countSub: '{{n}} 次',
-  safeBrowsingSub: '恶意域名替换',
-  peakHour: '峰值小时',
-  trend24h: '24 小时趋势',
+  filterTrend: '拦截趋势',
+  malwareChart: '恶意/钓鱼',
+  adultChart: '成人网站',
   topDomains15: '热门域名 Top 15',
   topBlocked15: '拦截域名 Top 15',
   topClients10: '活跃客户端 Top 10',

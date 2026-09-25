@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { mutate } from 'swr'
-import { BarChart3, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
+import { Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { usePullToRefresh } from '../lib/pullToRefresh'
 import { scrollToTop } from '../lib/scrollToTop'
@@ -15,7 +15,7 @@ import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
 import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button } from './ui'
 
-type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.stats' | 'nav.clients'; icon: typeof Home; match?: string[] }
+type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.clients'; icon: typeof Home; match?: string[] }
 
 const TABS: NavItem[] = [
   { to: '/', labelKey: 'nav.overview', icon: Home },
@@ -25,9 +25,7 @@ const TABS: NavItem[] = [
 ]
 
 const DESK_NAV: NavItem[] = [
-  ...TABS.slice(0, 1),
-  { to: '/stats', labelKey: 'nav.stats', icon: BarChart3 },
-  ...TABS.slice(1, 3),
+  ...TABS.slice(0, 3),
   { to: '/clients', labelKey: 'nav.clients', icon: Users, match: ['/clients', '/rewrites'] },
   TABS[3],
 ]
