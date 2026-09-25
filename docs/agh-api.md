@@ -11,7 +11,7 @@
 | 统计 | `GET /stats` 包含 `dns_queries` 时间序列及排行；`top_*` 是单键对象数组，读取前需归一。前端类型 `KVMap` 同时兼容字典形式；`avg_processing_time` 与 `top_upstreams_avg_time` 是秒（浮点），显示为毫秒时需要换算 |
 | 查询日志 | 响应为 `{data: [...]}`；查询支持 `search`、可重复的 `reason[]`、`older_than`、`offset`、`limit` |
 | 防护 | `POST /protection` 使用 `{enabled, duration}`，其中 `duration` 为毫秒 |
-| 配置 | 查询日志为 `GET /querylog/config` 与 `PUT /querylog/config/update`；统计配置同构 |
+| 配置 | 查询日志为 `GET /querylog/config` 与 `PUT /querylog/config/update`；统计配置同构；两者均含 `ignored[]` 与 `ignored_enabled`（被忽略的域名：匹配名单的查询不写入日志/不计入统计，PUT 须随完整配置体下发） |
 | 拦截服务 | `GET /blocked_services/all` 返回目录（含 Base64 `icon_svg`）；`GET /blocked_services/get` 返回当前 `ids` 和 `schedule`；`PUT /blocked_services/update` 保存 |
 | 客户端 | `POST /clients/add`；`POST /clients/update` 使用 `{name, data}`；`POST /clients/delete` 使用 `{name}` |
 | DNS 重写 | `PUT /rewrite/update` 使用 `{target, update}`；`/rewrite/settings` 与 `/rewrite/settings/update` 管开关 |
