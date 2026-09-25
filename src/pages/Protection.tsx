@@ -154,14 +154,10 @@ export default function Protection() {
           <div className="flex items-center">
             <div className="min-w-0 flex-1 pr-1">
               <div className="text-[12px] text-t2">{t('protection.listCount')}</div>
-              <div className="mt-0.5 whitespace-nowrap text-[22px] font-bold leading-tight num">
-                <span style={{ color: 'var(--danger)' }}>{t('protection.blackShort', { n: filterCount })}</span>
-                <span className="text-t3"> / </span>
-                <span style={{ color: 'var(--ok)' }}>{t('protection.whiteShort', { n: allowCount })}</span>
+              <div className="mt-0.5 truncate text-[22px] font-bold leading-tight num text-t1" title={lastUpdated ? fmtDate(lastUpdated) : undefined}>
+                {lastUpdated ? relTime(lastUpdated) : t('protection.neverUpdated')}
               </div>
-              <div className="truncate text-[11.5px] text-t3 num" title={lastUpdated ? fmtDate(lastUpdated) : undefined}>
-                {lastUpdated ? t('protection.updatedAgo', { time: relTime(lastUpdated) }) : t('protection.neverUpdated')}
-              </div>
+              <div className="truncate text-[11.5px] text-t3">{t('protection.lastUpdated')}</div>
             </div>
             <Button
               variant="glass"
@@ -171,7 +167,7 @@ export default function Protection() {
               onClick={refreshAllFilters}
               label={t('protection.refreshNowLabel')}
             >
-              <RefreshCw size={15} />
+              {!refreshing && <RefreshCw size={15} />}
             </Button>
           </div>
         </div>
@@ -194,7 +190,7 @@ export default function Protection() {
           </div>
           <div className="ml-auto">
             <Button variant="glass" loading={refreshing} onClick={refreshAllFilters}>
-              <RefreshCw size={15} /> {t('protection.refreshNow')}
+              {!refreshing && <RefreshCw size={15} />} {t('protection.refreshNow')}
             </Button>
           </div>
       </Card>
