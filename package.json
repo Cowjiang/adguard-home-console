@@ -20,9 +20,11 @@
     "@sosweetham/tauri-plugin-system-components-api": "^0.1.8",
     "@tauri-apps/api": "^2.11.1",
     "express": "^4.21.2",
+    "i18next": "^26.4.2",
     "lucide-react": "latest",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.15",
     "react-router-dom": "^7.0.0",
     "swr": "^2.3.0"
   },

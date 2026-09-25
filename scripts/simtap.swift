@@ -1,8 +1,11 @@
-// 模拟器触摸注入小工具(验证用,不入库):
-// 用法: swift scripts/simtap.swift tap <x> <y>
-//       swift scripts/simtap.swift scroll <x> <y> <dy>   dy 为滚动距离(逻辑点,向上滑为负→内容上滚)
-//       swift scripts/simtap.swift drag <x> <y> <dx>     dx 为横向拖动距离(逻辑点,右滑为正)
-//       swift scripts/simtap.swift dragcancel <x> <y> <dx>  拖一半(过半)停顿后抬起,验证手势取消回弹
+// Simulator touch-injection helper for manual verification (tracked in scripts/):
+// usage: swift scripts/simtap.swift tap <x> <y>
+//       swift scripts/simtap.swift scroll <x> <y> <dy>   dy = scroll distance
+//         (logical points; negative swipes up → content scrolls up)
+//       swift scripts/simtap.swift drag <x> <y> <dx>     dx = horizontal drag
+//         distance (logical points; positive drags right)
+//       swift scripts/simtap.swift dragcancel <x> <y> <dx>  lift after pausing
+//         halfway (past half) to verify gesture-cancel rebound
 import CoreGraphics
 import Foundation
 
@@ -20,7 +23,8 @@ func deviceHubWindowBounds() -> [String: CGFloat]? {
 }
 
 func contentOrigin(_ b: [String: CGFloat]) -> (CGFloat, CGFloat) {
-  // 标定值(2026-09-22 下午重标,Device Hub 1100x800 窗口默认缩放):模拟器屏幕原点在窗口内的偏移 + 缩放
+  // Calibration values (re-measured 2026-09-22 PM, Device Hub 1100x800 window
+  // at default zoom): simulator screen origin offset within the window + scale
   return ((b["X"] ?? 0) + 522, (b["Y"] ?? 0) + 82)
 }
 let CAL_SCALE: CGFloat = 0.732
@@ -33,7 +37,9 @@ guard args.count >= 4, args[1] == "tap" || args[1] == "scroll" || args[1] == "dr
   exit(1)
 }
 let (ox, oy) = contentOrigin(b)
-// 屏幕逻辑点 → 窗口像素:取窗口内容宽/设备逻辑宽的比例(设备逻辑宽 402,iPhone 18 Pro 同 16 Pro 代)
+// Screen logical points → window pixels: ratio of window content width to
+// device logical width (device logical width 402; iPhone 18 Pro is the same
+// generation as the 16 Pro)
 let scale = CAL_SCALE
 let gx = ox + CGFloat(px) * scale
 let gy = oy + CGFloat(py) * scale

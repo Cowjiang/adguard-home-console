@@ -1,13 +1,15 @@
-/** 轻量 SVG 图表:平滑面积图 + 横向条形榜单 */
+/** Lightweight SVG charts: smoothed area chart + horizontal bar ranking list */
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { fmtCompact } from '../lib/format'
 
 function smoothPath(pts: [number, number][]): string {
   const n = pts.length
   if (n === 0) return ''
   if (n < 3) return 'M' + pts.map((p) => p.join(',')).join('L')
-  // Fritsch–Carlson 单调三次样条:切线在极值处归零,曲线不越出数据范围
-  // (Catmull-Rom 用相邻点算切线,遇到 0→峰值跳变时会向反方向过冲,跌破 0 轴)
+  // Fritsch–Carlson monotone cubic spline: tangents are zeroed at extrema so the curve
+  // never overshoots the data range (Catmull-Rom derives tangents from neighbors and
+  // overshoots the other way on 0→peak jumps, dipping below the 0 axis)
   const dx: number[] = []
   const m: number[] = []
   for (let i = 0; i < n - 1; i++) {
@@ -53,6 +55,7 @@ export function AreaChart({
   const PAD_T = 8
   const PAD_B = 20
   const [hover, setHover] = useState<number | null>(null)
+  const { t } = useTranslation()
 
   const { qPts, bPts, max } = useMemo(() => {
     const q = series.queries ?? []
@@ -72,8 +75,9 @@ export function AreaChart({
     setHover(Math.max(0, Math.min(n - 1, idx)))
   }
 
-  // 触摸端长按唤出预览:按下后 350ms 内未移动(未滚动/未拖动)则固定显示十字线,
-  // 之后可继续横向拖动查看;提前移动则取消判定,让位给页面滚动或横向 scrub
+  // Touch long-press preview: if not moved within 350ms of press (no scroll/drag), pin
+  // the crosshair; dragging may then continue horizontally. Moving earlier cancels the
+  // hold, yielding to page scroll or horizontal scrub
   const pressRef = useRef<{ startX: number; rect: DOMRect; timer: number | null; active: boolean } | null>(null)
   const clearPressTimer = () => {
     const p = pressRef.current
@@ -139,7 +143,7 @@ export function AreaChart({
           </linearGradient>
         </defs>
 
-        {/* 网格 */}
+        {/* Grid */}
         {[0.25, 0.5, 0.75].map((f) => (
           <line
             key={f}
@@ -167,7 +171,8 @@ export function AreaChart({
         )}
       </svg>
 
-      {/* x 轴标签:SVG 的 preserveAspectRatio=none 会把 <text> 横向拉伸,故用 HTML 叠加在底部留白区 */}
+      {/* x-axis labels: preserveAspectRatio=none stretches <text> horizontally, so overlay
+          HTML in the bottom padding area instead */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: PAD_B }}>
         {labels?.map((l, i) =>
           i % labelStep === 0 ? (
@@ -186,7 +191,8 @@ export function AreaChart({
         )}
       </div>
 
-      {/* 数据点:preserveAspectRatio=none 会把 <circle> 拉成椭圆,改用 HTML 叠加圆点保持正圆 */}
+      {/* Data points: preserveAspectRatio=none squashes <circle> into an ellipse, so overlay
+          HTML dots to keep them round */}
       {hover != null && (
         <>
           <div
@@ -212,9 +218,9 @@ export function AreaChart({
           style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%`, transform: `translateX(${hover > n * 0.7 ? '-105%' : hover < n * 0.2 ? '5%' : '-50%'})` }}
         >
           <div className="text-t2">{labels?.[hover]}</div>
-          <div style={{ color: 'var(--chart-1)' }}>查询 {fmtCompact(series.queries?.[hover] ?? 0)}</div>
+          <div style={{ color: 'var(--chart-1)' }}>{t('charts.hoverQueries', { n: fmtCompact(series.queries?.[hover] ?? 0) })}</div>
           {showBlocked && (
-            <div style={{ color: 'var(--chart-2)' }}>拦截 {fmtCompact(series.blocked?.[hover] ?? 0)}</div>
+            <div style={{ color: 'var(--chart-2)' }}>{t('charts.hoverBlocked', { n: fmtCompact(series.blocked?.[hover] ?? 0) })}</div>
           )}
         </div>
       )}
@@ -223,8 +229,9 @@ export function AreaChart({
 }
 
 export function BarList({ items, color = 'var(--accent)', max: maxProp }: { items: [string, number][]; color?: string; max?: number }) {
+  const { t } = useTranslation()
   const max = maxProp ?? Math.max(1, ...items.map((i) => i[1]))
-  if (!items.length) return <p className="py-4 text-center text-[13px] text-t3">暂无数据</p>
+  if (!items.length) return <p className="py-4 text-center text-[13px] text-t3">{t('charts.empty')}</p>
   return (
     <div className="flex flex-col gap-2">
       {items.map(([label, value]) => (
@@ -245,7 +252,7 @@ export function BarList({ items, color = 'var(--accent)', max: maxProp }: { item
   )
 }
 
-/** 环形图:请求构成等占比展示,附图例 */
+/** Donut chart: request composition as proportional segments, with legend */
 export function Donut({
   segments, size = 170, thickness = 24, centerLabel, centerSub,
 }: {
@@ -307,22 +314,24 @@ export function Donut({
   )
 }
 
-/** 排行表格:排名 + 名称 + 次数 + 占比条(桌面统计页用,比 BarList 更表格化) */
+/** Ranking table: rank + name + count + share bar (desktop stats page; more tabular than
+ *  BarList) */
 export function RankTable({ items, color = 'var(--accent)', resolve }: {
   items: [string, number][]
   color?: string
   resolve?: (key: string) => string
 }) {
+  const { t } = useTranslation()
   const max = Math.max(1, ...items.map((i) => i[1]))
   const total = items.reduce((s, i) => s + i[1], 0)
-  if (!items.length) return <p className="py-6 text-center text-[13px] text-t3">暂无数据</p>
+  if (!items.length) return <p className="py-6 text-center text-[13px] text-t3">{t('charts.empty')}</p>
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-3 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-t3">
         <span className="w-6 text-center">#</span>
-        <span className="min-w-0 flex-1">名称</span>
-        <span className="w-20 text-right">次数</span>
-        <span className="w-24 text-right">占比</span>
+        <span className="min-w-0 flex-1">{t('charts.colName')}</span>
+        <span className="w-20 text-right">{t('charts.colCount')}</span>
+        <span className="w-24 text-right">{t('charts.colPct')}</span>
       </div>
       {items.map(([key, value], i) => (
         <div key={key} className="flex items-center gap-3 rounded-lg px-2 py-[7px] transition-colors hover:bg-white/[0.04]">

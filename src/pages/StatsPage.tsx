@@ -1,7 +1,8 @@
-/** 统计分析(桌面端专属):环形图 + 24h 趋势 + 域名/客户端/上游排行表格 */
+/** Stats analysis (desktop only): donut + 24h trend + domain/client/upstream ranking tables */
 import useSWR from 'swr'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ShieldAlert, Globe, Users, Database, Timer, PieChart } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { swrFetcher, type Stats, type ClientsData } from '../lib/api'
@@ -9,7 +10,8 @@ import { AreaChart, Donut, RankTable, StatTile } from '../components/charts'
 import { usePageInClass, Card, Loading, EmptyState, Button } from '../components/ui'
 import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
 
-/** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
+/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
+ *  shape */
 function toMap(v: unknown): Record<string, number> {
   if (Array.isArray(v)) {
     return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))
@@ -25,6 +27,7 @@ function topN(obj: unknown, n: number): [string, number][] {
 
 export default function StatsPage() {
   const pageIn = usePageInClass()
+  const { t } = useTranslation()
   const { cfg } = useAuth()
   const nav = useNavigate()
   const { data: stats, error } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
@@ -56,7 +59,7 @@ export default function StatsPage() {
     }
   }, [stats])
 
-  if (error) return <Loading text="连接服务器中…" />
+  if (error) return <Loading text={t('dashboard.loading')} />
   if (!stats) return <Loading />
 
   const total = stats.num_dns_queries
@@ -73,29 +76,29 @@ export default function StatsPage() {
   return (
     <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className="mb-4 flex items-end justify-between">
-        <h1 className="text-[26px] font-bold leading-tight tracking-tight text-t1">统计分析</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-tight text-t1">{t('stats.title')}</h1>
       </div>
 
-      {/* 关键指标 */}
+      {/* Key metrics */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatTile label="总查询" value={fmtCompact(total)} sub={`${fmtNum(total)} 次`} />
-        <StatTile label="已拦截" value={fmtCompact(blocked)} sub={`拦截率 ${blockedPct}`} accent="var(--danger)" />
-        <StatTile label="安全浏览" value={fmtCompact(safeBrowsing)} sub="恶意域名替换" accent="var(--warn)" />
-        <StatTile label="平均耗时" value={fmtMs(stats.avg_processing_time)} sub="单次解析" accent="var(--accent-2)" />
-        <StatTile label="峰值小时" value={fmtCompact(peak)} sub={peakLabel} accent="var(--violet)" />
+        <StatTile label={t('stats.totalQueries')} value={fmtCompact(total)} sub={t('stats.countSub', { n: fmtNum(total) })} />
+        <StatTile label={t('dashboard.blocked')} value={fmtCompact(blocked)} sub={t('dashboard.blockRateSub', { pct: blockedPct })} accent="var(--danger)" />
+        <StatTile label={t('dashboard.safeBrowsing')} value={fmtCompact(safeBrowsing)} sub={t('stats.safeBrowsingSub')} accent="var(--warn)" />
+        <StatTile label={t('dashboard.avgLatency')} value={fmtMs(stats.avg_processing_time)} sub={t('dashboard.perQuery')} accent="var(--accent-2)" />
+        <StatTile label={t('stats.peakHour')} value={fmtCompact(peak)} sub={peakLabel} accent="var(--violet)" />
       </div>
 
-      {/* 趋势 + 请求构成 */}
+      {/* Trend + request composition */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[15.5px] font-bold text-t1">24 小时趋势</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('stats.trend24h')}</h2>
             <div className="flex items-center gap-2 text-[10.5px] text-t2">
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> 查询
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> 拦截
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
               </span>
             </div>
           </div>
@@ -104,61 +107,61 @@ export default function StatsPage() {
         <Card className="p-4">
           <div className="mb-3 flex items-center gap-2">
             <PieChart size={16} className="text-t2" />
-            <h2 className="text-[15.5px] font-bold text-t1">请求构成</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
           </div>
           <Donut
             centerLabel={fmtCompact(total)}
-            centerSub="总请求"
+            centerSub={t('dashboard.totalRequests')}
             segments={[
-              { label: '正常放行', value: passed, color: 'var(--chart-1)' },
-              { label: '已拦截', value: blocked, color: 'var(--danger)' },
-              { label: '安全浏览', value: safeBrowsing, color: 'var(--warn)' },
-              { label: '安全搜索', value: safeSearch, color: 'var(--accent-2)' },
-              { label: '家长控制', value: parental, color: 'var(--violet)' },
+              { label: t('dashboard.passed'), value: passed, color: 'var(--chart-1)' },
+              { label: t('dashboard.blocked'), value: blocked, color: 'var(--danger)' },
+              { label: t('dashboard.safeBrowsing'), value: safeBrowsing, color: 'var(--warn)' },
+              { label: t('dashboard.safeSearch'), value: safeSearch, color: 'var(--accent-2)' },
+              { label: t('dashboard.parental'), value: parental, color: 'var(--violet)' },
             ]}
           />
         </Card>
       </div>
 
-      {/* 排行表格 */}
+      {/* Ranking tables */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
           <div className="mb-2 flex items-center gap-2">
             <Globe size={16} className="text-t2" />
-            <h2 className="text-[15.5px] font-bold text-t1">热门域名 Top 15</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topDomains15')}</h2>
           </div>
           <RankTable items={topN(stats.top_queried_domains, 15)} />
           <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/queried')}>
-            查看更多
+            {t('dashboard.viewMore')}
           </Button>
         </Card>
         <Card className="p-4">
           <div className="mb-2 flex items-center gap-2">
             <ShieldAlert size={16} className="text-t2" />
-            <h2 className="text-[15.5px] font-bold text-t1">拦截域名 Top 15</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topBlocked15')}</h2>
           </div>
           {topN(stats.top_blocked_domains, 15).length ? (
             <>
               <RankTable items={topN(stats.top_blocked_domains, 15)} color="var(--danger)" />
               <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/blocked')}>
-                查看更多
+                {t('dashboard.viewMore')}
               </Button>
             </>
           ) : (
-            <EmptyState icon={<ShieldAlert size={30} className="text-t3" />} title="暂无拦截记录" subtitle="你的网络环境非常干净" />
+            <EmptyState icon={<ShieldAlert size={30} className="text-t3" />} title={t('dashboard.noBlockedTitle')} subtitle={t('dashboard.noBlockedSub')} />
           )}
         </Card>
         <Card className="p-4">
           <div className="mb-2 flex items-center gap-2">
             <Users size={16} className="text-t2" />
-            <h2 className="text-[15.5px] font-bold text-t1">活跃客户端 Top 10</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topClients10')}</h2>
           </div>
           <RankTable items={topN(stats.top_clients, 10)} color="var(--accent-2)" resolve={clientName} />
         </Card>
         <Card className="p-4">
           <div className="mb-2 flex items-center gap-2">
             <Database size={16} className="text-t2" />
-            <h2 className="text-[15.5px] font-bold text-t1">上游 DNS</h2>
+            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
           </div>
           <UpstreamTable stats={stats} />
         </Card>
@@ -168,19 +171,20 @@ export default function StatsPage() {
 }
 
 function UpstreamTable({ stats }: { stats: Stats }) {
+  const { t } = useTranslation()
   const rows = topN(stats.top_upstreams_responses, 8).map(([up, count]) => {
     const avg = toMap(stats.top_upstreams_avg_time)[up]
     return [up, count, avg ?? 0] as [string, number, number]
   })
-  if (!rows.length) return <p className="py-6 text-center text-[13px] text-t3">暂无数据</p>
+  if (!rows.length) return <p className="py-6 text-center text-[13px] text-t3">{t('charts.empty')}</p>
   const maxCount = Math.max(1, ...rows.map((r) => r[1]))
   const fastest = Math.min(...rows.filter((r) => r[2] > 0).map((r) => r[2]), Infinity)
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-3 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-t3">
-        <span className="min-w-0 flex-1">上游地址</span>
-        <span className="w-20 text-right">响应</span>
-        <span className="w-24 text-right">平均耗时</span>
+        <span className="min-w-0 flex-1">{t('stats.colUpstream')}</span>
+        <span className="w-20 text-right">{t('stats.colResponses')}</span>
+        <span className="w-24 text-right">{t('stats.colAvgTime')}</span>
       </div>
       {rows.map(([up, count, avg]) => (
         <div key={up} className="flex items-center gap-3 rounded-lg px-2 py-[7px] transition-colors hover:bg-white/[0.04]">

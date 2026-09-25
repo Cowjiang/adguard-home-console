@@ -1,14 +1,18 @@
 /**
- * 顶栏右侧操作按钮的原生液态玻璃版(iOS 壳,tauri-plugin-system-components 的
- * createComponent)。交接约定:
+ * Native liquid-glass version of the top bar's trailing action button
+ * (iOS shell, tauri-plugin-system-components createComponent). Handoff rules:
  *
- * - 页面就绪(前进/后退转场结束)后原地淡入,不跟随页面滑动;离开(含卸载)先淡出再移除;
- * - 原生接管期间自定义(CSS)按钮一律不显示(只保留布局占位),避免两种按钮同时出现;
- * - 侧滑手势期间原生按钮让位(不淡入),手势结束后再淡入;
- * - 不依赖 Router 上下文:弹层(sheet)是在 Router 之外渲染的,任何 Router hook
- *   在这里都会以 null context 抛错(添加租约/添加过滤器弹层曾因此整页报错)。
+ * - Fades in in place after the page is ready (forward/back transition done),
+ *   never follows page sliding; on leave (including unmount) fades out before removal;
+ * - While the native control owns the slot the custom (CSS) button never shows
+ *   (layout placeholder only), avoiding both buttons on screen at once;
+ * - During the edge-swipe gesture the native button yields (no fade-in), then
+ *   fades in after the gesture ends;
+ * - No Router context dependency: sheets render outside the Router, and any
+ *   Router hook here throws on null context (the add-lease/add-filter sheets
+ *   once crashed whole pages because of this).
  *
- * 原生不可用或创建失败时静默回落到 CSS 按钮。
+ * Falls back silently to the CSS button when native is unavailable or creation fails.
  */
 import { useEffect, useRef, useState } from 'react'
 import { isTauriIOS, useGestureActive, useTransitionHalfBusy, TRANSITION_HALF_MS } from './routeTransition'
@@ -17,27 +21,31 @@ import { consumeGestureCommit } from './routeTransition'
 import { FADE_IN_S, FADE_OUT_S, accentHex } from './nativeGlass'
 
 const BTN_ID = 'nav-action'
-/** 图标按钮的正方形边长(对齐 CSS 胶囊 h-11 w-11) */
+/** Square side length of icon buttons (matches the CSS capsule h-11 w-11) */
 const ICON_SIZE = 44
 const HEIGHT = 44
-/** 与 CSS 导航条同一条垂直带:插件按 safe-area + margin(16) 定位,dy=-8 对齐胶囊顶 */
+/** Same vertical band as the CSS nav bar: the plugin positions via
+ *  safe-area + margin(16), dy=-8 aligns the capsule top */
 const DY = -8
 const plugin = () => import('@sosweetham/tauri-plugin-system-components-api')
-/** 当前持有顶栏原生组件的实例;只有持有者才能动它(同屏两个实例时不互删) */
+/** Instance currently owning the native top bar component; only the owner
+ *  may touch it (coexisting instances don't delete each other) */
 let owner: symbol | null = null
 
 export interface NativeHeaderSpec {
-  /** 按钮文字(带文字的操作);与 sfSymbol 至少给一个 */
+  /** Button label (for text actions); provide at least one of label/sfSymbol */
   label?: string
-  /** 图标 SF Symbol */
+  /** Icon SF Symbol */
   sfSymbol?: string
-  /** 文字与图标颜色;'accent' 取当前主题强调色,不传用系统默认 */
+  /** Label and icon color; 'accent' uses the current theme accent,
+   *  omit for system default */
   foreground?: string | 'accent'
-  /** 图标按钮:正方形 44×44(与 CSS 圆形胶囊同形) */
+  /** Icon button: square 44×44 (same shape as the CSS circular capsule) */
   iconOnly?: boolean
 }
 
-/** 原生按钮是否已接管(自定义按钮据此隐藏,只留占位) */
+/** Whether the native button has taken over (custom button hides on this,
+ *  placeholder only) */
 export function useNativeHeaderAction(
   spec: NativeHeaderSpec | undefined,
   onPress: (() => void) | undefined,
@@ -45,10 +53,12 @@ export function useNativeHeaderAction(
 ): boolean {
   const isDesktop = useIsDesktop()
   const gesturing = useGestureActive()
-  // 转场前半程内不出场:等到过半(≈170ms)再淡入,与页面落位同步
+  // No entrance during the first half of the transition: fade in past halfway
+  // (≈170ms), synced with the page settling
   const halfBusy = useTransitionHalfBusy()
-  // 原生路径一旦成立,自定义按钮就永远不显示(手势/转场间隙同样不显示 —— 否则
-  // 侧滑过程中会冒出 CSS 胶囊,与原生按钮同框);仅当创建失败才回退到 CSS。
+  // Once the native path holds, the custom button never shows (including
+  // gesture/transition gaps — otherwise a CSS capsule pops up mid-swipe
+  // next to the native button); fall back to CSS only on creation failure.
   const [failed, setFailed] = useState(false)
   const pressRef = useRef(onPress)
   pressRef.current = onPress
@@ -61,7 +71,7 @@ export function useNativeHeaderAction(
   const iconOnly = spec?.iconOnly ?? false
   const active = enabled && !isDesktop && isTauriIOS() && (!!label || !!sfSymbol)
 
-  // 点击 → 页面自己的 handler(ref 取最新,监听只挂一次)
+  // Click → the page's own handler (latest via ref, listener mounted once)
   useEffect(() => {
     if (!active) return
     let disposed = false
@@ -85,9 +95,11 @@ export function useNativeHeaderAction(
     }
   }, [active])
 
-  // 转场结束 → 淡入;转场中/手势中/未激活 → 淡出移除
+  // Transition finished → fade in; during transition/gesture/inactive →
+  // fade out and remove
   useEffect(() => {
-    // 非顶栏槽位的普通 Button(enabled=false)完全不参与,否则会误删同页顶栏的组件
+    // Plain Buttons in non-top-bar slots (enabled=false) must not participate
+    // at all, or they'd delete the same page's top bar component
     if (!enabled) return
     const mine = tokenRef.current
     const fadeOutRemove = () => {
@@ -120,7 +132,8 @@ export function useNativeHeaderAction(
               foreground: color,
               ...(iconOnly ? { width: ICON_SIZE } : {}),
               height: HEIGHT,
-              // 原地淡入(插件原生入场:淡入 + 轻微缩放),不跟随页面滑动
+              // Fade in in place (plugin's native entrance: fade + slight
+              // scale), never follows page sliding
               appearAnimation: true,
               appearDuration: FADE_IN_S,
             },
@@ -138,7 +151,8 @@ export function useNativeHeaderAction(
     }
   }, [enabled, active, gesturing, halfBusy, label, sfSymbol, foreground, iconOnly])
 
-  // 卸载:退场过半再淡出,不留残影(侧滑提交没有 CSS 退场动画,立即淡出)
+  // Unmount: fade out after the exit passes halfway, no ghost left (a swipe
+  // commit has no CSS exit animation, so fade out immediately)
   const commitSeen = useRef(0)
   useEffect(
     () => () => {
@@ -147,7 +161,8 @@ export function useNativeHeaderAction(
       owner = null
       const delay = consumeGestureCommit(commitSeen) ? 0 : TRANSITION_HALF_MS
       setTimeout(() => {
-        // 期间若有新实例接管(同页重建/新页进场),不要删它的按钮
+        // If a new instance took over meanwhile (same-page rebuild / new page
+        // entering), don't delete its button
         if (owner !== null) return
         void plugin()
           .then(async (p) => {

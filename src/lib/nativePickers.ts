@@ -1,16 +1,21 @@
 /**
- * 苹果移动设备判定:决定单选项走原生 <select> 覆盖层还是自绘锚定下拉。
+ * Apple mobile detection: decides whether a single-select uses the native
+ * <select> overlay or a self-drawn anchored dropdown.
  *
- * 原生 select 入口必须是页面里真实渲染的 <select>(见 ui.tsx 的 PickSelect),
- * 不能靠 JS 唤起——WebKit 没有实现 HTMLSelectElement.showPicker()
- * (Safari 仅预览版把该项放在开关后),旧的 showPicker 方案在 iOS 上恒为失败回退。
+ * The native select entry must be a real <select> rendered in the page (see
+ * PickSelect in ui.tsx); it cannot be invoked from JS — WebKit does not
+ * implement HTMLSelectElement.showPicker() (only Safari Technology Preview
+ * exposes it behind a flag), so the old showPicker approach always ended in
+ * fallback on iOS.
  */
 
 /**
- * 苹果移动设备(iPhone/iPad/iPod,含 iPadOS 13+ 伪装成 Mac 的情况)。
- * PC 浏览器的设备模拟会把 UA 伪装成 iPhone/iPad,但 navigator.vendor 不跟随伪装
- * (Chrome 系为 "Google Inc." 等),真苹果 WebKit(含 iOS 上的第三方浏览器)恒为
- * "Apple Computer, Inc."——以此把模拟环境排除回自绘下拉。
+ * Apple mobile devices (iPhone/iPad/iPod, including iPadOS 13+ posing as Mac).
+ * Desktop browser device emulation spoofs the UA to iPhone/iPad, but
+ * navigator.vendor does not follow the spoof (Chrome-family reports
+ * "Google Inc." etc.), while genuine Apple WebKit (including third-party
+ * browsers on iOS) always reports "Apple Computer, Inc." — this excludes
+ * emulated environments back to the self-drawn dropdown.
  */
 export function isAppleMobile(): boolean {
   const ua = navigator.userAgent

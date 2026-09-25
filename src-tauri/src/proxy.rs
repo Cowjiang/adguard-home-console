@@ -1,9 +1,14 @@
-//! `agh_fetch` — Rust 版 proxyAGH,行为对齐 `server/index.mjs` 的 `proxyAGH`:
-//! - 路径归一:`/api/agh/*` → `/control/*`(前端也可直接传 `/control/...` 或 `/status` 这类短路径)
-//! - 手动跟随 301/302/307/308 最多 3 次;location 只取 **origin**(整个换 origin,路径沿用原请求,照抄 Express 语义)
-//! - 超时:含 `/filtering/refresh` 120s,其余 25s;超时/网络错误 → 502 `{"error":"..."}`
-//! - 响应原样回传 text + content-type,不在 Rust 解析/改写 JSON
-//! - 绝不打印 Authorization/密码(本模块无任何请求头日志)
+//! `agh_fetch` — Rust port of proxyAGH, mirroring `proxyAGH` in `server/index.mjs`:
+//! - Path normalization: `/api/agh/*` → `/control/*` (the frontend may also pass
+//!   short paths such as `/control/...` or `/status` directly)
+//! - Manually follows 301/302/307/308 up to 3 times; location uses the **origin**
+//!   only (swap the whole origin, keep the original request path — Express
+//!   semantics)
+//! - Timeouts: 120s for `/filtering/refresh`, 25s otherwise; timeout/network
+//!   errors → 502 `{"error":"..."}`
+//! - Responses are returned as-is as text + content-type; JSON is not parsed or
+//!   rewritten in Rust
+//! - Never prints Authorization/passwords (this module has no request-header logs)
 use std::time::Duration;
 
 use serde::Serialize;
@@ -14,8 +19,9 @@ const REDIRECT_CODES: [u16; 4] = [301, 302, 307, 308];
 const TIMEOUT_DEFAULT: Duration = Duration::from_secs(25);
 const TIMEOUT_FILTERING_REFRESH: Duration = Duration::from_secs(120);
 
-/// invoke 的返回值。错误也走同一结构(status=400/502 + body_text=`{"error":msg}`),
-/// 前端把非 2xx 映射为 ApiError,与 fetch 路径语义完全一致。
+/// Return value of the invoke. Errors use the same struct (status=400/502 +
+/// body_text=`{"error":msg}`); the frontend maps non-2xx to ApiError, matching
+/// the fetch path semantics exactly.
 #[derive(Debug, Serialize)]
 pub struct AghFetchResult {
     pub status: u16,
@@ -38,7 +44,8 @@ fn error_body(msg: &str) -> String {
     serde_json::json!({ "error": msg }).to_string()
 }
 
-/// 路径归一:对齐 Express `req.originalUrl.replace(/^\/api\/agh/, '/control')`
+/// Path normalization: mirrors Express
+/// `req.originalUrl.replace(/^\/api\/agh/, '/control')`
 fn normalize_path(path_with_query: &str) -> String {
     let p = path_with_query.trim();
     let p = if p.is_empty() { "/" } else { p };
@@ -54,7 +61,8 @@ fn normalize_path(path_with_query: &str) -> String {
     with_control
 }
 
-/// 拼最终上游 URL。Express 用 `targetUrl.origin` + 归一后的路径(target 里的 path 丢弃)
+/// Builds the final upstream URL. Express uses `targetUrl.origin` plus the
+/// normalized path (any path inside target is dropped)
 fn upstream_url(target: &str, path_with_query: &str) -> Result<Url, String> {
     let t = Url::parse(target.trim()).map_err(|_| "目标地址无效".to_string())?;
     if t.scheme() != "http" && t.scheme() != "https" {
@@ -65,7 +73,7 @@ fn upstream_url(target: &str, path_with_query: &str) -> Result<Url, String> {
         .map_err(|_| "目标地址无效".to_string())
 }
 
-/// 308 等重定向的 origin 替换:`new URL(location, upstream).origin`
+/// Origin replacement for 308-style redirects: `new URL(location, upstream).origin`
 fn redirect_origin(current: &Url, location: &str) -> Result<String, String> {
     let loc = Url::parse(location)
         .or_else(|_| current.join(location))
@@ -76,7 +84,7 @@ fn redirect_origin(current: &Url, location: &str) -> Result<String, String> {
     }
 }
 
-/// 超时分档:Express 按 `req.path.includes('/filtering/refresh')`
+/// Timeout tiers: Express keys on `req.path.includes('/filtering/refresh')`
 fn timeout_for(path_with_query: &str) -> Duration {
     if path_with_query.contains("/filtering/refresh") {
         TIMEOUT_FILTERING_REFRESH
@@ -93,7 +101,7 @@ fn client(timeout: Duration) -> Result<reqwest::Client, String> {
         .map_err(|e| format!("HTTP 客户端初始化失败: {e}"))
 }
 
-/// 核心实现(与 Tauri 命令解耦,便于单测)
+/// Core implementation (decoupled from the Tauri command for unit testing)
 pub async fn agh_fetch_impl(
     method: &str,
     target: &str,
@@ -114,7 +122,8 @@ pub async fn agh_fetch_impl(
         Err(msg) => return AghFetchResult::error(502, &msg),
     };
 
-    // 手动跟随重定向:location 只取 origin,路径保持本次请求不变(Express 版语义)
+    // Manual redirect following: take only the origin from location, keep the
+    // request path unchanged (Express semantics)
     let mut redirects: usize = 0;
     let mut current_target = target.to_string();
     loop {
@@ -138,7 +147,8 @@ pub async fn agh_fetch_impl(
         let resp = match req.send().await {
             Ok(r) => r,
             Err(e) => {
-                // reqwest 错误信息只含 URL/IO 细节,不含请求头,可安全返回
+                // reqwest error messages only contain URL/IO details, no request
+                // headers, so they are safe to return
                 let msg = if e.is_timeout() {
                     "连接超时,请检查地址与网络".to_string()
                 } else {
@@ -197,7 +207,8 @@ pub async fn agh_fetch_impl(
     }
 }
 
-/// Tauri 命令:统一返回 Ok(结果结构),错误语义在结构内(与 Express 一致)
+/// Tauri command: always returns Ok with the result struct; error semantics
+/// live inside the struct (consistent with Express)
 #[tauri::command]
 pub async fn agh_fetch(
     method: String,
@@ -216,7 +227,7 @@ pub async fn agh_fetch(
     .await
 }
 
-// ---------- 单测 ----------
+// ---------- Unit tests ----------
 
 #[cfg(test)]
 mod tests {
@@ -237,10 +248,11 @@ mod tests {
     fn upstream_cases() {
         let u = upstream_url("http://127.0.0.1:3990", "/status").unwrap();
         assert_eq!(u.as_str(), "http://127.0.0.1:3990/control/status");
-        // target 带路径时 origin 语义:丢弃 target 路径(对齐 new URL(path, origin))
+        // Origin semantics when target has a path: drop the target path
+        // (mirrors new URL(path, origin))
         let u2 = upstream_url("http://127.0.0.1:3990/sub", "/status").unwrap();
         assert_eq!(u2.as_str(), "http://127.0.0.1:3990/control/status");
-        // 非 http 协议拒绝
+        // Reject non-http schemes
         assert!(upstream_url("ftp://example.com", "/status").is_err());
         assert!(upstream_url("file:///etc/passwd", "/status").is_err());
     }
@@ -248,12 +260,13 @@ mod tests {
     #[test]
     fn redirect_origin_cases() {
         let cur = Url::parse("http://a.example:8080/control/status").unwrap();
-        // 绝对地址:整个换 origin(含端口);URL origin 序列化无尾斜杠(与 new URL().origin 一致)
+        // Absolute location: swap the whole origin (port included); URL origin
+        // serialization has no trailing slash (same as new URL().origin)
         assert_eq!(
             redirect_origin(&cur, "https://b.example:8443/other").unwrap(),
             "https://b.example:8443"
         );
-        // 相对地址:按当前 upstream 解析后取 origin
+        // Relative location: resolve against the current upstream, take origin
         assert_eq!(
             redirect_origin(&cur, "//c.example/control").unwrap(),
             "http://c.example"
@@ -271,7 +284,7 @@ mod tests {
         assert_eq!(timeout_for("/filtering/status"), Duration::from_secs(25));
     }
 
-    // ---- 依赖真实 mock 服务器的冒烟测试(127.0.0.1:3990,未启动则自动跳过) ----
+    // ---- Smoke tests against a real mock server at 127.0.0.1:3990 (auto-skip if down) ----
 
     fn mock_up() -> bool {
         std::net::TcpStream::connect("127.0.0.1:3990").is_ok()
@@ -327,12 +340,13 @@ mod tests {
         )
         .await;
         assert_eq!(r.status, 200);
-        // 回读 /status 确认防护开启
+        // Re-read /status to confirm protection is enabled
         let s = agh_fetch_impl("GET", "http://127.0.0.1:3990", "Basic YWRtaW46ZGVtbw==", "/status", None).await;
         assert!(s.body_text.contains("\"protection_enabled\":true"));
     }
 
-    // ---- 308 重定向:自起迷你 HTTP 服务器,验证“整个换 origin、路径沿用原请求” ----
+    // ---- 308 redirect: spin up mini HTTP servers to verify "swap the whole
+    // origin, keep the original request path" ----
 
     async fn spawn_origin_server(port: u16, reply: &'static str) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
@@ -367,7 +381,8 @@ mod tests {
 
     #[tokio::test]
     async fn redirect_chain_of_three_then_stop() {
-        // A(39803) → B(39804) → C(39805) → D(39806),共 3 跳;第 4 个 308 不再跟随,原样返回 308
+        // A(39803) → B(39804) → C(39805) → D(39806): 3 hops total; the 4th 308
+        // is not followed, 308 is returned as-is
         let _a = spawn_origin_server(39803, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39804/x\r\nContent-Length: 0\r\n\r\n").await;
         let _b = spawn_origin_server(39804, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39805/x\r\nContent-Length: 0\r\n\r\n").await;
         let _c = spawn_origin_server(39805, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39806/x\r\nContent-Length: 0\r\n\r\n").await;
@@ -379,7 +394,8 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_timeout_is_502() {
-        // 10.255.255.1 为不可路由地址,连接必然超时(若机器恰好有奇怪路由,跳过)
+        // 10.255.255.1 is unroutable so the connection always times out (skip
+        // if this machine happens to have a strange route)
         let r = agh_fetch_impl("GET", "http://10.255.255.1:3990", "", "/status", None).await;
         if r.status == 502 && r.body_text.contains("超时") {
             assert_eq!(r.status, 502);

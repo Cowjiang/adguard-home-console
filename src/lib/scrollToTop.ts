@@ -1,6 +1,7 @@
 /**
- * 平滑滚动主文档到顶部(再点当前 tab 的回顶部手势)。
- * 已在顶部时跳过;系统开启"减弱动态效果"时退化为瞬时跳转。
+ * Smooth-scroll the main document to the top (tap-current-tab-again gesture).
+ * Skips when already at top; degrades to an instant jump when the system has
+ * "Reduce Motion" enabled.
  */
 export function scrollToTop(): void {
   const el = document.scrollingElement

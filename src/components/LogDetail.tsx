@@ -1,14 +1,22 @@
-/** 查询日志单条记录详情(桌面弹窗与移动端详情页共用) */
+/** Query log entry detail (shared by the desktop modal and the mobile detail page) */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, Copy } from 'lucide-react'
 import { Badge, Button, toast } from './ui'
 import { copyText } from '../lib/clipboard'
-import { REASON_META, qtypeColor } from '../lib/constants'
+import { REASON_META, qtypeColor, type ReasonLabelKey } from '../lib/constants'
 import { fmtTimeFull, fmtMs } from '../lib/format'
 import type { QueryLogItem, FilteringStatus } from '../lib/api'
 
-export function reasonMeta(reason: string) {
-  return REASON_META[reason] ?? { label: reason, kind: 'info' as const }
+type TFn = (key: ReasonLabelKey) => string
+
+/** Unregistered reasons (e.g. new enums from the newer API) are shown as-is; registered
+ *  ones are translated via the dictionary */
+export function reasonMeta(reason: string, t: TFn) {
+  const meta = REASON_META[reason]
+  return meta
+    ? { label: t(meta.labelKey), kind: meta.kind }
+    : { label: reason, kind: 'info' as const }
 }
 
 export function LogDetail({
@@ -18,7 +26,8 @@ export function LogDetail({
   filtering?: FilteringStatus
   onSaveRule: (rule: string, block: boolean) => void
 }) {
-  const meta = reasonMeta(item.reason)
+  const { t } = useTranslation()
+  const meta = reasonMeta(item.reason, t)
   const domain = item.question.name
   const blocked = meta.kind === 'blocked'
   const [copied, setCopied] = useState(false)
@@ -27,10 +36,10 @@ export function LogDetail({
     const ok = await copyText(domain)
     if (ok) {
       setCopied(true)
-      toast('已复制域名')
+      toast(t('querylog.copiedDomain'))
       setTimeout(() => setCopied(false), 1500)
     } else {
-      toast('复制失败', 'err')
+      toast(t('common.copyFailed'), 'err')
     }
   }
 
@@ -48,17 +57,17 @@ export function LogDetail({
       </div>
 
       <div className="glass mb-3 rounded-2xl px-4 py-3 text-[13px]">
-        <DetailRow label="客户端" value={`${item.client_info?.name || '未知'} (${item.client})${item.client_proto ? ' · ' + item.client_proto.toUpperCase() : ''}`} />
-        <DetailRow label="响应状态" value={item.status || '—'} />
-        <DetailRow label="解析耗时" value={fmtMs(Number(item.elapsedMs))} />
-        {item.service_name && <DetailRow label="匹配服务" value={item.service_name} />}
-        {item.ecs && <DetailRow label="ECS 子网" value={item.ecs} />}
-        {item.upstream && <DetailRow label="上游服务器" value={item.upstream} />}
-        <DetailRow label="缓存" value={item.cached ? '命中' : '未命中'} />
-        {item.answer_dnssec && <DetailRow label="DNSSEC" value="已验证" />}
+        <DetailRow label={t('querylog.client')} value={`${item.client_info?.name || t('agh.unknown')} (${item.client})${item.client_proto ? ' · ' + item.client_proto.toUpperCase() : ''}`} />
+        <DetailRow label={t('querylog.status')} value={item.status || '—'} />
+        <DetailRow label={t('querylog.elapsed')} value={fmtMs(Number(item.elapsedMs))} />
+        {item.service_name && <DetailRow label={t('querylog.matchedService')} value={item.service_name} />}
+        {item.ecs && <DetailRow label={t('querylog.ecs')} value={item.ecs} />}
+        {item.upstream && <DetailRow label={t('querylog.upstream')} value={item.upstream} />}
+        <DetailRow label={t('querylog.cache')} value={item.cached ? t('agh.cacheHit') : t('agh.cacheMiss')} />
+        {item.answer_dnssec && <DetailRow label="DNSSEC" value={t('agh.dnssecVerified')} />}
       </div>
 
-      <p className="mb-1.5 px-2 text-[12.5px] font-semibold text-t3">解析结果</p>
+      <p className="mb-1.5 px-2 text-[12.5px] font-semibold text-t3">{t('querylog.resultGroup')}</p>
       <div className="glass mb-3 max-h-[180px] overflow-y-auto rounded-2xl px-4 py-3 text-[13px]">
         {item.answer?.length ? (
           item.answer.map((a, i) => (
@@ -69,18 +78,18 @@ export function LogDetail({
             </div>
           ))
         ) : (
-          <p className="py-1 text-center text-t3">无记录(NXDOMAIN 或被拦截)</p>
+          <p className="py-1 text-center text-t3">{t('querylog.noRecord')}</p>
         )}
       </div>
 
       {item.rules?.length ? (
         <>
-          <p className="mb-1.5 px-2 text-[12.5px] font-semibold text-t3">命中规则</p>
+          <p className="mb-1.5 px-2 text-[12.5px] font-semibold text-t3">{t('querylog.rulesGroup')}</p>
           <div className="glass mb-3 rounded-2xl px-4 py-3">
             {item.rules.map((r, i) => (
               <p key={i} className="break-all py-0.5 font-mono text-[12px] text-t2">
                 {r.text}
-                <span className="ml-2 text-t3">(列表 {r.filter_list_id})</span>
+                <span className="ml-2 text-t3">{t('querylog.listId', { id: r.filter_list_id })}</span>
               </p>
             ))}
           </div>
@@ -88,16 +97,17 @@ export function LogDetail({
       ) : null}
 
       <div className="mt-3 flex gap-2.5">
-        <Button variant="glass" size="md" onClick={copy} className="flex-1">
-          <Copy size={15} /> {copied ? '已复制' : '复制域名'}
+        {/* nowrap + tighter padding keeps both labels on one line at 360px viewports */}
+        <Button variant="glass" size="md" onClick={copy} className="flex-1 whitespace-nowrap !px-3">
+          <Copy size={15} /> {copied ? t('querylog.copied') : t('querylog.copyDomain')}
         </Button>
         {!blocked ? (
-          <Button variant="danger" size="md" className="flex-1" onClick={() => onSaveRule(`||${domain}^`, true)}>
-            <Ban size={15} /> 拦截此域名
+          <Button variant="danger" size="md" className="flex-1 whitespace-nowrap !px-3" onClick={() => onSaveRule(`||${domain}^`, true)}>
+            <Ban size={15} /> {t('querylog.blockDomain')}
           </Button>
         ) : (
-          <Button variant="glass" size="md" className="flex-1" onClick={() => onSaveRule(`@@||${domain}^$important`, false)}>
-            <CheckCircle2 size={15} /> 加入白名单
+          <Button variant="glass" size="md" className="flex-1 whitespace-nowrap !px-3" onClick={() => onSaveRule(`@@||${domain}^$important`, false)}>
+            <CheckCircle2 size={15} /> {t('querylog.whitelistDomain')}
           </Button>
         )}
       </div>

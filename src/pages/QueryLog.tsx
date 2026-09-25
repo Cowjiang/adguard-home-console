@@ -1,6 +1,7 @@
-/** 查询日志:实时滚动、筛选、搜索、详情操作 */
+/** Query log: live streaming, filters, search, detail actions */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
   Radar, Play, ChevronDown, Globe,
@@ -18,12 +19,13 @@ const keyOf = (i: QueryLogItem) => `${i.time}|${i.question.name}|${i.client}|${i
 export default function QueryLog() {
   const pageIn = usePageInClass()
   const { cfg } = useAuth()
+  const { t } = useTranslation()
   const sheet = useSheet()
   const isDesktop = useIsDesktop()
   const nav = useNavigate()
 
   const [searchParams, setSearchParams] = useSearchParams()
-  // ?q= 预填搜索(客户端详情页"查看查询记录"跳入)
+  // ?q= pre-fills the search (entered from the client detail page's "view queries" jump)
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
   const urlFilter = searchParams.get('filter') ?? 'all'
@@ -40,8 +42,10 @@ export default function QueryLog() {
   }, [search])
 
   /**
-   * 筛选与搜索是页内状态:同步进 URL,但用 replace 不压历史栈(与 tab 切换同一约定)。
-   * 否则从日志详情返回或刷新时,组件按进入本页时的旧 ?filter= 重建,筛选会被拽回去。
+   * Filter and search are page-local state: synced to the URL but with replace so they do
+   * not push history (same convention as tab switching). Otherwise, returning from log
+   * detail or a refresh rebuilds from the stale ?filter= of when the page was entered and
+   * drags the filter back.
    */
   const syncUrl = useCallback(
     (next: { filter?: string; q?: string }) => {
@@ -69,7 +73,7 @@ export default function QueryLog() {
     reason: reasons,
   })
 
-  // 拉取一页(第一页或更早)
+  // Fetch one page (first page or older)
   const fetchPage = useCallback(
     async (mode: 'reset' | 'older') => {
       if (!cfg) return
@@ -94,7 +98,7 @@ export default function QueryLog() {
           setExhausted(list.length < 100)
         }
       } catch (e: any) {
-        toast('日志加载失败:' + e.message, 'err')
+        toast(t('querylog.loadFailed', { msg: e.message }), 'err')
       } finally {
         setLoading(false)
         setOlderLoading(false)
@@ -104,7 +108,7 @@ export default function QueryLog() {
     [cfg, basePath, items.length ? items[items.length - 1]?.time : null, debounced, filterKey]
   )
 
-  // 首次/筛选变化加载
+  // Load on first mount / filter change
   useEffect(() => {
     setItems([])
     setExhausted(false)
@@ -112,7 +116,7 @@ export default function QueryLog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced, filterKey])
 
-  // 实时模式:每 2 秒拉最新一页,合并新条目
+  // Live mode: fetch the newest page every 2s and merge in new entries
   const liveRef = useRef(live)
   liveRef.current = live
   const fetchingRef = useRef(false)
@@ -133,7 +137,7 @@ export default function QueryLog() {
           return merged.length > 500 ? merged.slice(0, 500) : merged
         })
       } catch {
-        /* 静默重试 */
+        /* Silent retry */
       } finally {
         fetchingRef.current = false
       }
@@ -153,7 +157,7 @@ export default function QueryLog() {
     if (isDesktop) {
       sheet.open(<LogDetail item={item} filtering={filtering} onSaveRule={saveRule} />)
     } else {
-      nav('/log/detail', { state: { item } })
+      nav('/logs/detail', { state: { item } })
     }
   }
 
@@ -163,10 +167,10 @@ export default function QueryLog() {
     try {
       await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
       mutateFiltering()
-      toast(block ? `已拦截 ${itemDomain(rule)}` : '已加入白名单规则')
+      toast(block ? t('querylog.blockedToast', { domain: itemDomain(rule) }) : t('querylog.whitelistedToast'))
       sheet.close()
     } catch (e: any) {
-      toast('保存规则失败:' + e.message, 'err')
+      toast(t('querylog.ruleSaveFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -177,7 +181,7 @@ export default function QueryLog() {
   return (
     <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-[26px] font-bold tracking-tight text-t1">查询日志</h1>
+        <h1 className="text-[26px] font-bold tracking-tight text-t1">{t('querylog.title')}</h1>
         <button
           onClick={() => setLive((v) => !v)}
           className="press glass flex items-center gap-2 rounded-full px-3.5 py-2 text-[12.5px] font-semibold"
@@ -186,11 +190,11 @@ export default function QueryLog() {
           {live ? (
             <>
               <span className="pulse-dot h-2 w-2 rounded-full" style={{ background: 'var(--accent)' }} />
-              <Radar size={14} /> 实时
+              <Radar size={14} /> {t('querylog.live')}
             </>
           ) : (
             <>
-              <Play size={14} /> 已暂停
+              <Play size={14} /> {t('querylog.paused')}
             </>
           )}
         </button>
@@ -201,13 +205,13 @@ export default function QueryLog() {
           <SearchBar
             value={search}
             onChange={(v) => { setSearch(v); syncUrl({ q: v.trim() }) }}
-            placeholder="搜索域名或客户端…"
+            placeholder={t('querylog.searchPlaceholder')}
           />
         </div>
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0 lg:pb-0">
           {LOG_FILTERS.map((f) => (
             <Chip key={f.key} active={filterKey === f.key} onClick={() => pickFilter(f.key)}>
-              {f.label}
+              {t(f.labelKey)}
             </Chip>
           ))}
         </div>
@@ -228,7 +232,7 @@ export default function QueryLog() {
         )}
 
         {!loading && items.length === 0 && (
-          <EmptyState icon={<Globe size={30} className="text-t3" />} title="暂无日志" subtitle="调整筛选条件,或等待新的 DNS 请求到来" />
+          <EmptyState icon={<Globe size={30} className="text-t3" />} title={t('querylog.emptyTitle')} subtitle={t('querylog.emptySub')} />
         )}
 
         {items.length > 0 && !exhausted && (
@@ -236,11 +240,11 @@ export default function QueryLog() {
             onClick={() => fetchPage('older')}
             className="press glass flex items-center justify-center gap-2 rounded-2xl py-3 text-[13.5px] font-medium text-t2"
           >
-            {olderLoading ? <Spinner size={16} /> : <ChevronDown size={16} />} 加载更早日志
+            {olderLoading ? <Spinner size={16} /> : <ChevronDown size={16} />} {t('querylog.loadOlder')}
           </button>
         )}
         {items.length > 0 && exhausted && (
-          <p className="py-3 text-center text-[12px] text-t3">已到最早记录</p>
+          <p className="py-3 text-center text-[12px] text-t3">{t('querylog.earliest')}</p>
         )}
         </div>
       </TabContent>
@@ -249,7 +253,8 @@ export default function QueryLog() {
 }
 
 function LogRow({ item, onClick }: { item: QueryLogItem; onClick: () => void }) {
-  const meta = reasonMeta(item.reason)
+  const { t } = useTranslation()
+  const meta = reasonMeta(item.reason, t)
   const cname = item.client_info?.name || item.client
   return (
     <Card onClick={onClick} className="!rounded-2xl px-3.5 py-2.5">
@@ -268,8 +273,8 @@ function LogRow({ item, onClick }: { item: QueryLogItem; onClick: () => void }) 
               {item.question.type}
             </span>
             {item.cached && (
-              <span className="flex-none text-[10px] text-t3" title="来自缓存">
-                缓存
+              <span className="flex-none text-[10px] text-t3" title={t('querylog.cachedTitle')}>
+                {t('querylog.cached')}
               </span>
             )}
           </div>
@@ -291,23 +296,25 @@ function reasonDot(kind: string) {
   return kind === 'blocked' ? 'var(--danger)' : kind === 'rewrite' ? 'var(--violet)' : kind === 'warn' ? 'var(--warn)' : 'var(--ok)'
 }
 
-/** 桌面端表格视图:高密度列布局,点击行打开同一个详情浮层 */
+/** Desktop table view: high-density columns; clicking a row opens the same detail
+ *  overlay */
 function LogTable({ items, onRow }: { items: QueryLogItem[]; onRow: (i: QueryLogItem) => void }) {
+  const { t } = useTranslation()
   return (
     <Card className="overflow-hidden !rounded-2xl">
       <div
         className={`${LOG_COLS} px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-t3`}
         style={{ borderBottom: '1px solid var(--glass-border)' }}
       >
-        <span>时间</span>
-        <span>域名</span>
-        <span>客户端</span>
-        <span>结果</span>
-        <span className="text-right">耗时</span>
+        <span>{t('querylog.colTime')}</span>
+        <span>{t('querylog.colDomain')}</span>
+        <span>{t('querylog.colClient')}</span>
+        <span>{t('querylog.colResult')}</span>
+        <span className="text-right">{t('querylog.colElapsed')}</span>
       </div>
       <div className="max-h-[calc(100dvh-330px)] overflow-y-auto">
         {items.map((item) => {
-          const meta = reasonMeta(item.reason)
+          const meta = reasonMeta(item.reason, t)
           const cname = item.client_info?.name || item.client
           return (
             <button
@@ -326,7 +333,7 @@ function LogTable({ items, onRow }: { items: QueryLogItem[]; onRow: (i: QueryLog
                 >
                   {item.question.type}
                 </span>
-                {item.cached && <span className="flex-none text-[10px] text-t3">缓存</span>}
+                {item.cached && <span className="flex-none text-[10px] text-t3">{t('querylog.cached')}</span>}
               </span>
               <span className="truncate text-[12.5px] text-t2">{cname}</span>
               <span>

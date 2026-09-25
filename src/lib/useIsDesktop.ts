@@ -1,4 +1,5 @@
-/** 桌面断点(≥lg 1024px)检测:matchMedia + useSyncExternalStore,避免双套 DOM 常驻 */
+/** Desktop breakpoint (≥lg 1024px) detection: matchMedia +
+ *  useSyncExternalStore, avoids keeping two DOM sets mounted */
 import { useSyncExternalStore } from 'react'
 
 const mq = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)') : null

@@ -1,7 +1,8 @@
 /**
- * AdGuard Home Console — 本地服务
- * 1. 托管前端构建产物(SPA)
- * 2. 反向代理 /api/agh/* 到用户配置的 AdGuard Home,绕过浏览器 CORS 限制
+ * AdGuard Home Console — local server
+ * 1. Serves the frontend build output (SPA)
+ * 2. Reverse-proxies /api/agh/* to the user-configured AdGuard Home, bypassing
+ *    browser CORS limits
  */
 import express from 'express'
 import path from 'node:path'
@@ -11,7 +12,7 @@ import net from 'node:net'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-// 加载项目根目录 .env(不覆盖已存在的环境变量);文件缺失则跳过
+// Load .env from the project root (does not override existing env vars); skip if missing
 {
   const envPath = path.join(__dirname, '..', '.env')
   if (fs.existsSync(envPath)) {
@@ -24,8 +25,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 }
 const DIST = path.join(__dirname, '..', 'dist')
 const PORT = Number(process.env.PORT || 8787)
-// HOSTS:逗号分隔的绑定地址;不设则监听所有网卡。
-// 例:HOSTS=127.0.0.1,<AGH_HOST>,10.126.126.2 → 只暴露给回环/Tailscale/EasyTier,公网网卡不监听
+// HOSTS: comma-separated bind addresses; if unset, listen on all interfaces.
+// e.g. HOSTS=127.0.0.1,<AGH_HOST>,10.126.126.2 → expose only to loopback,
+// Tailscale and EasyTier; public interfaces are not bound
 const HOSTS = (process.env.HOSTS || '')
   .split(',')
   .map((s) => s.trim())
@@ -35,7 +37,7 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '4mb' }))
 
-// —— CORS(开发期直连或同源部署都不需要,保险起见放开)——
+// —— CORS (unneeded for dev direct connect or same-origin deploys; opened just in case) ——
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
@@ -48,12 +50,12 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, name: 'adguard-home-console', time: Date.now() })
 })
 
-// 默认目标服务器(可选,方便登录页预填)
+// Default target server (optional, prefills the login page)
 app.get('/api/config', (_req, res) => {
   res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
 })
 
-// —— AGH 反向代理 ——
+// —— AGH reverse proxy ——
 const MAX_REDIRECTS = 3
 
 async function proxyAGH(req, res, target, authHeader, redirects = 0) {
@@ -80,11 +82,11 @@ async function proxyAGH(req, res, target, authHeader, redirects = 0) {
       headers,
       body,
       redirect: 'manual',
-      // 过滤器全量刷新需从各 URL 下载规则,耗时远超普通接口
+      // Full filter refresh downloads rules from each URL, far slower than normal endpoints
       signal: AbortSignal.timeout(req.path.includes('/filtering/refresh') ? 120_000 : 25_000),
     })
 
-    // 跟随上游重定向(例如 http->https 308)
+    // Follow upstream redirects (e.g. http->https 308)
     if ([301, 302, 307, 308].includes(r.status) && r.headers.get('location') && redirects < MAX_REDIRECTS) {
       const loc = new URL(r.headers.get('location'), upstream).origin
       return proxyAGH(req, res, loc, authHeader, redirects + 1)
@@ -105,7 +107,7 @@ app.use('/api/agh', (req, res) => {
   proxyAGH(req, res, target.trim(), auth)
 })
 
-// —— 静态资源 + SPA 回退 ——
+// —— Static assets + SPA fallback ——
 app.use(express.static(DIST, { maxAge: '1h', index: false }))
 app.use((req, res, next) => {
   if (req.method !== 'GET' || req.path.startsWith('/api/')) return next()
@@ -116,8 +118,9 @@ app.use((req, res, next) => {
     .send('<h3>前端尚未构建</h3><p>请先执行 <code>npm run build</code>,或开发模式下访问 5173 端口。</p>')
 })
 
-// HOSTS:逗号分隔;条目可以是 IP,也可以是网卡名(如 tailscale0、tun0)。
-// 网卡名在绑定时解析当前 IPv4,并在地址变化时自动重绑 → VPN 换网段/开机未就绪均能自愈
+// HOSTS: comma-separated; entries can be IPs or interface names (e.g. tailscale0, tun0).
+// An interface name resolves its current IPv4 at bind time and rebinds when the address
+// changes → self-heals across VPN subnet changes and slow startup
 function ipv4Of(spec) {
   if (net.isIP(spec)) return spec
   const addrs = os.networkInterfaces()[spec]
@@ -131,7 +134,7 @@ const bound = new Map() // spec -> { srv, ip }
 function listenOn(spec) {
   const ip = ipv4Of(spec)
   if (!ip) {
-    // VPN 网卡可能晚于本服务就绪(如开机时 Tailscale 尚未分配地址)
+    // The VPN interface may come up after this server (e.g. Tailscale unassigned at boot)
     console.error(`[adguard-home-console] ${spec} has no IPv4 yet, retry in 10s`)
     return setTimeout(() => listenOn(spec), 10_000)
   }

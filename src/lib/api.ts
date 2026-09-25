@@ -1,12 +1,12 @@
 /**
- * AGH API 客户端
- * 所有请求经本服务代理(/api/agh/* → 目标 AGH /control/*),
- * 通过 X-AGH-Target 头指定目标服务器,Authorization 携带 Basic 凭据。
+ * AGH API client
+ * All requests go through this app's proxy (/api/agh/* → target AGH /control/*);
+ * X-AGH-Target selects the target server, Authorization carries Basic credentials.
  */
 import type { SvrConfig } from './auth'
 export type { SvrConfig }
 
-/** SWR 通用 fetcher:useSWR<T>([name, cfg, path], swrFetcher) */
+/** Shared SWR fetcher: useSWR<T>([name, cfg, path], swrFetcher) */
 export const swrFetcher = <T,>(args: readonly [string, SvrConfig, string]): Promise<T> =>
   api<T>(args[1], args[2])
 
@@ -22,14 +22,15 @@ function basicAuth(user: string, pass: string): string {
   return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)))
 }
 
-/** Tauri 壳探测:iOS/桌面壳内走 Rust 代理(agh_fetch),绕过 WebView 的 CORS */
+/** Tauri shell detection: inside the iOS/desktop shell go through the Rust
+ *  proxy (agh_fetch), bypassing WebView CORS */
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 function getTauriInvoke(): TauriInvoke | null {
   const w = window as unknown as { __TAURI_INTERNALS__?: { invoke?: TauriInvoke } }
   return w.__TAURI_INTERNALS__?.invoke ?? null
 }
 
-/** agh_fetch 返回结构(Rust 侧 AghFetchResult,serde 字段名保持 snake_case) */
+/** agh_fetch result shape (Rust-side AghFetchResult; serde field names stay snake_case) */
 interface AghFetchResult {
   status: number
   content_type: string
@@ -46,8 +47,9 @@ export async function api<T = unknown>(
   let text: string
   const invoke = getTauriInvoke()
   if (invoke) {
-    // Tauri 壳:Rust 代理,行为对齐 server/index.mjs 的 proxyAGH
-    // (路径归一 /api/agh → /control、重定向、超时、错误语义均在 Rust 侧完成)
+    // Tauri shell: Rust proxy, behavior mirrors server/index.mjs proxyAGH
+    // (path normalization /api/agh → /control, redirects, timeouts and error
+    // semantics are all done Rust-side)
     try {
       const r = (await invoke('agh_fetch', {
         method,
@@ -59,7 +61,8 @@ export async function api<T = unknown>(
       status = r.status
       text = r.body_text ?? ''
     } catch (e) {
-      // IPC 层失败(命令缺失/序列化异常等):与网络错误同语义
+      // IPC failure (missing command / serialization error etc.): same
+      // semantics as a network error
       throw new ApiError(502, String((e as Error)?.message ?? e))
     }
   } else {
@@ -82,7 +85,7 @@ export async function api<T = unknown>(
   try {
     data = text ? JSON.parse(text) : undefined
   } catch {
-    /* 非 JSON 响应 */
+    /* Non-JSON response */
   }
   if (status < 200 || status >= 300) {
     const msg = data?.error || data?.message || text?.slice(0, 200) || `HTTP ${status}`
@@ -91,7 +94,7 @@ export async function api<T = unknown>(
   return data as T
 }
 
-/** 带 query 的 GET 路径 */
+/** GET path with query string */
 export function qs(params: Record<string, string | number | string[] | undefined>): string {
   const sp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -103,7 +106,7 @@ export function qs(params: Record<string, string | number | string[] | undefined
   return s ? '?' + s : ''
 }
 
-// ---------- 类型定义(v0.107.79) ----------
+// ---------- Type definitions (v0.107.79) ----------
 
 export interface Status {
   version: string
@@ -138,7 +141,7 @@ export interface Stats {
   top_upstreams_avg_time: KVMap
 }
 
-/** v0.107.79 返回单键对象数组,旧版为字典 */
+/** v0.107.79 returns single-key object arrays; older versions use dictionaries */
 export type KVMap = Record<string, number> | Record<string, number>[]
 
 export interface QueryLogItem {

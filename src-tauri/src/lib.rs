@@ -1,9 +1,10 @@
-//! Tauri 壳入口:命令注册 + 移动端入口点
+//! Tauri shell entry: command registration + mobile entry point
 mod proxy;
 
-/// debug 构建专用:从环境变量读自动登录配置(`simctl launch` 的
-/// `SIMCTL_CHILD_AGH_*` 会以 `AGH_*` 落进进程环境)。
-/// 不写日志、不进错误消息;release 构建恒返回 None。
+/// Debug builds only: reads the auto-login config from environment variables
+/// (`SIMCTL_CHILD_AGH_*` from `simctl launch` lands in the process environment
+/// as `AGH_*`).
+/// Never logged, never surfaced in error messages; always None in release builds.
 #[derive(serde::Serialize)]
 pub struct DebugLogin {
     url: String,
@@ -44,11 +45,15 @@ fn get_debug_login() -> Option<DebugLogin> {
     debug_login()
 }
 
-/// WKWebView 系统侧滑返回**关闭**,改由前端自绘边缘手势接管。
-/// 原因:同文档(pushState)侧滑时 WebKit 的下层是空渲染 —— 手势进行中只有空白底,
-/// commit 之后才轮到前端渲染,观感是"原页空白 → 内容忽然出现"(逐帧实测见
-/// .agents/logs/tauri-ios.md)。前端 src/lib/routeTransition.tsx 的 useEdgeSwipe
-/// 用真实下层快照自绘同款转场,故必须关掉原生手势以避免双重触发。
+/// WKWebView system swipe-back is **disabled**; the frontend's own edge-swipe
+/// gesture takes over. Reason: for same-document (pushState) swipes WebKit's
+/// underlying snapshot is blank — during the gesture only a blank layer shows,
+/// and the frontend only renders after the commit, so it looks like "old page
+/// goes blank → content suddenly appears" (frame-by-frame evidence in
+/// .agents/logs/tauri-ios.md). The frontend useEdgeSwipe in
+/// src/lib/routeTransition.tsx redraws the same transition from a real
+/// snapshot, so the native gesture must be turned off to avoid double
+/// triggering.
 #[cfg(target_os = "ios")]
 fn disable_back_forward_gestures(app: &tauri::AppHandle) {
     use objc2::runtime::AnyObject;
