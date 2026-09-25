@@ -1,7 +1,8 @@
 /**
- * 客户端详情视图:移动端(/clients/detail 独立子页)与桌面端(居中弹窗)共用。
- * 信息面对齐官方后台;持久客户端支持 DNS 设置页式内联即时编辑(名称/标识/防护开关,
- * 无独立编辑按钮,行内改动即时保存并刷新列表缓存)。
+ * Client detail view: shared by mobile (standalone /clients/detail subpage) and desktop
+ * (centered modal). Info mirrors the official admin UI; persistent clients support DNS
+ * settings-style inline instant editing (name/ids/protection switches — no separate edit
+ * button; inline changes save immediately and refresh the list cache).
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -17,11 +18,12 @@ export interface ClientDetailData {
   name?: string
   source?: string
   whois?: Record<string, string>
-  /** 命中持久客户端时带出完整配置 */
+  /** Full config carried along when a persistent client matches */
   persistent?: AghClient
 }
 
-/** top_clients 的键可能是 "name" / "IP" / "name|IP",按候选键取近期请求次数(列表页共用) */
+/** top_clients keys can be "name" / "IP" / "name|IP"; sum recent query counts by candidate
+ *  keys (shared with the list page) */
 export function kvCount(map: Stats['top_clients'] | undefined, keys: (string | undefined)[]): number | undefined {
   if (!map) return undefined
   const want = keys.filter((x): x is string => !!x)
@@ -34,13 +36,15 @@ export function kvCount(map: Stats['top_clients'] | undefined, keys: (string | u
   return total
 }
 
-/** on/off 指示:开启为绿色徽标,关闭为灰色文字(全局设置下的只读展示) */
+/** on/off indicator: green badge when on, gray text when off (read-only display under
+ *  global settings) */
 function OnOff({ on }: { on: boolean }) {
   const { t } = useTranslation()
   return on ? <Badge kind="ok">{t('clients.onBadge')}</Badge> : <span className="flex-none text-[13px] text-t3">{t('clients.offText')}</span>
 }
 
-/** 行内文本编辑行(DNS 设置页模式):点行进入编辑,Enter/保存即时提交,Esc 取消 */
+/** Inline text edit row (DNS settings page style): tap the row to edit, Enter/Save commits
+ *  instantly, Esc cancels */
 function EditableTextRow({ title, value, placeholder, onSave, extraRight }: {
   title: string
   value: string
@@ -97,7 +101,8 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
   data: ClientDetailData
   onDelete?: () => void
   onAdd?: () => void
-  /** 跳转查询日志;由调用方注入 nav——桌面弹窗经 SheetProvider 渲染在 Router 之外 */
+  /** Open query log; nav is injected by the caller — the desktop modal renders via
+   *  SheetProvider outside the Router */
   onOpenLog?: (key: string) => void
 }) {
   const { t } = useTranslation()
@@ -111,7 +116,8 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
   const { data: stats } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher)
   const queries = kvCount(stats?.top_clients, [data.ip, data.name, ...ids])
 
-  // 本地镜像配置:乐观更新开关/文本,保存失败回滚(桌面弹窗内容不随列表重渲,需自持状态)
+  // Local mirror of the config: optimistic switch/text updates, rollback on failed save
+  // (the desktop modal does not re-render with the list, so it holds its own state)
   const [draft, setDraft] = useState<AghClient | undefined>(c)
   useEffect(() => setDraft(c), [c])
   const displayName = draft?.name ?? name
@@ -120,7 +126,8 @@ export function ClientDetail({ data, onDelete, onAdd, onOpenLog }: {
     ? <Smartphone size={19} />
     : c ? <Laptop size={19} /> : <UserRound size={19} />
 
-  /** DNS 设置页式即时保存:更新持久客户端并刷新列表缓存;乐观更新,失败回滚 */
+  /** DNS settings-style instant save: update the persistent client and refresh the list
+   *  cache; optimistic, rollback on failure */
   async function saveClient(patch: Partial<AghClient>) {
     if (!cfg || !draft) return
     const prev = draft

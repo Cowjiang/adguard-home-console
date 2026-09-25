@@ -1,4 +1,4 @@
-/** 概览仪表盘文案 */
+/** Overview dashboard strings */
 
 const enDashboard = {
   loading: 'Connecting to server…',

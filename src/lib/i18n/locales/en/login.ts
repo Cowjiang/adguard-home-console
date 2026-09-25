@@ -1,4 +1,4 @@
-/** 登录页文案 */
+/** Login page strings */
 
 const enLogin = {
   serverAddress: 'Server address',

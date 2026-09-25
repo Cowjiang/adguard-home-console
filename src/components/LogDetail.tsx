@@ -1,4 +1,4 @@
-/** 查询日志单条记录详情(桌面弹窗与移动端详情页共用) */
+/** Query log entry detail (shared by the desktop modal and the mobile detail page) */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, Copy } from 'lucide-react'
@@ -10,7 +10,8 @@ import type { QueryLogItem, FilteringStatus } from '../lib/api'
 
 type TFn = (key: ReasonLabelKey) => string
 
-/** 未登记原因(如新版 API 新增枚举)原样展示,已登记的经词典翻译 */
+/** Unregistered reasons (e.g. new enums from the newer API) are shown as-is; registered
+ *  ones are translated via the dictionary */
 export function reasonMeta(reason: string, t: TFn) {
   const meta = REASON_META[reason]
   return meta

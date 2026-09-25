@@ -1,19 +1,22 @@
 /**
- * 本地 Mock AdGuard Home v0.107.79 — 供 iOS 线(Tauri 壳)与本地联调离线测试。
- * 用法:node scripts/mock-agh.mjs  → 监听 127.0.0.1:3990
- * 鉴权:任意非空 Basic 凭据即可(缺 Authorization → 401),用于走通 401 分支。
- * 契约依据:src/lib/api.ts + docs/agh-api.md
- *   - interval/duration 单位毫秒;avg_processing_time 与 top_upstreams_avg_time 是秒(浮点)
- *   - stats 的 top_* 为单键对象数组(新格式);reason 为 12 个字符串枚举
- *   - /protection POST {enabled, duration(ms)};状态在内存中可变,供 UI 操作回读
- * 只用 Node 内置模块,无第三方依赖。
+ * Local mock AdGuard Home v0.107.79 — for the iOS line (Tauri shell) and offline
+ * local integration testing.
+ * Usage: node scripts/mock-agh.mjs  → listens on 127.0.0.1:3990
+ * Auth: any non-empty Basic credentials (missing Authorization → 401);
+ * used to exercise the 401 branch.
+ * Contract source: src/lib/api.ts + docs/agh-api.md
+ *   - interval/duration in ms; avg_processing_time and top_upstreams_avg_time
+ *     in seconds (float)
+ *   - stats top_* are single-key object arrays (new format); reason has 12 string enums
+ *   - /protection POST {enabled, duration(ms)}; state mutates in memory for UI read-back
+ * Node built-ins only, no third-party dependencies.
  */
 import http from 'node:http'
 
 const PORT = 3990
 const startedAt = Date.now() - 3 * 3600_000 - 42 * 60_000
 
-// ---------- 内存状态 ----------
+// ---------- In-memory state ----------
 const state = {
   protectionEnabled: true,
   protectionDisabledUntil: null, // ISO string | null
@@ -78,7 +81,7 @@ const state = {
   accessList: { allowed_clients: [], disallowed_clients: [], blocked_hosts: ['mail spamhaus org'] },
 }
 
-// ---------- 确定性样本数据 ----------
+// ---------- Deterministic sample data ----------
 const DOMAINS = [
   'www.google.com', 'api.github.com', 'cdn.jsdelivr.net', 'www.youtube.com', 'fonts.googleapis.com',
   'graph.microsoft.com', 'hub.fastgit.org', ' telemetry.microsoft.com'.trim(), 'www.bilibili.com', 's1.hdslb.com',
@@ -96,13 +99,13 @@ const REASONS_BLOCK = ['FilteredBlackList', 'FilteredBlackList', 'FilteredBlocke
 const REASONS_RW = ['Rewrite', 'RewriteEtcHosts', 'RewriteRule', 'FilteredSafeSearch']
 const QTYPES = ['A', 'AAAA', 'HTTPS', 'TXT', 'MX', 'SRV', 'CNAME', 'PTR']
 
-// seeded pseudo-random,保证多次启动数据形态一致
+// seeded pseudo-random, keeps the data shape consistent across runs
 let seed = 42
 function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648 }
 function pick(arr) { return arr[Math.floor(rnd() * arr.length)] }
 function int(lo, hi) { return lo + Math.floor(rnd() * (hi - lo + 1)) }
 
-// 24h 统计(oldest→newest)
+// 24h stats (oldest→newest)
 const hourQueries = Array.from({ length: 24 }, (_, i) => 380 + int(0, 260) + Math.round(120 * Math.sin(i / 3.4)))
 const hourBlocked = hourQueries.map((q, i) => Math.round(q * (0.09 + 0.13 * Math.abs(Math.sin(i / 5)))))
 const stats = {
@@ -112,7 +115,7 @@ const stats = {
   num_replaced_safebrowsing: 17,
   num_replaced_safesearch: 9,
   num_replaced_parental: 4,
-  avg_processing_time: 0.0234, // 秒(浮点),前端 fmtMs 负责换算
+  avg_processing_time: 0.0234, // seconds (float); frontend fmtMs converts
   dns_queries: hourQueries,
   blocked_filtering: hourBlocked,
   replaced_safebrowsing: hourQueries.map((_, i) => (i % 7 === 3 ? 2 : 0)),
@@ -126,7 +129,7 @@ const stats = {
     { '223.5.5.5:53': 1890 },
     { 'https://doh.pub/dns-query': 742 },
   ],
-  top_upstreams_avg_time: [ // 秒(浮点)
+  top_upstreams_avg_time: [ // seconds (float)
     { 'https://dns.google/dns-query': 0.0312 },
     { 'https://cloudflare-dns.com/dns-query': 0.0181 },
     { '223.5.5.5:53': 0.0092 },
@@ -134,7 +137,7 @@ const stats = {
   ],
 }
 
-// 查询日志:600 条,时间倒序
+// Query log: 600 entries, newest first
 const LOG_TOTAL = 600
 const logItems = []
 for (let i = 0; i < LOG_TOTAL; i++) {
@@ -184,7 +187,7 @@ const BLOCKED_SERVICES = [
   group_id: 'grp_' + id,
 }))
 
-// ---------- 状态推导 ----------
+// ---------- Derived status ----------
 function statusPayload() {
   const s = {
     version: '0.107.79',
@@ -202,7 +205,7 @@ function statusPayload() {
   return s
 }
 
-// ---------- HTTP 骨架 ----------
+// ---------- HTTP skeleton ----------
 function json(res, code, body) {
   const text = JSON.stringify(body)
   res.writeHead(code, {
@@ -230,7 +233,7 @@ const server = http.createServer(async (req, res) => {
   const [user, pass] = Buffer.from(auth.slice(6), 'base64').toString().split(':')
   if (!user || pass === undefined) return json(res, 401, { error: 'Unauthorized' })
   const body = await readBody(req)
-  await new Promise((r) => setTimeout(r, 8)) // 模拟网络延迟
+  await new Promise((r) => setTimeout(r, 8)) // simulated network latency
 
   switch (`${req.method} ${p}`) {
     case 'GET /status': return json(res, 200, statusPayload())
@@ -289,7 +292,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, {})
     }
     case 'POST /filtering/refresh': {
-      await new Promise((r) => setTimeout(r, 1500)) // 模拟长任务
+      await new Promise((r) => setTimeout(r, 1500)) // simulated long task
       return json(res, 200, { updated: 0 })
     }
     case 'GET /filtering/check_host': {

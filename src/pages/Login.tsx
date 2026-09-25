@@ -1,4 +1,4 @@
-/** 登录 / 连接服务器 */
+/** Log in / connect to a server */
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck, Server, User, KeyRound, ArrowRight } from 'lucide-react'
@@ -25,8 +25,9 @@ export default function Login() {
       .catch(() => {})
   }, [])
 
-  // Tauri 壳调试辅助:debug 构建下从环境变量预填连接信息(自动连接在 App 层的
-  // DebugAutoLogin 处理,避免本组件卸载后 navigate 失效);release 壳恒返回 null
+  // Tauri shell debug helper: debug builds pre-fill connection info from env vars
+  // (auto-connect is handled by the App-level DebugAutoLogin, avoiding a navigate after
+  // this component unmounts); the release shell always returns null
   useEffect(() => {
     const invoke = (
       window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }

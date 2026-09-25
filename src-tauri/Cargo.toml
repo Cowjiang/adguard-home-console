@@ -4,7 +4,8 @@ version = "1.0.0"
 description = "AdGuard Home Console — Tauri 壳(Rust 代理 + 原生组件)"
 edition = "2021"
 
-# Tauri 2 移动端约定:lib 名 = 包名(下划线)+ _lib,gen/apple 工程按此链接
+# Tauri 2 mobile convention: lib name = package name (underscored) + _lib;
+# the gen/apple project links against this name
 [lib]
 name = "adguard_home_console_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -16,28 +17,35 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# net/io-util/time 供 proxy.rs 单测的自起 TCP 服务器使用
+# net/io-util/time support the self-started TCP server in proxy.rs unit tests
 tokio = { version = "1", features = ["macros", "rt", "net", "io-util", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 url = "2"
 thiserror = "2"
-# iOS 液态玻璃 TabBar / macOS 玻璃组件(社区插件,sosweetham v0.1.8,MIT)
+# iOS liquid-glass TabBar / macOS glass components (community plugin,
+# sosweetham v0.1.8, MIT)
 tauri-plugin-system-components = "0.1.8"
 
-# iOS 手势返回:with_webview 拿 WKWebView 指针后用 objc2 msg_send 调
-# setAllowsBackForwardNavigationGestures(objc2-web-kit 的类型绑定仅支持 macOS)
+# iOS swipe-back gesture: after with_webview grabs the WKWebView pointer, use
+# objc2 msg_send to call setAllowsBackForwardNavigationGestures (objc2-web-kit
+# type bindings only support macOS)
 [target."cfg(target_os = \"ios\")".dependencies]
 objc2 = "0.6.4"
 
 [profile.dev.package."*"]
 opt-level = 0
 
-# iOS 27 SDK 强制 UIScene 生命周期:Info.plist 必须声明 UIApplicationSceneManifest(引用 tao 的
-# TaoSceneDelegate)。tao 0.35.3 已带 scene 支持,但在 release 构建下有 scene configuration
-# 过早释放的 bug(上游 #1245 已修,0.37 未进入 tauri-runtime-wry 2.11.4 的依赖区间 ^0.35)。
-# 这里 patch 到社区回迁分支(= 0.35.3 + #1245 五行修复,Argos-Dynamics 已在 iOS 26/27 验证)。
+# The iOS 27 SDK forces the UIScene lifecycle: Info.plist must declare
+# UIApplicationSceneManifest (referencing tao's TaoSceneDelegate). tao 0.35.3
+# already has scene support, but release builds hit a bug where scene
+# configuration is released too early (fixed upstream in #1245; 0.37 is not in
+# tauri-runtime-wry 2.11.4's dependency range ^0.35). Patched to the community
+# backport branch (= 0.35.3 + the five-line #1245 fix; verified on iOS 26/27 by
+# Argos-Dynamics).
 [patch.crates-io]
 tao = { git = "https://github.com/Argos-Dynamics/tao", branch = "argos/0.35.3-scene-config-autorelease" }
-# 本地 vendor 版:新增 appearAnimation(原生控件入场动画,返回按钮用)。
-# 上游 0.1.8 无此能力,而原生控件悬浮于 WebView 之上,出现特效只能由原生侧做。
+# Local vendored fork: adds appearAnimation (entrance animation for native
+# controls, used by the back button). Upstream 0.1.8 lacks it, and native
+# controls float above the WebView, so the effect can only be done on the
+# native side.
 tauri-plugin-system-components = { path = "plugins/tauri-plugin-system-components" }

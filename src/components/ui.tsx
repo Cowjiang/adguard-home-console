@@ -1,4 +1,4 @@
-/** iOS 风格基础组件库 */
+/** iOS-style base component library */
 import {
   createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
 } from 'react'
@@ -16,14 +16,16 @@ import { useNativeHeaderAction, type NativeHeaderSpec } from '../lib/nativeHeade
 import { navBack } from '../lib/backNav'
 import { copyText } from '../lib/clipboard'
 
-/* ---------- 页面容器与标题 ---------- */
+/* ---------- Page containers and titles ---------- */
 
-/** 顶级路由定义在 lib/routes.ts,此处 re-export 供旧引用方兼容 */
+/** Top-level routes live in lib/routes.ts; re-exported here for older importers */
 export { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES }
 
-/** page-in 闩:滑动转场进行中跳过 page-in 淡入,避免与平移叠加;闩住一次性,
- *  防止转场结束后 dir 归零时 page-in 类重新补挂导致动画重播。
- *  页面根节点(无论是否经 Screen)统一用它挂 page-in。 */
+/** page-in latch: skip the page-in fade while a slide transition runs so it
+ *  doesn't stack with the translation; the latch is one-shot, so once dir
+ *  resets after the transition the page-in class is not re-attached and the
+ *  animation does not replay. Page roots attach page-in through this, with or
+ *  without Screen. */
 export function usePageInClass(): string {
   const t = useRouteTransition()
   const noAnim = useRef(false)
@@ -38,14 +40,17 @@ export function Screen({ children, pad = true }: { children: ReactNode; pad?: bo
   )
 }
 
-/** 顶部滚动边缘渐变遮罩:内容滚入状态栏/导航栏区时淡出,纯渐变不用 backdrop-filter(避开 iOS 发烫红线) */
+/** Top scroll-edge gradient mask: fades out as content scrolls under the
+ *  status/nav bar area; a pure gradient, no backdrop-filter (avoids the iOS
+ *  heat red line) */
 export function NavScrim({ className = '' }: { className?: string }) {
   return (
     <div
       aria-hidden
       className={`pointer-events-none absolute inset-x-0 top-0 ${className}`}
       style={{
-        // Tailwind 任意值类名带空格不会生成,高度用 inline style
+        // Tailwind arbitrary class names with spaces are not generated; height
+        // goes in inline style
         height: 'calc(env(safe-area-inset-top, 0px) + 72px)',
         background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 98%, transparent) 58%, transparent)',
       }}
@@ -58,21 +63,27 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const isDesktop = useIsDesktop()
-  // iOS 壳内原生液态玻璃返回按钮接管时,CSS 胶囊让位(避免双按钮)
+  // When the native liquid-glass back button takes over inside the iOS shell,
+  // the CSS pill yields (avoids double buttons)
   const nativeBack = useNativeBackShown()
   const transition = useRouteTransition()
-  // 顶级页面(侧边栏/TabBar 直达)在桌面端不需要返回按钮,返回只属于二级页面
+  // Top-level pages (sidebar/TabBar direct) need no back button on desktop;
+  // back belongs to secondary pages only
   const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname)
   const showBack = back && !(isDesktop && isTopLevel)
-  // 移动端二级页:返回胶囊 + 居中标题固定在左上角,内容从下方滚过(对齐 iOS 26 液态玻璃导航栏)
+  // Mobile secondary page: back pill + centered title pinned top-left, content
+  // scrolls beneath (matches the iOS 26 liquid-glass nav bar)
   const floating = showBack && !isDesktop
 
   const goBack = () => navBack(nav, pathname)
 
   if (floating) {
-    // 固定导航条与页面层做同步平移(push/pop),转场时随页面滑动。
-    // 旧页的导航条由退场快照克隆携带滑出,存活的新页导航条永远拿 IN 动画
-    // (拿 OUT 会反向平移后再跳回 = 前进穿帮);原生手势转场无 CSS 动画,不加类
+    // The fixed nav bar translates in sync with the page layer (push/pop),
+    // sliding along during transitions. The old page's nav bar slides out
+    // carried by the exit snapshot clone; the surviving new page's nav bar
+    // always gets the IN animation (OUT would translate it backwards then jump
+    // = a glitch on push); native gesture transitions have no CSS animation,
+    // so no class is added
     const barAnim = transition.exiting
       ? transition.dir === 'push'
         ? 'rt-push-in'
@@ -84,11 +95,14 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
         className={`pointer-events-none fixed inset-x-0 top-0 z-40 lg:hidden ${barAnim}`}
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 6px)' }}
       >
-        {/* 滚动边缘渐变遮罩:见 NavScrim 注释 */}
+        {/* Scroll-edge gradient mask: see the NavScrim comment */}
         <NavScrim />
         <div className="relative flex h-12 items-center px-4">
-          {/* 原生玻璃按钮接管时仅视觉隐藏:转场快照克隆此条时补回按钮,
-              避免滑出的旧页在按钮位留洞(原生控件瞬时移除,无法随页面滑动) */}
+          {/* When the native glass button takes over it is only visually
+              hidden: the transition snapshot clone of this bar restores the
+              button, so the sliding old page doesn't leave a hole at its spot
+              (the native control is removed instantly and cannot slide with
+              the page) */}
           <button
             data-back-btn
             onClick={goBack}
@@ -130,12 +144,15 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
 }
 
 /**
- * 顶栏右侧操作按钮(PageHeader 的 right 槽位):移动端高度与返回胶囊一致
- * (h-11 / 44pt,iOS 最小可点面积),图标按钮补 w-11、带文字的补 px-4;
- * 桌面端(lg)回到 h-10。所有顶栏右侧按钮都走这里或 Button 的 size="header"。
+ * Header-right action buttons (PageHeader's right slot): mobile height matches
+ * the back pill (h-11 / 44pt, the iOS minimum tap target); icon buttons add
+ * w-11, text buttons px-4; desktop (lg) drops back to h-10. All header-right
+ * buttons go through this or Button's size="header".
  *
- * 传 `native` 时,苹果壳内会创建同位的原生液态玻璃按钮接管显示 —— CSS 按钮
- * 只保留占位(visibility:hidden),转场快照克隆里再补回可见,避免双按钮穿帮。
+ * With `native`, the Apple shell creates a co-located native liquid-glass
+ * button that takes over display -- the CSS button keeps only a placeholder
+ * (visibility:hidden), restored visible in transition snapshot clones to avoid
+ * a double-button glitch.
  */
 export function HeaderAction({ onClick, label, className = '', native, children }: {
   onClick?: (e: RMouseEvent<HTMLButtonElement>) => void
@@ -160,7 +177,7 @@ export function HeaderAction({ onClick, label, className = '', native, children 
   )
 }
 
-/* ---------- 卡片与列表 ---------- */
+/* ---------- Cards and lists ---------- */
 
 export function Card({ children, className = '', strong = false, onClick }: { children: ReactNode; className?: string; strong?: boolean; onClick?: () => void }) {
   return (
@@ -216,7 +233,7 @@ export function Row({
 }
 
 export function Rows({ children }: { children: ReactNode }) {
-  // 给除最后一个之外的孩子加分隔线
+  // Insert a divider after every child except the last
   const arr = Array.isArray(children) ? children : [children]
   return (
     <div>
@@ -230,7 +247,7 @@ export function Rows({ children }: { children: ReactNode }) {
   )
 }
 
-/* ---------- 开关 ---------- */
+/* ---------- Switch ---------- */
 
 export function Switch({ on, onChange, danger, disabled, loading }: { on: boolean; onChange: (v: boolean, e: RMouseEvent<HTMLButtonElement>) => void; danger?: boolean; disabled?: boolean; loading?: boolean }) {
   const inert = disabled || loading
@@ -254,7 +271,7 @@ export function Switch({ on, onChange, danger, disabled, loading }: { on: boolea
   )
 }
 
-/* ---------- 按钮 ---------- */
+/* ---------- Buttons ---------- */
 
 export function Button({
   children, onClick, variant = 'primary', size = 'md', loading, disabled, className = '', type, label, native,
@@ -263,10 +280,12 @@ export function Button({
   size?: 'sm' | 'md' | 'lg' | 'header'; loading?: boolean; disabled?: boolean; className?: string; type?: 'button' | 'submit'; label?: string
   native?: NativeHeaderSpec
 }) {
-  // size="header"(顶栏右侧槽位)时,苹果壳内交给原生液态玻璃按钮;CSS 只保留占位
+  // With size="header" (the header-right slot), the Apple shell hands off to
+  // the native liquid-glass button; the CSS side keeps only a placeholder
   const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
   const base = 'press inline-flex items-center justify-center gap-2 rounded-full font-semibold select-none'
-  // header:顶栏右侧槽位专用,移动端与返回胶囊同高(h-11),桌面与 sm 一致
+  // header: header-right slot only; mobile matches the back pill height (h-11),
+  // desktop matches sm
   const sizes = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-[14.5px]', lg: 'h-12 px-6 text-[16px]', header: 'h-11 px-4 text-[13px] lg:h-8 lg:px-3.5' }[size]
   const variants = {
     primary: 'text-white',
@@ -297,17 +316,18 @@ export function Button({
   )
 }
 
-/* ---------- 分段控件 ---------- */
+/* ---------- Segmented control ---------- */
 
 export function Segmented<T extends string>({
   options, value, onChange, size = 'md', fit = false,
 }: {
   options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; size?: 'sm' | 'md'
-  /** true = 收缩为内容宽度(用于卡片内局部选择器);默认通栏 */
+  /** true = shrink to content width (for pickers inside cards); full width by default */
   fit?: boolean
 }) {
   const refs = useRef(new Map<T, HTMLButtonElement | null>())
-  // 滑动指示块:像 tabbar 一样在激活项之间左右平移,而非每项各自闪现
+  // Sliding indicator: translates left/right between active items like a
+  // tabbar, instead of each item flashing its own
   const [ind, setInd] = useState<{ left: number; width: number } | null>(null)
 
   useEffect(() => {
@@ -353,11 +373,14 @@ export function Segmented<T extends string>({
   )
 }
 
-/* ---------- Tab 切换内容动画 ---------- */
+/* ---------- Tab switch content animation ---------- */
 
-/** 包一层 tab-in 动画:value 变化时重挂载子节点,重播切换动画(配合 Segmented / Chip 使用)。
- *  挂载于滑动转场中则跳过本次入场(手势期间动画挂起 → fill both 首帧透明 = 整页空白);
- *  闩只影响挂载那次,之后由用户触发的 value 切换照常播。 */
+/** Wraps children in the tab-in animation: on value change the children
+ *  remount and the switch animation replays (use with Segmented / Chip).
+ *  Mounted mid slide-transition, this enter is skipped (during the gesture the
+ *  animation is suspended -> fill both first frame transparent = blank page);
+ *  the latch affects only the mount, later user-triggered value switches still
+ *  animate. */
 export function TabContent<T extends string | number>({
   value, children, className = '',
 }: { value: T; children: ReactNode; className?: string }) {
@@ -379,7 +402,7 @@ export function TabContent<T extends string | number>({
   )
 }
 
-/* ---------- 底部浮层 ---------- */
+/* ---------- Sheet overlays ---------- */
 
 interface SheetCtx {
   open: (node: ReactNode, opts?: { title?: string }) => void
@@ -396,8 +419,9 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   const open = (n: ReactNode, opts?: { title?: string }) => {
     setTitle(opts?.title)
     setNode(n)
-    // 双 rAF:必须让浏览器先把初始态(透明+缩放)绘制出来再切 visible,
-    // transition 才会播放;单层 rAF 会与首帧合并导致弹窗"闪现无动画"
+    // Double rAF: the browser must first paint the initial state (transparent
+    // + scaled) before visible flips, or the transition won't play; a single
+    // rAF merges with the first frame and the sheet "pops in with no animation"
     requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
   }
   const close = () => {
@@ -417,8 +441,10 @@ export function SheetProvider({ children }: { children: ReactNode }) {
       <MenuHost>{children}</MenuHost>
       {node &&
         createPortal(
-          // 项目红线(2026-09-23 用户定稿):任何弹窗一律屏幕居中出现,禁止从底部上升——
-          // iOS 原生 tabbar 会挡住底部浮层。确认框/表单/详情全走此处,天然统一。
+          // Project red line (finalized by the user 2026-09-23): every dialog
+          // appears centered on screen, never rising from the bottom -- the
+          // iOS native tabbar would cover a bottom sheet. Confirm dialogs /
+          // forms / detail sheets all go through here, unified by construction.
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div
               onClick={close}
@@ -443,15 +469,16 @@ export function SheetProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/* ---------- 单选下拉菜单(锚点定位:苹果设备原生 select,其余自绘锚定下拉) ---------- */
+/* ---------- Single-select menus (anchor-positioned: native select on Apple
+   devices, drawn anchored dropdown elsewhere) ---------- */
 
 interface PickReq<T extends string | number> {
   options: { label: ReactNode; value: T }[]
   value?: T
   onPick: (value: T) => void
-  /** 弹层标题(锚定下拉菜单目前不展示,保留字段兼容) */
+  /** Popup title (the anchored dropdown doesn't show it yet; kept for compatibility) */
   title?: string
-  /** 触发元素,桌面下拉以其矩形定位 */
+  /** Trigger element; the desktop dropdown positions itself by its rect */
   anchor: HTMLElement
   align?: 'left' | 'right'
 }
@@ -481,7 +508,8 @@ function MenuHost({ children }: { children: ReactNode }) {
   }
 
   const open = <T extends string | number>(req: PickReq<T>) => {
-    // 同一触发元素再次点击 = 关闭(toggle);换锚点则切换到新菜单
+    // Clicking the same trigger again = close (toggle); a different anchor
+    // switches to the new menu
     setSt((prev) => {
       if (prev && reqRef.current?.anchor === req.anchor) {
         reqRef.current = null
@@ -501,7 +529,7 @@ function MenuHost({ children }: { children: ReactNode }) {
       close()
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
-    // 滚动/缩放时直接关,不做跟随重定位
+    // Close immediately on scroll/resize; no follow-along repositioning
     window.addEventListener('pointerdown', onDown)
     window.addEventListener('keydown', onKey)
     window.addEventListener('scroll', close, true)
@@ -515,7 +543,8 @@ function MenuHost({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.req])
 
-  // 渲染后测量菜单高度:默认展开在锚点下方,放不下则翻转到上方
+  // Measure the menu after render: opens below the anchor by default, flips
+  // above when there is no room
   useLayoutEffect(() => {
     if (!st || !menuRef.current) return
     const el = menuRef.current
@@ -540,7 +569,7 @@ function MenuHost({ children }: { children: ReactNode }) {
             ref={menuRef}
             className="glass-strong fixed z-[55] min-w-[160px] max-w-[calc(100vw-16px)] rounded-2xl p-1.5 shadow-2xl"
             style={{
-              // top 由 useLayoutEffect 按菜单实际高度计算
+              // top is computed by useLayoutEffect from the menu's real height
               top: st.rect.bottom + 6,
               left: st.req.align === 'left' ? st.rect.left : Math.min(st.rect.right - 160, window.innerWidth - 168),
               opacity: st.visible ? 1 : 0,
@@ -573,10 +602,11 @@ function MenuHost({ children }: { children: ReactNode }) {
 }
 
 /**
- * 单选选择器:一律自绘锚定下拉菜单。
- * 苹果设备的原生选择器不走本函数——WebKit 未实现 <select> 的 showPicker()
- * (Safari 仅在预览版置于开关后),原生入口必须是真实渲染的 <select> 覆盖层,
- * 见 PickSelect 与各页面的 isAppleMobile() 分支。
+ * Single-select picker: always the drawn anchored dropdown menu.
+ * Native pickers on Apple devices never go through this -- WebKit has not
+ * implemented <select>'s showPicker() (Safari only has it in preview builds
+ * behind a flag), so the native entry point must be a really rendered
+ * <select> overlay; see PickSelect and the isAppleMobile() branches in pages.
  */
 export function usePick() {
   const menu = useContext(MenuContext)
@@ -591,7 +621,8 @@ function pickText(node: ReactNode): string {
   return props ? pickText(props.children) : ''
 }
 
-/** 苹果移动设备用的真实原生 <select>:点击即弹系统选择器,无任何 JS 介入 */
+/** Real native <select> for Apple mobile devices: tapping pops the system
+ *  picker, with no JS involvement */
 export function PickSelect<T extends string | number>({
   value, options, onPick, className, placeholder, ariaLabel,
 }: {
@@ -605,8 +636,10 @@ export function PickSelect<T extends string | number>({
   const current = value != null ? String(value) : (placeholder ?? '')
   return (
     <select
-      // overflow-hidden:WebKit 会把 <option> 按文字宽度真实布局,长选项(如「请求数从多到少」)
-      // 溢出这个被压到 56pt 的覆盖层并把整个文档撑宽,页面因此能左右拖动
+      // overflow-hidden: WebKit lays out <option> text at its real width, so
+      // long options (e.g. a sort label) overflow this overlay squeezed to
+      // 56pt and widen the whole document, letting the page be dragged
+      // sideways
       className={`appearance-none outline-none overflow-hidden ${className ?? ''}`}
       style={{ WebkitTapHighlightColor: 'transparent' }}
       aria-label={ariaLabel}
@@ -625,7 +658,7 @@ export function PickSelect<T extends string | number>({
   )
 }
 
-/* ---------- 徽标 / 标签 ---------- */
+/* ---------- Badges / tags ---------- */
 
 export function Badge({ children, kind = 'ok' }: { children: ReactNode; kind?: 'ok' | 'blocked' | 'warn' | 'rewrite' | 'info' }) {
   const map = {
@@ -645,7 +678,7 @@ export function Badge({ children, kind = 'ok' }: { children: ReactNode; kind?: '
   )
 }
 
-/* ---------- 源徽标(客户端来源,不同来源不同色) ---------- */
+/* ---------- Source badges (client origin; a color per source) ---------- */
 
 const SOURCE_STYLE: Record<string, { c: string; bg: string }> = {
   ARP: { c: 'var(--accent-2)', bg: 'color-mix(in srgb, var(--accent-2) 14%, transparent)' },
@@ -679,7 +712,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
   )
 }
 
-/* ---------- 搜索框 ---------- */
+/* ---------- Search bar ---------- */
 
 export function SearchBar({ value, onChange, placeholder, className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   const { t } = useTranslation()
@@ -704,9 +737,10 @@ export function SearchBar({ value, onChange, placeholder, className = '' }: { va
   )
 }
 
-/* ---------- 复制按钮 ---------- */
+/* ---------- Copy button ---------- */
 
-/** 图标复制按钮:点击复制文本,成功后短暂变对勾;用于详情页 IP/WHOIS 等行尾 */
+/** Icon copy button: copies text on tap, briefly turns into a check on
+ *  success; used at the end of detail-page rows like IP/WHOIS */
 export function CopyIconButton({ text, label = '', className = '' }: { text?: string; label?: string; className?: string }) {
   const { t } = useTranslation()
   const [done, setDone] = useState(false)
@@ -734,11 +768,13 @@ export function CopyIconButton({ text, label = '', className = '' }: { text?: st
   )
 }
 
-/* ---------- 分页器 ---------- */
+/* ---------- Pagination ---------- */
 
 /**
- * 轻量分页:双端通用的上一页/下一页 + 页码;桌面端额外显示总条数与每页条数选择。
- * 仅一页时不渲染(mobile);桌面端传 total 时仍显示汇总行。
+ * Lightweight pagination: prev/next + page number, shared by both platforms;
+ * desktop additionally shows the total count and a page-size picker.
+ * Not rendered at all with a single page (mobile); on desktop the summary row
+ * still shows when total is passed.
  */
 export function Pagination({
   page, pages, onChange, total, pageSize, onPageSize,
@@ -799,7 +835,7 @@ export function Pagination({
   )
 }
 
-/* ---------- 状态小组件 ---------- */
+/* ---------- Small status components ---------- */
 
 export function Spinner({ size = 20 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-t2" />
@@ -839,7 +875,7 @@ export function ErrorBox({ children, onRetry }: { children: ReactNode; onRetry?:
   )
 }
 
-/* ---------- 轻提示 ---------- */
+/* ---------- Toast ---------- */
 
 let toastFn: ((msg: string, kind?: 'ok' | 'err') => void) | null = null
 export function toast(msg: string, kind: 'ok' | 'err' = 'ok') {
@@ -878,7 +914,7 @@ export function ToastHost() {
   )
 }
 
-/* ---------- 确认对话框 ---------- */
+/* ---------- Confirm dialog ---------- */
 
 export function useConfirm() {
   const sheet = useSheet()

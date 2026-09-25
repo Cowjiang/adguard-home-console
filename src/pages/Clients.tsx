@@ -1,5 +1,7 @@
-/** 客户端管理:持久客户端 CRUD + 自动识别客户端(点入双端详情,见 components/ClientDetail);
- *  移动端卡片/列表 + 同行排序入口,桌面端持久/自动识别双表格,双端排序分页,添加/编辑走独立子页(移动)或居中弹窗(桌面) */
+/** Client management: persistent client CRUD + auto-detected clients (tap into a detail view
+ *  on both platforms, see components/ClientDetail); mobile cards/list with inline sort entry,
+ *  desktop persistent/auto dual tables, sort + pagination on both; add/edit goes to a
+ *  standalone subpage (mobile) or centered modal (desktop) */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -35,7 +37,7 @@ export const emptyClient = (): Partial<AghClient> => ({
   ignore_statistics: false,
 })
 
-/* ---------- 排序 ---------- */
+/* ---------- Sorting ---------- */
 
 type SortKey = 'requests' | 'name' | 'source'
 const SORT_OPTIONS = [
@@ -46,7 +48,8 @@ const SORT_OPTIONS = [
   { value: 'source-asc', labelKey: 'clients.sortSourceAsc' },
 ] as const
 
-/** 双端共用的行模型:持久客户端与自动识别客户端合并后的展示视图 */
+/** Row model shared by both platforms: merged display view of persistent + auto-detected
+ *  clients */
 interface ClientRowModel {
   key: string
   name: string
@@ -54,9 +57,9 @@ interface ClientRowModel {
   ids: string[]
   source?: string
   whois?: Record<string, string>
-  /** 国家 + 运营商,官方同款 "CN CHINANET-GD" */
+  /** Country + ISP, same style as the official UI: "CN CHINANET-GD" */
   whoisText?: string
-  /** 统计周期内请求次数(来自 /stats top_clients) */
+  /** Request count within the stats period (from /stats top_clients) */
   requests?: number
   persistent?: AghClient
 }
@@ -83,7 +86,8 @@ export default function Clients() {
   const pick = usePick()
   const [search, setSearch] = useState('')
 
-  // 排序与分页(双端共用排序;桌面持久/自动识别两张表各自分页)
+  // Sorting and pagination (sort shared by both; desktop persistent/auto tables paginate
+  // separately)
   const [sortKey, setSortKey] = useState<SortKey>('requests')
   const [sortAsc, setSortAsc] = useState(false)
   const [pageSize, setPageSize] = useState(20)
@@ -93,7 +97,8 @@ export default function Clients() {
   const { data, mutate, isLoading } = useSWR<ClientsData>(cfg ? ['clients', cfg, '/clients'] : null, swrFetcher, {
     refreshInterval: 30000,
   })
-  // 与 ClientDetail 同 key 共享缓存,取 top_clients 计算每个客户端的请求次数
+  // Shares the SWR cache with ClientDetail via the same key; uses top_clients to compute
+  // each client's request count
   const { data: stats } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
     refreshInterval: 30000,
   })
@@ -109,14 +114,16 @@ export default function Clients() {
 
   const autoByIp = useMemo(() => new Map(autos.map((a) => [a.ip, a])), [autos])
 
-  // 公网 IP 的 WHOIS 信息挂在自动识别客户端上,持久客户端详情也借此补全
+  // Public-IP WHOIS info is attached to auto-detected clients; persistent client details
+  // borrow it to fill in too
   const whoisMatch = useMemo(() => {
     const map = new Map<string, Record<string, string>>()
     for (const a of autos) if (a.whois_info && Object.keys(a.whois_info).length) map.set(a.ip, a.whois_info)
     return map
   }, [autos])
 
-  /** 合并视图:持久客户端(带出同 IP 自动识别的源/WHOIS)+ 未配置的自动识别客户端 */
+  /** Merged view: persistent clients (carrying source/WHOIS from same-IP auto-detected
+   *  entries) + unconfigured auto-detected clients */
   const rows = useMemo<ClientRowModel[]>(() => {
     const list: ClientRowModel[] = []
     for (const c of clients) {
@@ -152,7 +159,8 @@ export default function Clients() {
     return list
   }, [clients, autos, persistMatch, autoByIp, whoisMatch, stats])
 
-  /** 双端详情:桌面弹居中弹窗,移动端进独立子页(同日志详情模式) */
+  /** Detail on both platforms: desktop opens a centered modal, mobile goes to a standalone
+   *  subpage (same pattern as log detail) */
   function openDetail(d: ClientDetailData) {
     if (isDesktop) {
       sheet.open(
@@ -178,7 +186,8 @@ export default function Clients() {
     persistent: r.persistent,
   })
 
-  /** 添加/编辑:桌面居中弹窗;移动端进独立子页(不再用上滑组件) */
+  /** Add/edit: desktop centered modal; mobile goes to a standalone subpage (not the
+   *  slide-up sheet) */
   function openForm(existing: AghClient | null, prefillIp?: string) {
     const c = existing ?? { ...emptyClient(), ids: prefillIp ? [prefillIp] : [] }
     if (isDesktop) {
@@ -209,12 +218,12 @@ export default function Clients() {
   const sortedAutos = useMemo(() => sortRows(filteredRows.filter((r) => !r.persistent), sortKey, sortAsc), [filteredRows, sortKey, sortAsc])
   const sortedPersist = useMemo(() => sortRows(persistentRows, sortKey, sortAsc), [persistentRows, sortKey, sortAsc])
 
-  // 移动端:持久卡片(API 顺序)+ 自动识别列表(排序 + 分页)
+  // Mobile: persistent cards (API order) + auto-detected list (sorted + paginated)
   const autoPages = Math.max(1, Math.ceil(sortedAutos.length / pageSize))
   const mobileAutoPage = Math.min(pageAuto, autoPages)
   const pagedAutos = sortedAutos.slice((mobileAutoPage - 1) * pageSize, mobileAutoPage * pageSize)
 
-  // 桌面端:两张表(排序共用,分页各自独立)
+  // Desktop: two tables (shared sorting, independent pagination)
   const persistPages = Math.max(1, Math.ceil(sortedPersist.length / pageSize))
   const deskPersistPage = Math.min(pagePersist, persistPages)
   const pagedPersist = sortedPersist.slice((deskPersistPage - 1) * pageSize, deskPersistPage * pageSize)
@@ -446,7 +455,7 @@ function IconB({ children }: { children: React.ReactNode }) {
   )
 }
 
-/* ---------- 桌面端表格视图 ---------- */
+/* ---------- Desktop table view ---------- */
 
 const TBL_COLS = 'grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_104px_minmax(0,1.1fr)_88px_92px] items-center gap-3'
 
@@ -465,7 +474,8 @@ function SortTh({ label, k, sortKey, sortAsc, onSort, align }: {
   )
 }
 
-/** 桌面端客户端表:点击行开详情弹窗;客户端/源/请求数可排序 */
+/** Desktop client table: click a row to open the detail modal; name/source/requests are
+ *  sortable */
 function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
   rows: ClientRowModel[]
   sortKey: SortKey
@@ -522,7 +532,7 @@ function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
   )
 }
 
-/* ---------- 客户端编辑表单(桌面居中弹窗 / 移动端独立子页共用) ---------- */
+/* ---------- Client edit form (desktop centered modal / mobile standalone subpage) ---------- */
 
 export function ClientForm({
   initial, isNew, onClose, onSaved, showTitle = true,
@@ -531,7 +541,8 @@ export function ClientForm({
   isNew: boolean
   onClose: () => void
   onSaved: () => void
-  /** 页面形态由 PageHeader 提供标题,可关掉表单内置标题避免重复 */
+  /** Page form: the title comes from PageHeader; disable the form's built-in title to
+   *  avoid duplication */
   showTitle?: boolean
 }) {
   const { cfg } = useAuth()

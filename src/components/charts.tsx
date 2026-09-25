@@ -1,4 +1,4 @@
-/** 轻量 SVG 图表:平滑面积图 + 横向条形榜单 */
+/** Lightweight SVG charts: smoothed area chart + horizontal bar ranking list */
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fmtCompact } from '../lib/format'
@@ -7,8 +7,9 @@ function smoothPath(pts: [number, number][]): string {
   const n = pts.length
   if (n === 0) return ''
   if (n < 3) return 'M' + pts.map((p) => p.join(',')).join('L')
-  // Fritsch–Carlson 单调三次样条:切线在极值处归零,曲线不越出数据范围
-  // (Catmull-Rom 用相邻点算切线,遇到 0→峰值跳变时会向反方向过冲,跌破 0 轴)
+  // Fritsch–Carlson monotone cubic spline: tangents are zeroed at extrema so the curve
+  // never overshoots the data range (Catmull-Rom derives tangents from neighbors and
+  // overshoots the other way on 0→peak jumps, dipping below the 0 axis)
   const dx: number[] = []
   const m: number[] = []
   for (let i = 0; i < n - 1; i++) {
@@ -74,8 +75,9 @@ export function AreaChart({
     setHover(Math.max(0, Math.min(n - 1, idx)))
   }
 
-  // 触摸端长按唤出预览:按下后 350ms 内未移动(未滚动/未拖动)则固定显示十字线,
-  // 之后可继续横向拖动查看;提前移动则取消判定,让位给页面滚动或横向 scrub
+  // Touch long-press preview: if not moved within 350ms of press (no scroll/drag), pin
+  // the crosshair; dragging may then continue horizontally. Moving earlier cancels the
+  // hold, yielding to page scroll or horizontal scrub
   const pressRef = useRef<{ startX: number; rect: DOMRect; timer: number | null; active: boolean } | null>(null)
   const clearPressTimer = () => {
     const p = pressRef.current
@@ -141,7 +143,7 @@ export function AreaChart({
           </linearGradient>
         </defs>
 
-        {/* 网格 */}
+        {/* Grid */}
         {[0.25, 0.5, 0.75].map((f) => (
           <line
             key={f}
@@ -169,7 +171,8 @@ export function AreaChart({
         )}
       </svg>
 
-      {/* x 轴标签:SVG 的 preserveAspectRatio=none 会把 <text> 横向拉伸,故用 HTML 叠加在底部留白区 */}
+      {/* x-axis labels: preserveAspectRatio=none stretches <text> horizontally, so overlay
+          HTML in the bottom padding area instead */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0" style={{ height: PAD_B }}>
         {labels?.map((l, i) =>
           i % labelStep === 0 ? (
@@ -188,7 +191,8 @@ export function AreaChart({
         )}
       </div>
 
-      {/* 数据点:preserveAspectRatio=none 会把 <circle> 拉成椭圆,改用 HTML 叠加圆点保持正圆 */}
+      {/* Data points: preserveAspectRatio=none squashes <circle> into an ellipse, so overlay
+          HTML dots to keep them round */}
       {hover != null && (
         <>
           <div
@@ -248,7 +252,7 @@ export function BarList({ items, color = 'var(--accent)', max: maxProp }: { item
   )
 }
 
-/** 环形图:请求构成等占比展示,附图例 */
+/** Donut chart: request composition as proportional segments, with legend */
 export function Donut({
   segments, size = 170, thickness = 24, centerLabel, centerSub,
 }: {
@@ -310,7 +314,8 @@ export function Donut({
   )
 }
 
-/** 排行表格:排名 + 名称 + 次数 + 占比条(桌面统计页用,比 BarList 更表格化) */
+/** Ranking table: rank + name + count + share bar (desktop stats page; more tabular than
+ *  BarList) */
 export function RankTable({ items, color = 'var(--accent)', resolve }: {
   items: [string, number][]
   color?: string

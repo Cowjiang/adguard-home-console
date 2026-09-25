@@ -2,9 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// 真机 dev(`tauri ios dev --host`)时 Tauri 把 devUrl 里的 localhost 换成 Mac 的局域网地址,
-// 并通过 TAURI_DEV_HOST 告知;dev server 不监听该地址的话手机加载不到前端。
-// 桌面/浏览器开发时该变量为空,行为与之前一致(仅监听 localhost)。
+// Real-device dev (`tauri ios dev --host`): Tauri rewrites the localhost in
+// its devUrl to the Mac's LAN address and reports it via TAURI_DEV_HOST;
+// unless the dev server listens on that address, the phone cannot load the
+// frontend. In desktop/browser dev the variable is empty and behavior is
+// unchanged (localhost only).
 const devHost = process.env.TAURI_DEV_HOST
 
 export default defineConfig({

@@ -1,4 +1,4 @@
-/** 榜单全量子页(概览页"查看更多"入口):全量排行 + 搜索 + 计数 */
+/** Full-ranking subpage (dashboard "view more" entry): complete ranking + search + count */
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -10,7 +10,8 @@ import { RankTable } from '../components/charts'
 import { usePageInClass, Loading, EmptyState, SearchBar, Card, PageHeader } from '../components/ui'
 import { fmtNum } from '../lib/format'
 
-/** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
+/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
+ *  shape */
 function toMap(v: unknown): Record<string, number> {
   if (Array.isArray(v)) {
     return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))

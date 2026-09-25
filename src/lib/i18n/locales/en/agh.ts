@@ -1,4 +1,5 @@
-/** AGH 领域词汇:拦截原因、日志筛选、缓存等来自 AdGuard Home API 的枚举标签 */
+/** AGH domain vocabulary: block reasons, log filters, caching and other
+ *  enum labels from the AdGuard Home API */
 
 const enAgh = {
   reasonBlackList: 'Blocklist',

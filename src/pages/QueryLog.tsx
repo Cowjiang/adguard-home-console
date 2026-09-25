@@ -1,4 +1,4 @@
-/** 查询日志:实时滚动、筛选、搜索、详情操作 */
+/** Query log: live streaming, filters, search, detail actions */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -25,7 +25,7 @@ export default function QueryLog() {
   const nav = useNavigate()
 
   const [searchParams, setSearchParams] = useSearchParams()
-  // ?q= 预填搜索(客户端详情页"查看查询记录"跳入)
+  // ?q= pre-fills the search (entered from the client detail page's "view queries" jump)
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
   const urlFilter = searchParams.get('filter') ?? 'all'
@@ -42,8 +42,10 @@ export default function QueryLog() {
   }, [search])
 
   /**
-   * 筛选与搜索是页内状态:同步进 URL,但用 replace 不压历史栈(与 tab 切换同一约定)。
-   * 否则从日志详情返回或刷新时,组件按进入本页时的旧 ?filter= 重建,筛选会被拽回去。
+   * Filter and search are page-local state: synced to the URL but with replace so they do
+   * not push history (same convention as tab switching). Otherwise, returning from log
+   * detail or a refresh rebuilds from the stale ?filter= of when the page was entered and
+   * drags the filter back.
    */
   const syncUrl = useCallback(
     (next: { filter?: string; q?: string }) => {
@@ -71,7 +73,7 @@ export default function QueryLog() {
     reason: reasons,
   })
 
-  // 拉取一页(第一页或更早)
+  // Fetch one page (first page or older)
   const fetchPage = useCallback(
     async (mode: 'reset' | 'older') => {
       if (!cfg) return
@@ -106,7 +108,7 @@ export default function QueryLog() {
     [cfg, basePath, items.length ? items[items.length - 1]?.time : null, debounced, filterKey]
   )
 
-  // 首次/筛选变化加载
+  // Load on first mount / filter change
   useEffect(() => {
     setItems([])
     setExhausted(false)
@@ -114,7 +116,7 @@ export default function QueryLog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced, filterKey])
 
-  // 实时模式:每 2 秒拉最新一页,合并新条目
+  // Live mode: fetch the newest page every 2s and merge in new entries
   const liveRef = useRef(live)
   liveRef.current = live
   const fetchingRef = useRef(false)
@@ -135,7 +137,7 @@ export default function QueryLog() {
           return merged.length > 500 ? merged.slice(0, 500) : merged
         })
       } catch {
-        /* 静默重试 */
+        /* Silent retry */
       } finally {
         fetchingRef.current = false
       }
@@ -294,7 +296,8 @@ function reasonDot(kind: string) {
   return kind === 'blocked' ? 'var(--danger)' : kind === 'rewrite' ? 'var(--violet)' : kind === 'warn' ? 'var(--warn)' : 'var(--ok)'
 }
 
-/** 桌面端表格视图:高密度列布局,点击行打开同一个详情浮层 */
+/** Desktop table view: high-density columns; clicking a row opens the same detail
+ *  overlay */
 function LogTable({ items, onRow }: { items: QueryLogItem[]; onRow: (i: QueryLogItem) => void }) {
   const { t } = useTranslation()
   return (

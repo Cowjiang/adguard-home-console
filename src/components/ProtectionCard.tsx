@@ -1,4 +1,4 @@
-/** 防护总开关卡片(仪表盘/防护页共用) */
+/** Master protection switch card (shared by Dashboard / Protection pages) */
 import { useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, ShieldOff, Clock3, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -15,18 +15,20 @@ export function ProtectionCard() {
   const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null)
 
   const serverEnabled = status?.protection_enabled ?? false
-  // 乐观更新：等待 API 期间立即显示目标状态，服务端确认后自动对齐
+  // Optimistic: show the target state immediately while the API runs; aligns with the
+  // server once it confirms
   const enabled = pendingEnabled ?? serverEnabled
   if (pendingEnabled !== null && pendingEnabled === serverEnabled) {
-    // 用微任务清除，避免渲染期间 setState
+    // Clear in a microtask to avoid setState during render
     queueMicrotask(() => setPendingEnabled(null))
   }
   const disabledUntil = (status as any)?.protection_disabled_until as string | undefined
-  // 服务器以毫秒报告暂停时长(protection_disabled_duration 与请求 duration 同单位)
+  // Server reports the pause duration in ms (protection_disabled_duration shares the unit
+  // with request duration)
   const disabledDurMs = status?.protection_disabled_duration ?? 0
 
-  // 截止时间只在状态快照变化时计算一次(放到渲染期算会因 Date.now() 漂移,
-  // 每 5 秒的统计轮询重渲染会不断重置到期定时器,导致永远不刷新)
+  // Compute the deadline once per status snapshot (computing during render drifts with
+  // Date.now(): every 5s stats poll re-render resets the expiry timer, so it never fires)
   const resumeAtMs = useMemo(() => {
     if (disabledUntil) return new Date(disabledUntil).getTime()
     if (disabledDurMs > 0) return Date.now() + disabledDurMs
@@ -34,7 +36,8 @@ export function ProtectionCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabledUntil, disabledDurMs])
 
-  // 定时暂停到期后自动刷新状态,让界面及时恢复"防护已开启"
+  // Auto-refresh status when the timed pause expires so the UI promptly shows
+  // "protection on" again
   useEffect(() => {
     if (enabled || !resumeAtMs) return
     const wait = Math.max(1000, resumeAtMs - Date.now() + 1000)
@@ -42,7 +45,7 @@ export function ProtectionCard() {
     return () => clearTimeout(id)
   }, [enabled, resumeAtMs, refreshStatus])
 
-  // 暂停期间每秒跳动倒计时
+  // Tick the countdown every second while paused
   const [nowTick, setNowTick] = useState(() => Date.now())
   useEffect(() => {
     if (enabled || !resumeAtMs) return
@@ -70,7 +73,7 @@ export function ProtectionCard() {
   }
 
   function openPausePicker(e: React.MouseEvent<HTMLElement>) {
-    // 时长档位标签复用 units 词典(en 侧自动取复数形式)
+    // Duration option labels reuse the units dictionary (en side auto-pluralizes)
     const options = [
       { value: 0, label: t('protection.untilManual') },
       { value: 30, label: t('units.second', { count: 30 }) },

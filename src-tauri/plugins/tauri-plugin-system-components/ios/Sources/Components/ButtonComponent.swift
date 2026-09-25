@@ -56,9 +56,11 @@ enum ButtonComponent: ComponentBuilder {
                 config.image = ImageUtil.icon(decoded, side: 20, circular: props?.circular ?? false)
                 config.imagePadding = 6
             } else if let symbol = props?.sfSymbol {
-                // 图标着色必须落在符号图本身:iOS 26 的 glass 配置会忽略
-                // baseForegroundColor / imageColorTransformer 对符号的颜色作用,
-                // alwaysOriginal 让图像自带颜色,不被系统按自适应色重绘
+                // Symbol tinting must land on the image itself: iOS 26 glass
+                // configurations ignore baseForegroundColor /
+                // imageColorTransformer for symbols; alwaysOriginal bakes the
+                // color into the image so the system does not repaint it as an
+                // adaptive color
                 var image = UIImage(systemName: symbol)
                 if let fg = props?.foreground.flatMap(ColorUtil.from(hex:)) {
                     image = image?.withTintColor(fg, renderingMode: .alwaysOriginal)

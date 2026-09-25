@@ -1,4 +1,5 @@
-/** 全局布局:环境背景 + 移动端浮动玻璃标签栏 / 桌面端固定侧边栏(≥lg) */
+/** Global layout: ambient background + mobile floating glass tab bar /
+ *  desktop fixed sidebar (≥lg) */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -40,15 +41,18 @@ export function Ambient() {
   return <div className="ambient" />
 }
 
-/** 顶部悬浮状态条(仅移动端 tab 根页面:二级页顶部由固定导航栏接管,见 docs/web-interaction.md)。
- *  下拉刷新期间淡出:刷新留白带是指示器的位置,pill 留着会与圆圈重叠 */
+/** Floating status pill (mobile tab root pages only: secondary pages are headed by the fixed
+ *  nav bar, see docs/web-interaction.md). Fades out during pull-to-refresh: the refresh
+ *  whitespace band is where the indicator sits, the pill would overlap the circle */
 function TopBar({ dimmed }: { dimmed?: boolean }) {
   const { status, offline } = useAuth()
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  // CSS 快照转场返回(pop)落地 tab 根页:与页面 rt-pop-in 同步淡入 —— pill 被
-  // z-50 退场快照盖着、随其滑走逐渐露出,纯淡入即无硬切;侧滑提交/无动画返回时
-  // 页面瞬时就位,pill 瞬现才不穿帮,故不淡入。data-status-pill 供转场快照捕获
+  // CSS snapshot transition pop back onto a tab root: fade in synced with the page's
+  // rt-pop-in — the pill is covered by the z-50 exit snapshot and gradually revealed as
+  // it slides away, so a pure fade has no hard cut; on swipe-commit / no-anim back the
+  // page lands instantly and the pill must too, so no fade. data-status-pill lets the
+  // transition snapshot capture it
   const popIn = useArrivalPopAnim(pathname)
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
@@ -89,7 +93,8 @@ function TabBar() {
   const barRef = useRef<HTMLDivElement>(null)
   const lensRef = useRef<HTMLDivElement>(null)
 
-  // iOS 26/27 手感:点击时透镜沿移动轴拉伸变形,栏体做一次橡皮筋回弹
+  // iOS 26/27 feel: on tap the lens stretches along the move axis, the bar does a
+  // rubber-band bounce
   const playBounce = () => {
     const ease = 'cubic-bezier(0.3, 1.1, 0.4, 1)'
     barRef.current?.animate(
@@ -120,7 +125,7 @@ function TabBar() {
         className="glass-nav relative flex w-full max-w-[500px] items-stretch rounded-full px-1.5 py-1.5"
         style={{ transformOrigin: '50% 88%' }}
       >
-        {/* 滑动的玻璃透镜:选中项像一块浮起的独立玻璃片 */}
+        {/* Sliding glass lens: the selected item reads as a raised piece of glass */}
         <div
           className="tab-lens-track absolute inset-y-1.5 left-1.5"
           aria-hidden
@@ -141,7 +146,8 @@ function TabBar() {
               replace
               onClick={() => {
                 playBounce()
-                // iOS 手感:再点当前 tab 滚回顶部(跨 tab 导航不干预)
+                // iOS feel: tapping the active tab again scrolls to top (cross-tab nav
+                // is left alone)
                 if (isActive) scrollToTop()
               }}
               className={({ isActive }) =>
@@ -164,7 +170,8 @@ function TabBar() {
   )
 }
 
-/** 桌面端侧边栏(≥lg):实色面板,延续深色设计系统;底部承接防护状态 */
+/** Desktop sidebar (≥lg): solid panel continuing the dark design system; hosts the
+ *  protection status at the bottom */
 function Sidebar() {
   const { pathname } = useLocation()
   const { status, offline } = useAuth()
@@ -224,8 +231,9 @@ function Sidebar() {
   )
 }
 
-/** 落地 tab 根页时刷新一次服务器状态:SWR 数据随页面重挂本就会重验证,
- *  status 不归 SWR 管(只在启动与自愈探针时更新),这里补上导航时机 */
+/** Refresh server status once when landing on a tab root: SWR data revalidates on remount,
+ *  but status is not SWR-managed (updated only at startup and by the self-heal probe),
+ *  so add the navigation trigger here */
 function useTabLandStatusRefresh() {
   const { pathname } = useLocation()
   const { refreshStatus } = useAuth()
@@ -234,17 +242,21 @@ function useTabLandStatusRefresh() {
   }, [pathname, refreshStatus])
 }
 
-/** 断网时代理层 25s 才报超时,刷新指示器不等它:到 deadline 先收,
- *  请求失败的结果随后自行落地(/status 探测 5s 内已先给出离线结论) */
+/** Offline, the proxy layer only reports a timeout after 25s; the refresh indicator does
+ *  not wait: it closes at the deadline, and the failed request's result lands afterwards
+ *  (the /status probe already concludes offline within 5s) */
 const REFRESH_DEADLINE_MS = 8000
 
-/** 服务离线遮罩:只在 tab 根页盖住内容区,旧数据不再可见;二级页不遮挡(保护
- *  表单输入,靠状态条与操作报错感知)。z-20 在下拉指示器(z-30)与 TabBar/
- *  状态条(z-40)之下,断网中下拉刷新仍是可用的重试手段 */
+/** Offline overlay: covers the content area only on tab root pages so stale data is no
+ *  longer visible; secondary pages are not covered (protects form input; offline is
+ *  sensed via the status pill and operation errors). z-20 sits below the pull indicator
+ *  (z-30) and the TabBar / status pill (z-40), so pull-to-refresh remains a usable retry
+ *  while offline */
 function OfflineNotice({ onRetry }: { onRetry: () => unknown }) {
   const { t } = useTranslation()
   const [retrying, setRetrying] = useState(false)
-  // 与下拉刷新共用同一条 refreshAll 链(含 8s deadline):按钮转圈到链路收口为止
+  // Shares the refreshAll chain with pull-to-refresh (8s deadline): the button spins
+  // until the chain settles
   const retry = () => {
     if (retrying) return
     setRetrying(true)
@@ -270,15 +282,17 @@ function OfflineNotice({ onRetry }: { onRetry: () => unknown }) {
 }
 
 export default function Layout() {
-  // iOS Tauri 壳:原生液态玻璃 UITabBar 接管导航,CSS 标签栏让位
+  // iOS Tauri shell: the native liquid-glass UITabBar takes over navigation, the CSS
+  // tab bar steps aside
   const nativeBar = useNativeTabBar()
-  // 移动布局且原生 TabBar 可用时:左上角返回按钮交给原生玻璃胶囊(createComponent glass)
+  // Mobile layout with a native TabBar available: the top-left back button goes to the
+  // native glass capsule (createComponent glass)
   const isDesktop = useIsDesktop()
   useNativeBackButton(nativeBar && !isDesktop)
   useTabLandStatusRefresh()
-  // 下拉刷新:status 重探 + SWR 全量重验证;仅移动布局、粗指针(触摸)设备且
-  // 在 tab 根页(二级页不启用)。mutate 用全局绑定(默认缓存),不依赖 SWRConfig
-  // 上下文
+  // Pull-to-refresh: status re-probe + full SWR revalidation; only on mobile layout,
+  // coarse-pointer (touch) devices, and tab root pages (secondary pages opt out).
+  // mutate uses the global binding (default cache), not the SWRConfig context
   const { refreshStatus, offline } = useAuth()
   const { pathname } = useLocation()
   const [coarse] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
@@ -305,14 +319,17 @@ export default function Layout() {
           <TransitionArea />
         </div>
       </main>
-      {/* 设置根页豁免遮罩:它承载「服务器连接」与应用设置,离线时用户可能正需要
-          改服务器地址,改由 Settings 页隐藏依赖服务器的入口组 */}
+      {/* Settings root page is exempt from the overlay: it hosts "server connection" and
+          app settings; offline, the user may need to change the server address, so the
+          Settings page hides the server-dependent entry groups instead */}
       {offline && isTabRoot && pathname !== '/settings' && (
         <OfflineNotice onRetry={refreshAll} />
       )}
-      {/* 下拉刷新指示器:锚在 safe+16(pill 正下方的页面留白带)、卡片顶(safe+64)
-          上方 12px,跟手 1:1 位移;刷新时内容回弹、圈停在基位旋转;不进转场快照
-          管线,transform 留给跟手位移,水平居中用负 margin */}
+      {/* Pull-to-refresh indicator: anchored at safe+16 (the whitespace band right below
+          the pill), 12px above the card top (safe+64); tracks the finger 1:1; when
+          refreshing, content bounces back and the ring spins at its base position; kept
+          out of the transition snapshot pipeline — transform is reserved for finger
+          tracking, centered with a negative margin */}
       <div
         ref={indicatorRef}
         aria-hidden

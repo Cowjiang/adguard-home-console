@@ -1,8 +1,11 @@
 /**
- * 提案与记录约定校验 — .agents/pipelines 的文件名/分类/状态，以及 .agents/reviews 的快照命名。
- * 用法:node scripts/verify-proposals.mjs [--links]
- *   --links  额外核对文档里引用的具体路径是否存在（默认关闭:证据路径允许"01–09*.png"这类区间简写）
- * 约定依据:.agents/pipelines/WORKFLOW.md、.agents/pipelines/CLASSIFICATION.md、.agents/README.md
+ * Validates proposal/record conventions — file names, class and status under
+ * .agents/pipelines, and snapshot naming under .agents/reviews.
+ * Usage: node scripts/verify-proposals.mjs [--links]
+ *   --links  also verifies concrete paths referenced in docs (off by default: evidence paths
+ *            allow range shorthand like "01–09*.png")
+ * Convention source: .agents/pipelines/WORKFLOW.md, .agents/pipelines/CLASSIFICATION.md,
+ * .agents/README.md
  */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,22 +1,25 @@
 /**
- * 导航元信息:让"转场动画方向"与"历史栈操作"解耦。
+ * Navigation meta: decouples "transition animation direction" from "history
+ * stack operation".
  *
- * 侧滑返回依赖 WKWebView 历史栈(backForwardList),tab 根页面之间的跳转必须
- * replace 才不会把上一个 tab 压进栈(否则侧滑会跨 tab 返回,见
- * docs/web-interaction.md 的路由与转场约定);但 replace 默认无转场。
- * markNavAnim('push') 让 TransitionArea 对这类 replace 照常执行 push 平移动画
- * —— 视觉上是下钻,栈上是平级。
+ * The back swipe relies on the WKWebView history stack (backForwardList), so
+ * jumps between tab root pages must replace or the previous tab gets pushed
+ * onto the stack (otherwise the swipe would go back across tabs, see the
+ * routing/transition conventions in docs/web-interaction.md); but replace has
+ * no transition by default. markNavAnim('push') makes TransitionArea play the
+ * usual push translation for such replaces — visually a drill-down, stack-wise
+ * a sibling move.
  */
 import { useNavigate } from 'react-router-dom'
 
 let pending: 'push' | null = null
 
-/** 标记下一次导航按 push 方向做转场动画(配合 replace 使用) */
+/** Mark the next navigation to animate as push (used together with replace) */
 export function markNavAnim(kind: 'push') {
   pending = kind
 }
 
-/** TransitionArea 在路由提交时读取并清除标记 */
+/** TransitionArea reads and clears the marker when the route commits */
 export function consumeNavAnim(): 'push' | null {
   const v = pending
   pending = null
@@ -24,8 +27,9 @@ export function consumeNavAnim(): 'push' | null {
 }
 
 /**
- * 跨 tab 跳转:replace(不进历史栈 → 侧滑不可返回)+ push 转场动画。
- * 用于 tab 根页面之间的业务入口(如概览 → 日志/客户端),语义 = 切 tab。
+ * Cross-tab jump: replace (no history entry → not back-swipeable) + push
+ * transition animation. For business entries between tab root pages
+ * (e.g. overview → logs/clients); semantics = switching tabs.
  */
 export function useTabJump() {
   const nav = useNavigate()

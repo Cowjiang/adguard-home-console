@@ -1,4 +1,4 @@
-/** 时长与相对时间单位(format.ts 消费) */
+/** Duration and relative-time units (consumed by format.ts) */
 
 const enUnits = {
   now: 'just now',

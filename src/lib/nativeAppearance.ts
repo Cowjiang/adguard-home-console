@@ -1,12 +1,16 @@
 /**
- * 原生层外观跟随应用主题。
+ * Native layer appearance follows the app theme.
  *
- * UIKit 的原生控件默认跟随**系统**外观,而应用主题(设置里的浅色/深色/跟随系统)
- * 可能与系统不一致 —— 玻璃 TabBar、返回胶囊、顶栏操作按钮与原生弹层都会因此
- * 渲染成相反的明暗。这里把最终解析出的明暗显式告诉插件。
+ * UIKit native controls default to the **system** appearance, while the app
+ * theme (light/dark/follow-system in settings) may differ from it — the glass
+ * TabBar, back capsule, top bar action button and native sheets would all
+ * render in the opposite light/dark. This passes the finally resolved
+ * light/dark to the plugin explicitly.
  *
- * npm 包(@sosweetham/...-api 0.1.8)尚无该命令的 JS 实现,故直接走命令通道;
- * 插件侧见 src-tauri/plugins/tauri-plugin-system-components(SystemComponentsPlugin.setAppearance)。
+ * The npm package (@sosweetham/...-api 0.1.8) has no JS implementation for this
+ * command yet, so we go through the command channel directly; plugin side:
+ * src-tauri/plugins/tauri-plugin-system-components
+ * (SystemComponentsPlugin.setAppearance).
  */
 import { isTauriIOS } from './routeTransition'
 

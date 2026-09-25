@@ -1,4 +1,5 @@
-/** 查询日志与单条详情(桌面弹窗与移动详情页共用) */
+/** Query log and single-entry details (shared by the desktop dialog and
+ *  the mobile detail page) */
 
 const enQuerylog = {
   title: 'Query log',

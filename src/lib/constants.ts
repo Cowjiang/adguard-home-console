@@ -1,6 +1,6 @@
-/** AGH API 常量:类型、状态、拦截原因、服务目录等 */
+/** AGH API constants: types, statuses, block reasons, service catalog etc. */
 
-/** 拦截原因标签的词典 key(LogDetail 展示时经 t() 翻译) */
+/** Dictionary keys for block-reason labels (translated via t() when LogDetail renders) */
 export type ReasonLabelKey =
   | 'agh.reasonBlackList'
   | 'agh.reasonBlockedService'
@@ -54,7 +54,8 @@ export function qtypeColor(t: string): string {
   return QTYPE_COLORS[t] ?? '#94a3b8'
 }
 
-/** 本地缓存的服务目录(id→name/icon),首次成功加载后写入 */
+/** Locally cached service catalog (id→name/icon), written after the first
+ *  successful load */
 export const SERVICE_CACHE_KEY = 'agh.services.v1'
 
 export const APP_NAME = 'AdGuard Home Console'

@@ -1,28 +1,34 @@
 /**
- * 移动端下拉刷新(自研):与 routeTransition 的边缘侧滑同一手势框架 ——
- * window 触摸监听 + 意图判定 + 非 passive preventDefault + transform 跟手,
- * 松手才提交。body 的 overscroll-behavior-y:none 已压掉浏览器原生下拉刷新
- * (整页 reload)与橡皮筋,接管后无双重触发。
+ * Mobile pull-to-refresh (in-house): shares the gesture framework of
+ * routeTransition's edge swipe — window touch listeners + intent detection +
+ * non-passive preventDefault + transform following the finger, committed only
+ * on release. body's overscroll-behavior-y:none already suppresses the
+ * browser's native pull-to-refresh (full page reload) and rubber-banding, so
+ * once this takes over there is no double triggering.
  *
- * 与边缘侧滑的让位规则(两者并列监听 window touch):
- *  - 触点落在左缘条内让给侧滑(start 即让位);
- *  - 水平意图让路,垂直意图才接管;转场中(busy)/侧滑手势中/刷新中不启用;
- *  - 只在页面已滚到顶部(window.scrollY <= 0)时接管。
+ * Yield rules vs the edge swipe (both listen on window touch):
+ *  - a touch inside the left edge strip yields to the swipe (at touchstart);
+ *  - horizontal intent yields, only vertical intent takes over; disabled
+ *    during transitions (busy) / swipe gestures / refreshing;
+ *  - takes over only when the page is scrolled to the top (window.scrollY <= 0).
  *
- * 快照安全:内容位移挂在 Layout 的包裹层、指示器在 Layout 层渲染,都不在
- * capturePage 的克隆范围内;转场与侧滑期间禁用,快照捕获时 transform 必为
- * 空闲。侧滑下层快照本就容忍内容漂移(数据轮询一直在变),刷新不改布局。
+ * Snapshot safety: content translation is applied to Layout's wrapper and the
+ * indicator renders at Layout level, both outside capturePage's clone; disabled
+ * during transitions and swipes, so transforms are always idle when a snapshot
+ * is captured. The under-swipe snapshot already tolerates content drift (data
+ * polling keeps changing) and the refresh does not change layout.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useGestureActive, useTransitionBusy } from './routeTransition'
 
-/** 左缘条:让给边缘侧滑(与 routeTransition 的 EDGE_PX 对齐) */
+/** Left edge strip: yields to the edge swipe (aligned with routeTransition's EDGE_PX) */
 const EDGE_YIELD_PX = 24
-/** 垂直意图判定:下拉超过该距离且纵向占优才接管 */
+/** Vertical intent: take over only when pull exceeds this distance and
+ *  vertical dominates */
 const ENGAGE_PX = 12
-/** 松手触发刷新的拖距 */
+/** Pull distance that triggers refresh on release */
 const THRESHOLD_PX = 64
-/** 跟手位移上限,超出部分做阻尼 */
+/** Cap for the finger-following offset; excess is damped */
 const MAX_PX = 96
 
 export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boolean) {
@@ -34,7 +40,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
   const refreshRef = useRef(onRefresh)
   refreshRef.current = onRefresh
   const refreshingRef = useRef(false)
-  // 手势回调只挂一次,busy/gesturing/enabled 走 ref 读最新值
+  // Gesture callbacks mounted once; busy/gesturing/enabled read latest via ref
   const gateRef = useRef({ busy, gesturing, enabled })
   gateRef.current = { busy, gesturing, enabled }
 
@@ -49,11 +55,13 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
       if (indicator) {
         const p = Math.min(1, pull / THRESHOLD_PX)
         indicator.style.opacity = pull > 4 ? String(Math.min(1, p * 1.5)) : '0'
-        // 指示器 1:1 跟手(LAYOUT 锚在 safe+16、卡片顶在 safe+64),与卡片顶恒差 12px
+        // Indicator follows the finger 1:1 (LAYOUT anchored at safe+16, card
+        // top at safe+64), always 12px above the card top
         indicator.style.transform = `translate3d(0, ${Math.round(pull)}px, 0) scale(${(0.55 + 0.45 * p).toFixed(3)})`
       }
     }
-    // 松手后的收位/回弹交给 CSS transition,拖拽期间保持指令式跟手
+    // Release settle/bounce is left to CSS transition; imperative
+    // finger-following during the drag
     const withAnim = (on: boolean) => {
       for (const el of [contentRef.current, indicatorRef.current]) el?.classList.toggle('ptr-anim', on)
     }
@@ -78,7 +86,8 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
       const dx = t.clientX - st.x0
       const dy = t.clientY - st.y0
       if (!st.on) {
-        // 水平意图让给侧滑/横向手势;下拉不足未接管,不干预原生滚动
+        // Horizontal intent yields to the swipe/lateral gesture; insufficient
+        // pull means not engaged yet, don't disturb native scrolling
         if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
           st.armed = false
           return
@@ -104,9 +113,11 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>, enabled: boo
         apply(0)
         return
       }
-      // 刷新中:内容与圈一起回弹到基位(iOS 原生手感),圈停在 pill 下方留白带
-      // (safe+16,卡片顶 safe+64,间距 12px)持续旋转至 refreshAll 收口,pill 已
-      // 由 Layout 淡出让位;期间禁止再次下拉
+      // Refreshing: content and spinner bounce back to base together (iOS
+      // native feel); the spinner rests in the whitespace band below the pill
+      // (safe+16, card top safe+64, 12px gap) and keeps spinning until
+      // refreshAll settles; Layout has faded the pill out to make room;
+      // further pulls are blocked meanwhile
       refreshingRef.current = true
       setRefreshing(true)
       st.pull = 0

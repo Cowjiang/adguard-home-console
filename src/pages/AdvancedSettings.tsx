@@ -1,4 +1,4 @@
-/** 高级设置:DNS、访问控制、加密、DHCP */
+/** Advanced settings: DNS, access control, encryption, DHCP */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +15,7 @@ import {
 import { fmtBytes, fmtDate } from '../lib/format'
 
 
-/* ================= DNS 设置 ================= */
+/* ================= DNS settings ================= */
 
 export function DnsSettings() {
   const { cfg } = useAuth()
@@ -306,7 +306,7 @@ function Field({ label, value, onChange, mono, placeholder, hint }: { label: str
   )
 }
 
-/* ================= 访问控制 ================= */
+/* ================= Access control ================= */
 
 export function AccessSettings() {
   const { cfg } = useAuth()
@@ -380,7 +380,7 @@ export function AccessSettings() {
   )
 }
 
-/* ================= 加密设置 ================= */
+/* ================= Encryption settings ================= */
 
 export function EncryptionSettings() {
   const { cfg } = useAuth()
@@ -401,7 +401,7 @@ export function EncryptionSettings() {
     if (!cfg || !d) return
     setSaving(true)
     try {
-      // 先验证,再应用
+      // Validate first, then apply
       const validate = await api<any>(cfg, '/tls/validate', { method: 'POST', body: d })
       const hasError = validate?.warning_validation && !validate?.valid_pair
       if (hasError) {

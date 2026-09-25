@@ -1,4 +1,5 @@
-/** 过滤器管理:黑/白名单、自定义规则、拦截服务、DNS 重写、规则检测 */
+/** Filter management: block/allow lists, custom rules, blocked services,
+ *  DNS rewrites, rule checker */
 
 const enFilters = {
   deleted: 'Filter removed',

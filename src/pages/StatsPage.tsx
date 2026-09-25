@@ -1,4 +1,4 @@
-/** 统计分析(桌面端专属):环形图 + 24h 趋势 + 域名/客户端/上游排行表格 */
+/** Stats analysis (desktop only): donut + 24h trend + domain/client/upstream ranking tables */
 import useSWR from 'swr'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +10,8 @@ import { AreaChart, Donut, RankTable, StatTile } from '../components/charts'
 import { usePageInClass, Card, Loading, EmptyState, Button } from '../components/ui'
 import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
 
-/** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
+/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
+ *  shape */
 function toMap(v: unknown): Record<string, number> {
   if (Array.isArray(v)) {
     return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))
@@ -78,7 +79,7 @@ export default function StatsPage() {
         <h1 className="text-[26px] font-bold leading-tight tracking-tight text-t1">{t('stats.title')}</h1>
       </div>
 
-      {/* 关键指标 */}
+      {/* Key metrics */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatTile label={t('stats.totalQueries')} value={fmtCompact(total)} sub={t('stats.countSub', { n: fmtNum(total) })} />
         <StatTile label={t('dashboard.blocked')} value={fmtCompact(blocked)} sub={t('dashboard.blockRateSub', { pct: blockedPct })} accent="var(--danger)" />
@@ -87,7 +88,7 @@ export default function StatsPage() {
         <StatTile label={t('stats.peakHour')} value={fmtCompact(peak)} sub={peakLabel} accent="var(--violet)" />
       </div>
 
-      {/* 趋势 + 请求构成 */}
+      {/* Trend + request composition */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,3fr)]">
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -122,7 +123,7 @@ export default function StatsPage() {
         </Card>
       </div>
 
-      {/* 排行表格 */}
+      {/* Ranking tables */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
           <div className="mb-2 flex items-center gap-2">

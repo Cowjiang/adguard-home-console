@@ -10,8 +10,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#07090f" />
     <script>
-      // 首帧引导:按存储设置主题与语言,避免刷新闪浅色/深色或闪错语言
-      // (与 src/lib/auth.tsx 的 THEME_KEY、src/lib/i18n 的 LANG_KEY 及词典保持一致)
+      // First-paint bootstrap: apply the stored theme and language so a refresh
+      // doesn't flash light/dark or the wrong language
+      // (keep in sync with THEME_KEY in src/lib/auth.tsx, LANG_KEY in
+      // src/lib/i18n, and the dictionaries)
       (function () {
         try {
           var t = localStorage.getItem('agh.console.theme.v1') || 'auto';
@@ -20,7 +22,7 @@
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', dark ? '#07090f' : '#eef1f7');
         } catch (e) {
-          /* 存储不可用时保持 HTML 默认深色 */
+          /* Keep the HTML default dark theme if storage is unavailable */
         }
         var lang = 'en';
         try {
@@ -35,7 +37,7 @@
               if (tag.indexOf('en') === 0) { lang = 'en'; break; }
             }
           }
-        } catch (e) { /* 存储不可用时保持英文 */ }
+        } catch (e) { /* Keep English if storage is unavailable */ }
         var zh = lang === 'zh';
         document.documentElement.lang = zh ? 'zh-CN' : 'en';
         document.title = zh ? 'AdGuard Home Console · 移动控制台' : 'AdGuard Home Console · Mobile Console';
@@ -54,7 +56,8 @@
   <body>
     <div id="root"></div>
     <script>
-      // 启动错误陷阱:WebView 内 JS 异常直接上屏(移动壳里无控制台时用于定位)
+      // Boot error trap: JS exceptions inside the WebView print straight onto
+      // the screen (for debugging in mobile shells with no console)
       window.addEventListener('error', function (e) {
         var el = document.getElementById('boot-err')
         if (!el) { el = document.createElement('pre'); el.id = 'boot-err'; document.body.appendChild(el) }

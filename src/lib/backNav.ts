@@ -1,9 +1,11 @@
 import type { NavigateFunction } from 'react-router-dom'
 
 /**
- * "点击返回按钮"标记:用于区分程序化返回与侧滑手势返回。
- * 两者在 react-router 里都是 POP,但侧滑时 WKWebView 已有原生快照平移动画,
- * 若 CSS 转场再动一次会出现双重动画;因此只有带此标记的 POP 才做滑动转场。
+ * "Back button tapped" marker: distinguishes programmatic back from the
+ * edge-swipe gesture back. Both are POP in react-router, but during a swipe
+ * WKWebView already plays its native snapshot translation; a CSS transition
+ * moving again would double-animate, so only a POP carrying this marker gets
+ * the sliding transition.
  */
 let pending = false
 
@@ -11,26 +13,31 @@ export function markBackTap() {
   pending = true
 }
 
-/** 读取并清除标记;返回是否为"点按钮触发"的返回 */
+/** Read and clear the marker; returns whether this back was button-triggered */
 export function consumeBackTap(): boolean {
   const v = pending
   pending = false
   return v
 }
 
-/** 只读窥探:当前是否带着"点按钮返回"标记(不清除)。供转场层之外的固定件
- *  (TopBar 状态 pill)在渲染期判定入场动画 —— 挂载后经 store 补挂动画类会
- *  晚一帧(闪帧);消费仍由 consumeBackTap 完成,这里不改变状态 */
+/** Read-only peek: whether the "back button tapped" marker is set (not
+ *  cleared). Lets fixed widgets outside the transition layer (TopBar status
+ *  pill) decide entrance animation at render time — adding the animation class
+ *  via store after mount runs a frame late (flicker); consumption stays with
+ *  consumeBackTap, this doesn't mutate state */
 export function peekBackTap(): boolean {
   return pending
 }
 
 /**
- * 统一返回语义:有历史条目就 POP(带标记,供转场层播放返回动画);栈空
- * (直落子页 / 刷新)才 replace 回父级。
+ * Unified back semantics: POP when history exists (with the marker, for the
+ * transition layer to play the back animation); replace to the parent only
+ * when the stack is empty (deep-linked sub-page / reload).
  *
- * 返回胶囊、原生返回按钮、表单保存与删除收尾共用此函数 —— 移动端不得用
- * replace 导航到父级页,那会在栈里留下重复条目,浏览器返回一次看起来"没反应"。
+ * Shared by the back capsule, the native back button, and form save/delete
+ * finishing — on mobile never replace-navigate to the parent page: that leaves
+ * a duplicate entry in the stack and the first browser back appears to "do
+ * nothing".
  */
 export function navBack(nav: NavigateFunction, pathname: string) {
   const idx = (window.history.state as { idx?: number } | null)?.idx

@@ -1,4 +1,4 @@
-/** 概览仪表盘 */
+/** Overview dashboard */
 import useSWR from 'swr'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,7 +15,8 @@ import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
 
 
-/** v0.107.79 的 top_* 字段是单键对象数组,兼容旧版字典结构 */
+/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
+ *  shape */
 function toMap(v: unknown): Record<string, number> {
   if (Array.isArray(v)) {
     return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))
@@ -38,12 +39,14 @@ type RangeKey = (typeof RANGE_OPTS)[number]['value']
 
 export default function Dashboard() {
   const pageIn = usePageInClass()
-  // 滑动转场中挂载(如手势返回落地)→ 跳过 content-in 入场,防手势期间动画挂起整页空白
+  // Mounted mid-slide-transition (e.g. gesture back landing) → skip the content-in
+  // entrance, so a pending animation cannot leave the whole page blank during the gesture
   const enterSkip = useEnterSkip()
   const { cfg, status } = useAuth()
   const nav = useNavigate()
-  // 跨 tab 跳转(tab 根页 → 另一个 tab 根页):replace 不进历史栈(侧滑不可
-  // 跨 tab 返回)+ push 转场动画;层级下钻(如 /top/*)仍用 nav push
+  // Cross-tab jump (tab root → another tab root): replace keeps it out of the history
+  // stack (swipe-back cannot return across tabs) + push transition animation; hierarchical
+  // drill-down (e.g. /top/*) still uses nav push
   const jump = useTabJump()
   const [topTab, setTopTab] = useState<'clients' | 'domains' | 'blocked'>('domains')
 
@@ -94,7 +97,8 @@ export default function Dashboard() {
     })
   }
 
-  // 三个分支的根 div 结构一致,React 复用同一节点,切换时不重播 page-in 动画
+  // All three branches share the same root div structure, so React reuses the node and
+  // the page-in animation does not replay when switching
   if (error && !stats) {
     return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
@@ -112,7 +116,7 @@ export default function Dashboard() {
     )
   }
 
-  // 移动端扩展指标(统计页合并):请求构成
+  // Extra mobile metrics (merged into the stats page): request composition
   const safeBrowsing = stats.num_replaced_safebrowsing
   const safeSearch = stats.num_replaced_safesearch
   const parental = stats.num_replaced_parental
@@ -123,7 +127,7 @@ export default function Dashboard() {
   return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className={enterSkip ? '' : 'content-in'}>
-        {/* 防护主卡 + 统计块:桌面并排 */}
+        {/* Protection card + stat tiles: side by side on desktop */}
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
         <div className="grid grid-cols-2 gap-3">
@@ -140,7 +144,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 流量趋势 */}
+      {/* Traffic trend */}
       <Card className="mt-4 p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -178,7 +182,7 @@ export default function Dashboard() {
         <AreaChart series={{ queries: chart.queries, blocked: chart.blocked }} labels={chart.labels} height={160} />
       </Card>
 
-      {/* 请求构成(移动端;桌面完整版在统计页) */}
+      {/* Request composition (mobile; full version lives on the stats page) */}
       <Card className="mt-4 p-4 lg:hidden">
         <h2 className="mb-3 text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
         <Donut
@@ -196,7 +200,7 @@ export default function Dashboard() {
         />
       </Card>
 
-      {/* Top 榜单(桌面占 2/3)+ 上游/服务器(右列) */}
+      {/* Top lists (2/3 width on desktop) + upstreams/server (right column) */}
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2">
           <Segmented
@@ -244,7 +248,7 @@ export default function Dashboard() {
         </Card>
 
         <div className="flex flex-col gap-4">
-          {/* 上游 DNS */}
+          {/* Upstream DNS */}
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
@@ -268,7 +272,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          {/* 服务器信息 */}
+          {/* Server info */}
           {status && (
             <Card className="p-4">
               <div className="grid grid-cols-3 gap-y-3 text-center">
@@ -285,7 +289,8 @@ export default function Dashboard() {
   )
 }
 
-/** 首次加载骨架:复刻首屏结构,根容器保持挂载,数据到达后仅替换内容、不重播页面动画 */
+/** First-load skeleton: mirrors the first screen; the root container stays mounted so data
+ *  arrival only swaps content and does not replay the page animation */
 function DashSkeleton() {
   const block = 'glass specular rounded-3xl animate-pulse'
   const enterSkip = useEnterSkip()

@@ -1,18 +1,21 @@
 @import 'tailwindcss';
 
 /* ============================================================
-   AdGuard Home Console — Liquid Glass 设计系统
-   半透明玻璃材质 · 同心圆角 · 浮动导航 · 高对比可读性
+   AdGuard Home Console — Liquid Glass design system
+   Translucent glass materials · concentric radii · floating nav ·
+   high-contrast readability
    ============================================================ */
 
-/* 安全区注入点:env() 只能在 CSS 里解析,内联样式/测试经此 var 读取与覆盖 */
+/* Safe-area injection point: env() can only be resolved in CSS; inline styles
+   and tests read and override it via this var */
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
 }
 
 :root,
 [data-theme='dark'] {
-  /* Jinx 式深色:纯黑底 + 近实色深灰卡片;磨砂只给导航与浮层(浮层用 --glass-pop) */
+  /* Jinx-style dark: pure black base + near-solid dark-gray cards; frosted
+     glass only for nav and overlays (overlays use --glass-pop) */
   --bg: #060608;
   --bg-elevated: #0f1116;
   --ambient-1: rgba(52, 211, 153, 0.07);
@@ -132,7 +135,7 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* 环境光晕背景 */
+/* Ambient glow background */
 .ambient {
   position: fixed;
   inset: 0;
@@ -144,7 +147,7 @@ body {
     radial-gradient(34vmax 34vmax at 72% 36%, var(--ambient-3), transparent 70%);
 }
 
-/* ---------- 玻璃材质 ---------- */
+/* ---------- Glass materials ---------- */
 .glass {
   background: var(--glass);
   border: 1px solid var(--glass-border);
@@ -162,7 +165,7 @@ body {
   box-shadow: var(--spec-top), var(--shadow-nav);
   backdrop-filter: blur(16px) saturate(1.6) var(--nav-bright, );
 }
-/* 顶部镜面高光,模拟玻璃折射 */
+/* Top specular highlight, mimicking glass refraction */
 .specular::after {
   content: '';
   position: absolute;
@@ -172,7 +175,8 @@ body {
   pointer-events: none;
 }
 
-/* 深色模式:卡片为纯实色,关闭镜面高光;仅导航栏保留一丝玻璃感 */
+/* Dark mode: cards are fully solid and the specular highlight is off; only
+   the nav bar keeps a hint of glass */
 [data-theme='dark'] .specular::after {
   background: none;
 }
@@ -180,7 +184,7 @@ body {
   background: linear-gradient(168deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 30%, transparent 55%);
 }
 
-/* ---------- 标签栏玻璃透镜(iOS 26/27 选中态) ---------- */
+/* ---------- Tab bar glass lens (iOS 26/27 selected state) ---------- */
 .tab-lens-track {
   transition: transform 0.45s cubic-bezier(0.32, 1.25, 0.4, 1);
 }
@@ -203,7 +207,7 @@ body {
     inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
-/* ---------- 触感反馈 ---------- */
+/* ---------- Tactile feedback ---------- */
 .press {
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
 }
@@ -212,7 +216,7 @@ body {
   opacity: 0.92;
 }
 
-/* ---------- 页面转场 ---------- */
+/* ---------- Page transitions ---------- */
 @keyframes page-in {
   from {
     opacity: 0;
@@ -227,11 +231,14 @@ body {
   animation: page-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ---------- 路由滑动转场(push/pop,见 lib/routeTransition.tsx) ----------
-   push=下钻:新页自右滑入,旧页向左让位;iOS 原生曲线。
-   pop=返回:旧页滑出右侧,新页自左浅层归位。
-   侧滑手势触发的 POP 不加这些类,由 WKWebView 原生快照动画接管,避免双重动画;
-   桌面端(≥lg)禁用,瞬时切换。 */
+/* ---------- Route slide transitions (push/pop, see lib/routeTransition.tsx) ----------
+   push = drill in: the new page slides in from the right, the old page yields
+   leftward; iOS native curve.
+   pop = back: the old page slides out to the right, the new page settles back
+   from a shallow left offset.
+   POPs triggered by the swipe gesture get none of these classes -- the
+   WKWebView native snapshot animation takes over, avoiding a double animation;
+   desktop (>=lg) disables them and switches instantly. */
 @keyframes rt-push-in {
   from { transform: translate3d(100%, 0, 0); }
   to { transform: translate3d(0, 0, 0); }
@@ -262,10 +269,13 @@ body {
 .rt-pop-in { animation-name: rt-pop-in; }
 .rt-pop-out { animation-name: rt-pop-out; }
 
-/* pop 返回落地 tab 根页:顶部状态 pill(TopBar,fixed 在转场容器之外、属新页)
-   与页面 rt-pop-in 同步纯淡入。它被 z-50 退场快照盖着、随其滑走逐渐露出,淡入
-   即无硬切;类由 useArrivalPopAnim 只在动画窗口给出,结束摘除(fill both 会一直
-   压住内联 opacity,留着会让下拉刷新的 dimmed 淡出失效) */
+/* pop back landing on a tab root: the top status pill (TopBar, fixed outside
+   the transition container, belonging to the new page) does a pure fade-in
+   synced with the page's rt-pop-in. It sits under the z-50 exit snapshot and
+   is gradually revealed as the snapshot slides away, so fading means no hard
+   cut; the class is given by useArrivalPopAnim only during the animation
+   window and removed at its end (fill both keeps overriding inline opacity,
+   and leaving it breaks pull-to-refresh's dimmed fade-out) */
 .rt-pill-in {
   animation: rt-pill-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
@@ -274,17 +284,20 @@ body {
   to { opacity: 1; }
 }
 
-/* 下拉刷新松手后的收位/回弹过渡(拖拽期间由指令式 transform 跟手,不带过渡) */
+/* Settle/spring-back transition after pull-to-refresh release (during the drag
+   an imperative transform follows the finger, with no transition) */
 .ptr-anim {
   transition:
     transform 300ms cubic-bezier(0.32, 0.72, 0, 1),
     opacity 200ms ease;
 }
 
-/* 转场层页面底:滑动的两层(新页容器/旧页快照)自身必须不透明,否则对方的
-   页面内容会从透明区域整个透出(双重曝光鬼影)。这里复制 body 底色 +
-   .ambient 光晕;转场结束摘除后恢复真实背景,径向光晕弥散,滑动中的微小
-   错位不可感知 */
+/* Transition-layer page background: the two sliding layers (new page container
+   / old page snapshot) must be opaque themselves, or the other layer's content
+   shows straight through any transparent area (double-exposure ghosting). This
+   copies the body base color + .ambient glow; once removed at transition end
+   the real background returns and the radial glow diffuses, so the tiny
+   mismatch while sliding is imperceptible */
 .rt-page-bg {
   background: var(--bg);
 }
@@ -294,9 +307,12 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  /* 限制为视口高:真实 .ambient 是 fixed(视口锚定),复制品若随页面内容
-     拉伸,渐变锚点(98% 102% 等)会落到折叠线以下,转场结束摘除换真身时
-     出现底色明暗跳变;页面顶部对齐视口顶,转场结束(滚动位仍为 0)逐像素一致 */
+  /* Capped at viewport height: the real .ambient is fixed (viewport-anchored);
+     if the copy stretched with the page content, the gradient anchors (98%
+     102% etc.) would fall below the fold and swapping in the real one at
+     transition end would make the base color jump in brightness. The page top
+     aligns with the viewport top, so at transition end (scroll still 0) they
+     are pixel-identical */
   height: 100dvh;
   pointer-events: none;
   background:
@@ -327,7 +343,8 @@ body {
   animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* 骨架屏 → 正式内容切换:仅轻微淡入,不重播整页动画 */
+/* Skeleton -> real content swap: a slight fade-in only, no full-page animation
+   replay */
 @keyframes content-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -336,7 +353,8 @@ body {
   animation: content-in 0.28s ease-out both;
 }
 
-/* Tab / 筛选切换:内容区轻量上浮淡入(比 page-in 快,不抢页面转场的戏) */
+/* Tab / filter switches: the content area fades in with a light rise (faster
+   than page-in, so it doesn't steal the page transition's show) */
 @keyframes tab-in {
   from {
     opacity: 0;
@@ -351,7 +369,7 @@ body {
   animation: tab-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ---------- 桌面下拉菜单项 ---------- */
+/* ---------- Desktop dropdown menu item ---------- */
 .menu-item {
   transition: background 0.12s ease;
 }
@@ -359,7 +377,7 @@ body {
   background: color-mix(in srgb, var(--t1) 8%, transparent);
 }
 
-/* ---------- 实时日志新条目 ---------- */
+/* ---------- New live-log entries ---------- */
 @keyframes log-flash {
   0% {
     opacity: 0;
@@ -375,7 +393,7 @@ body {
   animation: log-flash 0.9s ease-out;
 }
 
-/* ---------- iOS 开关 ---------- */
+/* ---------- iOS switch ---------- */
 .switch {
   position: relative;
   width: 51px;
@@ -412,7 +430,7 @@ body {
   background: #f4f6fb;
 }
 
-/* ---------- 细节 ---------- */
+/* ---------- Details ---------- */
 .num {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -427,13 +445,15 @@ body {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
 }
 
-/* 页面容器:移动优先 560px,桌面(≥lg)在侧边栏旁加宽 */
+/* Page container: mobile-first 560px; desktop (>=lg) widens beside the
+   sidebar */
 .page-shell {
   margin-inline: auto;
   width: 100%;
   max-width: 560px;
   padding-top: calc(var(--safe-top) + 64px);
-  /* --tabbar-space:原生玻璃 TabBar 模式下由 src/lib/nativeTabbar.ts 按 getTabBarInsets 注入;默认值对齐 CSS 标签栏高度 */
+  /* --tabbar-space: injected by src/lib/nativeTabbar.ts per getTabBarInsets in
+     native glass TabBar mode; the default matches the CSS tab bar height */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-space, 112px));
 }
 @media (min-width: 1024px) {
@@ -491,14 +511,14 @@ select.field {
   background-repeat: no-repeat;
 }
 
-/* 分隔线(iOS inset grouped) */
+/* Divider (iOS inset grouped) */
 .sep {
   height: 1px;
   background: var(--glass-border);
   margin-left: 56px;
 }
 
-/* 骨架屏 */
+/* Skeleton */
 @keyframes shimmer {
   from {
     background-position: 200% 0;
@@ -514,7 +534,7 @@ select.field {
   animation: shimmer 1.6s linear infinite;
 }
 
-/* 迷你脉冲点(实时) */
+/* Mini pulse dot (live) */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -528,7 +548,7 @@ select.field {
   animation: pulse-dot 1.8s ease-in-out infinite;
 }
 
-/* 输入域玻璃滚动条(替代原生白色滚动条) */
+/* Glass scrollbar for input fields (replaces the native white one) */
 .field {
   scrollbar-width: thin;
   scrollbar-color: var(--glass-border-strong) transparent;
@@ -547,7 +567,7 @@ select.field {
 .field::-webkit-scrollbar-corner {
   background: transparent;
 }
-/* 页面级细滚动条 */
+/* Thin page-level scrollbar */
 html {
   scrollbar-width: thin;
   scrollbar-color: var(--glass-border-strong) transparent;
@@ -563,7 +583,8 @@ html::-webkit-scrollbar-thumb {
   border-radius: 4px;
 }
 
-/* 全局禁用长按菜单与文本选择(输入框除外;需要复制的地方均有复制按钮) */
+/* Globally disable the long-press menu and text selection (inputs excepted;
+   everything copyable has a copy button) */
 body {
   -webkit-user-select: none;
   user-select: none;
@@ -580,7 +601,8 @@ svg {
   -webkit-user-drag: none;
 }
 
-/* 桌面指针设备恢复文本选择(移动端长按菜单仍全局禁用) */
+/* Restore text selection for fine-pointer devices (the mobile long-press menu
+   stays globally disabled) */
 @media (pointer: fine) {
   body {
     -webkit-user-select: text;
@@ -593,7 +615,9 @@ svg {
   }
 }
 
-/* 图表触摸区:禁止 iOS 长按呼出选择/放大镜/复制菜单;pan-y = 纵向滑动交还给页面滚动,横向拖动留给图表 scrub */
+/* Chart touch area: block the iOS long-press selection/magnifier/copy menu;
+   pan-y = vertical swipes go back to page scrolling, horizontal drags stay
+   with the chart scrub */
 .chart-touch {
   -webkit-user-select: none;
   user-select: none;

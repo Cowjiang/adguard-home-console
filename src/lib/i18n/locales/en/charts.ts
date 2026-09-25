@@ -1,4 +1,4 @@
-/** 图表组件文案 */
+/** Chart component strings */
 
 const enCharts = {
   hoverQueries: 'Queries {{n}}',

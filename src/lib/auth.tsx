@@ -1,5 +1,5 @@
 /**
- * 全局会话与主题:服务器配置、登录状态、主题切换
+ * Global session and theme: server config, login state, theme switching
  */
 import { applyNativeAppearance } from './nativeAppearance'
 import { i18n } from './i18n'
@@ -15,7 +15,8 @@ export interface SvrConfig {
 
 const CONFIG_KEY = 'agh.console.cfg.v1'
 const THEME_KEY = 'agh.console.theme.v1'
-/** /status 探测 deadline:断网时代理层 25s 才报超时,探测 5s 内必须给结论 */
+/** /status probe deadline: offline, the proxy layer takes 25s to report
+ *  timeout, so the probe must conclude within 5s */
 const PROBE_TIMEOUT_MS = 5000
 
 export type ThemeSetting = 'auto' | 'dark' | 'light'
@@ -23,7 +24,8 @@ export type ThemeSetting = 'auto' | 'dark' | 'light'
 interface AuthCtx {
   cfg: SvrConfig | null
   status: Status | null
-  /** 最近一次 /status 探测失败且此后未成功:服务离线,是 TopBar/遮罩的唯一事实源 */
+  /** Latest /status probe failed and has not succeeded since: the service
+   *  is offline; single source of truth for TopBar/mask */
   offline: boolean
   connecting: boolean
   error: string | null
@@ -62,7 +64,8 @@ function applyTheme(t: ThemeSetting) {
     (t === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
-  // 原生层(玻璃 TabBar/返回按钮/顶栏操作/原生弹层)不吃 CSS,必须显式告知明暗
+  // Native layer (glass TabBar / back button / top bar action / native sheets)
+  // ignores CSS; must be told light/dark explicitly
   applyNativeAppearance(dark)
 }
 
@@ -81,8 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => mq?.removeEventListener('change', () => applyTheme(theme))
   }, [theme])
 
-  // /status 探测快速失败:断网时代理层要 25s 才报超时,探测不等它——下拉刷新、
-  // 离线遮罩与 15s 自愈都依赖它尽快给结论。超时按失败返回 null,后台请求自生自灭
+  // Fast-fail /status probe: offline, the proxy layer takes 25s to time out
+  // and the probe doesn't wait — pull-to-refresh, the offline mask and the 15s
+  // self-heal all need a prompt verdict. A timeout resolves null as failure;
+  // the background request is left to finish on its own
   const fetchStatus = useCallback(async (c: SvrConfig): Promise<Status | null> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
@@ -99,12 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // 启动探测与断网自愈重探合一:浏览器 online/visibility 事件在 WKWebView/PWA
-  // 里可能丢失(轮询冻结的根因,见 proposals/feature/2026-09-25-refresh-triggers),
-  // 所以除事件即时探外保留 15s 低频重探;探测结果维护 offline(离线遮罩与状态条
-  // 的事实源),从失败恢复成功时全局 mutate 一次,解救被 SWR 在线标志冻住的 key,
-  // 并让状态条/防护卡回到真实状态。健康时开销仅为每 15s 一次 /status(对比 stats
-  // 轮询的每 5s 一次)。
+  // Startup probe and offline self-heal re-probe are one: online/visibility
+  // events can be lost in WKWebView/PWA (root cause of frozen polling, see
+  // proposals/feature/2026-09-25-refresh-triggers), so besides immediate
+  // event probes keep a low-frequency 15s re-probe; the probe result maintains
+  // offline (source of truth for the offline mask and status pill), and on
+  // recovery from failure a single global mutate rescues keys frozen by the
+  // SWR online flag and restores the status pill/protection card to reality.
+  // When healthy the cost is one /status per 15s (vs stats polling every 5s).
   const lastProbeOk = useRef(false)
   const probingRef = useRef(false)
   const probeStatus = useCallback(async () => {
@@ -195,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(THEME_KEY, t)
     } catch {
-      /* 存储不可用(隐私模式等):本次会话内仍然生效 */
+      /* Storage unavailable (private mode etc.): still applies for this session */
     }
     applyTheme(t)
     setThemeState(t)

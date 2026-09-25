@@ -1,4 +1,5 @@
-/** 客户端详情子页(移动端):从 /clients 点入,location.state 携带该客户端信息 */
+/** Client detail subpage (mobile): entered from /clients, location.state carries the
+ *  client data */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
@@ -17,7 +18,8 @@ export default function ClientDetailPage() {
   const { state, pathname } = useLocation() as { state?: { data?: ClientDetailData }; pathname: string }
   const data = state?.data
 
-  // 与列表页同 key,增删改后列表自动刷新
+  // Same SWR key as the list page, so the list refreshes automatically after
+  // add/delete/update
   const { mutate } = useSWR<ClientsData>(cfg ? ['clients', cfg, '/clients'] : null, swrFetcher, {
     revalidateOnMount: false,
   })

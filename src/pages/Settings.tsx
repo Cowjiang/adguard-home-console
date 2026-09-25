@@ -1,4 +1,4 @@
-/** 设置中心 + 通用设置 + 系统管理 + 外观/服务器连接/关于 */
+/** Settings hub + general settings + system management + appearance / server connection / about */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
@@ -23,7 +23,7 @@ import type { ThemeSetting } from '../lib/auth'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 
-/* ================= 设置中心 ================= */
+/* ================= Settings hub ================= */
 
 export default function Settings() {
   const nav = useNavigate()
@@ -45,8 +45,9 @@ export default function Settings() {
     { icon: <Info size={17} />, color: 'var(--violet)', title: t('settings.itemAbout'), desc: `${APP_NAME} v${APP_VERSION}`, to: '/settings/about' },
   ]
 
-  // 离线时隐藏依赖 AGH 服务器的「服务器设置」组,页面保持可点:用户可能正需要
-  // 经「服务器连接」更改服务器地址;连接恢复后该组随 offline 复位自动回来
+  // Hide the AGH-server-dependent "server settings" group while offline, keeping the page
+  // usable: the user may need to change the server address via "server connection";
+  // the group comes back automatically once offline resets on reconnect
   const groups = [
     ...(!offline ? [{ title: t('settings.groupServer'), items: serverItems }] : []),
     { title: t('settings.groupApp'), items: appItems },
@@ -81,7 +82,7 @@ export default function Settings() {
   )
 }
 
-/* ================= 通用设置 ================= */
+/* ================= General settings ================= */
 
 export function GeneralSettings() {
   const { cfg } = useAuth()
@@ -90,10 +91,11 @@ export function GeneralSettings() {
   const { data: ql, mutate: mQl } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
   const { data: sc, mutate: mSc } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
 
-  // v0.107.79 新版 API 的 interval 单位是毫秒(GET 返回 604800000 = 7 天)
+  // Newer v0.107.79 API: interval is in ms (GET returns 604800000 = 7 days)
   const HOUR = 3_600_000
   const DAY = 86_400_000
-  // 档位标签直接用 hoursLabel(走 units 词典),与格式化输出保持一致
+  // Retention labels use hoursLabel directly (units dictionary), consistent with the
+  // formatted output
   const QL_RETENTIONS = [6, 24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * HOUR }))
   const STAT_RETENTIONS = [24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * DAY }))
 
@@ -211,7 +213,7 @@ export function GeneralSettings() {
   )
 }
 
-/* ================= 系统管理 ================= */
+/* ================= System management ================= */
 
 export function SystemPage() {
   const { cfg, status } = useAuth()
@@ -250,7 +252,7 @@ export function SystemPage() {
     }
   }
 
-  // doneKey/failKey 指向 settings 域的完成/失败 toast
+  // doneKey/failKey point to the settings-domain success/failure toasts
   async function maintenance(path: string, doneKey: 'settings.cacheDone' | 'settings.statsDone' | 'settings.logDone', failKey: 'settings.cacheFail' | 'settings.statsFail' | 'settings.logFail') {
     if (!cfg) return
     try {
@@ -349,7 +351,7 @@ export function SystemPage() {
   )
 }
 
-/* ================= 外观 ================= */
+/* ================= Appearance ================= */
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useAuth()
@@ -380,7 +382,8 @@ export function AppearanceSettings() {
         <div className="mb-2.5 flex items-center gap-2 text-[13.5px] font-medium text-t1">
           <Languages size={15} className="text-t2" /> {t('settings.language')}
         </div>
-        {/* 语言名以各自语言原文展示(中文 / English),不随界面语言翻译 */}
+        {/* Language names are shown in their own language (Chinese / English), never
+            translated with the UI language */}
         <Segmented
           value={lang}
           onChange={(v) => setAppLang(v as Lang)}
@@ -398,7 +401,7 @@ export function AppearanceSettings() {
   )
 }
 
-/* ================= 服务器连接 ================= */
+/* ================= Server connection ================= */
 
 export function ServerSettings() {
   const { cfg, connect, logout } = useAuth()
@@ -446,7 +449,7 @@ export function ServerSettings() {
   )
 }
 
-/* ================= 关于 ================= */
+/* ================= About ================= */
 
 export function AboutSettings() {
   const { t } = useTranslation()

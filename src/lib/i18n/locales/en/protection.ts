@@ -1,4 +1,5 @@
-/** 防护总开关卡片(仪表盘/防护页共用)+ 过滤器中心页 */
+/** Protection master-switch card (shared by dashboard/protection pages)
+ *  + filters hub page */
 
 const enProtection = {
   on: 'Protection on',

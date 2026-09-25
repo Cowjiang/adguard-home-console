@@ -1,4 +1,4 @@
-/** 过滤器管理:黑/白名单列表、自定义规则、拦截服务 */
+/** Filter management: blacklist/whitelist filters, custom rules, blocked services */
 import { useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import useSWR from 'swr'
@@ -17,7 +17,7 @@ import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 
 
-/* ================= 黑名单 / 白名单过滤器 ================= */
+/* ================= Blacklist / whitelist filters ================= */
 
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg } = useAuth()
@@ -196,7 +196,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   )
 }
 
-/* ================= 自定义过滤规则 ================= */
+/* ================= Custom filtering rules ================= */
 
 export function RulesPage() {
   const { cfg } = useAuth()
@@ -252,9 +252,9 @@ export function RulesPage() {
   )
 }
 
-/* ================= 拦截服务 ================= */
+/* ================= Blocked services ================= */
 
-/** 拦截服务分类(group_id 来自 /blocked_services/all 目录) */
+/** Blocked service categories (group_id from the /blocked_services/all catalog) */
 const SERVICE_GROUPS: { id: string; labelKey: 'filters.svcStreaming' | 'filters.svcSocial' | 'filters.svcGaming' | 'filters.svcMessenger' | 'filters.svcAi' | 'filters.svcShopping' | 'filters.svcGambling' | 'filters.svcDating' | 'filters.svcPrivacy' | 'filters.svcHosting' | 'filters.svcSoftware' | 'filters.svcCdn' | 'filters.svcOther' }[] = [
   { id: 'streaming', labelKey: 'filters.svcStreaming' },
   { id: 'social_network', labelKey: 'filters.svcSocial' },
@@ -302,7 +302,8 @@ export function ServicesPage() {
     return (s ? all.filter((x) => x.name.toLowerCase().includes(s) || x.id.includes(s)) : all)
   }, [catalog, search])
 
-  // 点击即生效:乐观更新 + 保存队列串行化,期间 pending 保持住,避免"绿→灰→绿"闪烁
+  // Click applies instantly: optimistic update + serialized save queue; pending is held so
+  // the tile does not flicker "green → gray → green"
   const saveQueue = useRef<Promise<void>>(Promise.resolve())
   const latestIdsRef = useRef<Set<string> | null>(null)
 
@@ -337,7 +338,7 @@ export function ServicesPage() {
   const sections = (group === 'all' ? SERVICE_GROUPS : SERVICE_GROUPS.filter((g) => g.id === group))
     .map((g) => ({ group: g, items: visible.filter((x) => x.group_id === g.id) }))
     .filter((s) => s.items.length)
-  // 无分类归属的服务归入"其他"
+  // Services without a category go under "other"
   const otherItems = visible.filter((x) => !SERVICE_GROUPS.some((g) => g.id === x.group_id))
   if (otherItems.length) sections.push({ group: { id: 'other', labelKey: 'filters.svcOther' as const }, items: otherItems })
 
@@ -371,7 +372,8 @@ export function ServicesPage() {
   return (
     <Screen>
       <PageHeader back title={t('filters.svcTitle')} subtitle={t('filters.svcSub', { n: ids.size, total: catalog?.blocked_services?.length ?? 0 })} />
-      {/* 吸顶容器自身不拦截指针;吸附位置让出移动端悬浮顶栏,自然位置不留空行 */}
+      {/* The sticky container itself does not capture pointers; its stuck position clears
+          the mobile floating top bar, and its natural position leaves no blank row */}
       <div
         className="pointer-events-none sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-10 -mx-4 px-4 pb-2 lg:top-0"
         style={{ background: 'linear-gradient(var(--bg) 55%, transparent)' }}
@@ -414,7 +416,7 @@ export function ServicesPage() {
   )
 }
 
-/* ================= DNS 重写 ================= */
+/* ================= DNS rewrites ================= */
 
 export function RewritesPage() {
   const { cfg } = useAuth()
@@ -533,7 +535,7 @@ export function RewritesPage() {
   )
 }
 
-/* ================= 规则检测工具 ================= */
+/* ================= Rule check tool ================= */
 
 export function CheckHostPage() {
   const { cfg } = useAuth()

@@ -1,4 +1,5 @@
-/** 添加/编辑客户端独立子页(移动端;桌面端仍用居中弹窗,见 Clients.openForm) */
+/** Standalone client add/edit subpage (mobile; desktop still uses the centered modal,
+ *  see Clients.openForm) */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useSWRConfig } from 'swr'

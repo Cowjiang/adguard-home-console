@@ -1,7 +1,8 @@
-/** 数字与时间格式化:数值/日期按当前界面语言走 Intl,单位词走 i18n 词典 */
+/** Number and time formatting: values/dates use Intl with the current UI
+ *  language, unit words use the i18n dictionary */
 import { i18n } from './i18n'
 
-/** 当前界面语言的 BCP-47 标记 */
+/** BCP-47 tag of the current UI language */
 function lang(): string {
   return i18n.language || 'en'
 }

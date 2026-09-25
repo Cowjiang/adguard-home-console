@@ -1,4 +1,5 @@
-/** 设置中心与各子页(外观/语言为阶段一样板;通用、系统、服务器、关于为阶段二) */
+/** Settings hub and sub-pages (appearance/language are phase-one samples;
+ *  general, system, server, about are phase two) */
 
 const enSettings = {
   appearance: 'Appearance',

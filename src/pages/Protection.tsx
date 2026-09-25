@@ -1,4 +1,5 @@
-/** 过滤器中心:过滤规则入口 + 内容安全开关 + 过滤常规(防护总开关在概览页) */
+/** Filter hub: rules entry + content safety switches + filtering general (the master
+ *  protection switch lives on the dashboard) */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -55,7 +56,8 @@ export default function Protection() {
   const allowCount = filtering?.whitelist_filters?.length ?? 0
   const ruleCount = (filtering?.user_rules ?? []).filter((r) => r && !r.trim().startsWith('!') && !r.trim().startsWith('#')).length
 
-  // 状态卡:规则总数 = 启用的过滤器规则之和 + 自定义规则;上次更新取所有过滤器最近一次
+  // Status card: total rules = sum of enabled filter rules + custom rules; last update is
+  // the most recent across all filters
   const listRuleCount = (filtering?.filters ?? []).filter((f) => f.enabled).reduce((s, f) => s + (f.rules_count || 0), 0)
   const totalRules = listRuleCount + ruleCount
   const lastUpdated = [...(filtering?.filters ?? []), ...(filtering?.whitelist_filters ?? [])]
@@ -79,7 +81,7 @@ export default function Protection() {
     if (!cfg) return
     setRefreshing(true)
     try {
-      // /filtering/refresh 一次只刷一侧,黑白名单各调一次
+      // /filtering/refresh refreshes one side at a time, so call it once per list
       const [a, b] = await Promise.all([
         api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: false } }),
         api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: true } }),
@@ -140,7 +142,8 @@ export default function Protection() {
     <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <h1 className="mb-4 text-[26px] font-bold tracking-tight text-t1">{t('nav.protection')}</h1>
 
-      {/* 过滤器状态:移动端两个独立小方块(尺寸与概览页 StatTile 一致,圆形按钮在右侧居中);桌面端长条卡 */}
+      {/* Filter status: two separate small tiles on mobile (sized like the dashboard StatTile,
+          round button centered at right); a wide card on desktop */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:hidden">
         <div className="glass specular relative overflow-hidden rounded-2xl px-3.5 py-3">
           <div className="text-[12px] text-t2">{t('protection.totalRules')}</div>
@@ -196,7 +199,8 @@ export default function Protection() {
           </div>
       </Card>
 
-      {/* 桌面两列:左=过滤功能,右=安全防护+常规;移动端保持原纵向顺序 */}
+      {/* Desktop two columns: left = filtering, right = safety + general; mobile keeps the
+          original vertical order */}
       <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
         <div>
           <GroupTitle className="lg:mt-0">{t('protection.funcGroup')}</GroupTitle>

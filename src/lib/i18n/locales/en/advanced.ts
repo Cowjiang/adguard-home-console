@@ -1,4 +1,4 @@
-/** 高级设置:DNS、访问控制、加密、DHCP */
+/** Advanced settings: DNS, access control, encryption, DHCP */
 
 const enAdvanced = {
   titleDns: 'DNS settings',

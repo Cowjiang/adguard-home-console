@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# 服务器端拉取部署:从 GitHub Releases 下载最新产物并替换 /opt/agh-console。
-# 私有仓库需要只读 token,放在 /etc/agh-console-github-token(600, root)。
-# 由 agh-console-pull.timer 定时调用;版本没变化时直接退出,不会反复重启服务。
+# Server-side pull deployment: download the latest release asset from GitHub Releases and
+# replace /opt/agh-console. Private repos need a read-only token at
+# /etc/agh-console-github-token (600, root). Invoked on a schedule by
+# agh-console-pull.timer; exits early when the version is unchanged, so it does not
+# restart the service repeatedly.
 set -euo pipefail
 
 REPO="Cowjiang/adguard-home-console"
@@ -35,7 +37,7 @@ curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/octet-strea
 	-o "$TMP/$ASSET_NAME" \
 	"https://api.github.com/repos/$REPO/releases/assets/$ASSET_ID"
 
-# 备份旧版本,失败可回滚
+# Back up the previous version for rollback on failure
 rm -rf "$INSTALL_DIR.bak.prev"
 [ -d "$INSTALL_DIR.bak" ] && mv "$INSTALL_DIR.bak" "$INSTALL_DIR.bak.prev" || true
 mkdir -p "$INSTALL_DIR.bak"

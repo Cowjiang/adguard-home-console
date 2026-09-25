@@ -1,4 +1,4 @@
-/** 路由与全局守卫 */
+/** Routing and global guards */
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { SWRConfig, type SWRConfiguration } from 'swr'
@@ -32,8 +32,10 @@ function LoginRoute() {
   return <Login />
 }
 
-/** 调试自动登录(Tauri debug 壳):常驻组件,连接成功后跳 AGH_ROUTE 指定路由;
- *  放在 App 层避免 Login 卸载导致 navigate 失效;release 壳/浏览器该命令返回 null */
+/** Debug auto-login (Tauri debug shell): an always-mounted component; after a
+ *  successful connect it jumps to the route given by AGH_ROUTE. Kept at the
+ *  App layer so Login unmounting cannot invalidate navigate; the command
+ *  returns null in the release shell / browser */
 function DebugAutoLogin() {
   const { cfg, connect } = useAuth()
   const nav = useNavigate()
@@ -62,10 +64,12 @@ function DebugAutoLogin() {
   return null
 }
 
-/** SWR 全局配置:refreshWhenOffline 让轮询不被内部在线标志停摆。SWR 不读
- *  navigator.onLine,只认 offline/online 窗口事件,iOS WKWebView/PWA 里事件
- *  可能丢失,标志卡在 false 后轮询/focus/reconnect/错误重试会被同一标志全部
- *  门死(见 .agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md) */
+/** SWR global config: refreshWhenOffline keeps polling from being stalled by
+ *  the internal online flag. SWR doesn't read navigator.onLine, only the
+ *  offline/online window events; in iOS WKWebView/PWA those events can be
+ *  lost, and once the flag sticks at false, polling/focus/reconnect/error
+ *  retries are all gated off by that same flag (see
+ *  .agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md) */
 const SWR_GLOBAL: SWRConfiguration = {
   revalidateOnReconnect: true,
   refreshWhenOffline: true,

@@ -43,13 +43,15 @@ if [ -n "$missing" ]; then
 	exit 1
 fi
 
-# 与 tauri.conf.json 的 bundle.iOS.minimumSystemVersion 保持一致
+# Keep in sync with bundle.iOS.minimumSystemVersion in tauri.conf.json
 DEPLOYMENT_TARGET=15.0
 
-# 生成物的硬校验。XcodeGen 的默认设置不在二进制里，而在 <prefix>/share/xcodegen/SettingPresets；
-# 少了它（例如只把二进制拷进 PATH），xcodegen 会静默产出缺平台默认设置的工程——最典型的后果是
-# ipa 里没有图标（缺 ASSETCATALOG_COMPILER_APPICON_NAME）。这里把「生成物必须长什么样」写成断言：
-# 宁可当场失败，也不要落一个看着人畜无害的坏工程。
+# Hard validation of the generated project. XcodeGen's default settings live in
+# <prefix>/share/xcodegen/SettingPresets, not in the binary. Without them (e.g. only the
+# binary copied into PATH), xcodegen silently emits a project missing platform defaults —
+# the classic symptom is an ipa with no icon (missing ASSETCATALOG_COMPILER_APPICON_NAME).
+# Assert what the output must look like: fail on the spot instead of leaving a
+# harmless-looking broken project.
 verify_project() {
 	if [ ! -f "$PBXPROJ" ]; then
 		echo "[ios-signing] 找不到生成工程:$PBXPROJ" >&2
@@ -67,7 +69,8 @@ verify_project() {
 	require "DEVELOPMENT_TEAM = $AGH_APPLE_TEAM;" "DEVELOPMENT_TEAM = $AGH_APPLE_TEAM"
 	require "PRODUCT_BUNDLE_IDENTIFIER = $AGH_BUNDLE_ID;" "PRODUCT_BUNDLE_IDENTIFIER = $AGH_BUNDLE_ID"
 	require "IPHONEOS_DEPLOYMENT_TARGET = $DEPLOYMENT_TARGET;" "IPHONEOS_DEPLOYMENT_TARGET = $DEPLOYMENT_TARGET"
-	# 该值只来自 XcodeGen 的 SettingPresets/base.yml，用来判定预设是否真的被加载
+	# This value only comes from XcodeGen's SettingPresets/base.yml; use it to check
+	# that the presets were actually loaded
 	require "CLANG_ENABLE_OBJC_ARC = YES;" "XcodeGen 预设设置(CLANG_ENABLE_OBJC_ARC)"
 	if [ "$fail" -ne 0 ]; then
 		cat >&2 <<'EOF'
@@ -83,7 +86,7 @@ EOF
 	echo "[ios-signing] 工程校验通过:$PBXPROJ"
 }
 
-# 按 gen/apple/project.yml 重新生成工程并校验
+# Regenerate the project from gen/apple/project.yml and verify it
 generate_project() {
 	cd "$APPLE_DIR"
 	echo "[ios-signing] xcodegen generate(team=$AGH_APPLE_TEAM bundle=$AGH_BUNDLE_ID)"
@@ -123,8 +126,8 @@ case "$cmd" in
 			echo "若整个 gen/apple 都没了,按 .agents/logs/tauri-ios.md §19 用 tauri ios init 重铺并补回占位符。" >&2
 			exit 1
 		fi
-		# tauri ios build 不会重跑 xcodegen:pbxproj 一缺,构建只会以
-		# "failed to read pbxproj file … No such file or directory" 收尾。这里自愈。
+		# tauri ios build does not rerun xcodegen: once the pbxproj is missing, the build only
+		# ends with "failed to read pbxproj file … No such file or directory". Self-heal here.
 		rebuilt=0
 		if [ ! -f "$PBXPROJ" ]; then
 			echo "[ios-signing] 生成工程缺失,先按 project.yml 重建（不改任何源码）。"

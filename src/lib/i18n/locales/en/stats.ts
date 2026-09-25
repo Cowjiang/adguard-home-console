@@ -1,4 +1,4 @@
-/** 统计分析页与榜单全量子页 */
+/** Stats analysis page and the full-ranking sub-page */
 
 const enStats = {
   title: 'Statistics',

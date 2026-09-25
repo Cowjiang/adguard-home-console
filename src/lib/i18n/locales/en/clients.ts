@@ -1,4 +1,4 @@
-/** 客户端管理:列表、排序、编辑表单与详情 */
+/** Client management: list, sorting, edit form and details */
 
 const enClients = {
   title: 'Clients',

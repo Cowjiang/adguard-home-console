@@ -14,7 +14,8 @@ import filters from './filters'
 import stats from './stats'
 import advanced from './advanced'
 
-/** 与 zh 词典类型同构:缺 key 在 tsc 报错;en 可比 zh 多 key(结构检查不拒绝多余成员) */
+/** Type-isomorphic to the zh dictionary: missing keys fail tsc; en may have
+ *  extra keys (structural typing doesn't reject extras) */
 const en: typeof zhDict = { common, login, dashboard, settings, units, protection, nav, agh, charts, clients, querylog, filters, stats, advanced }
 
 export default en

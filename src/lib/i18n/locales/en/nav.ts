@@ -1,4 +1,5 @@
-/** 导航与全局状态文案:tab 标题(Layout 与原生 tabbar 共用)+ 状态条 */
+/** Navigation and global status strings: tab titles (shared by Layout and
+ *  the native tabbar) + status pill */
 
 const enNav = {
   overview: 'Overview',

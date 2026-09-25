@@ -1,7 +1,8 @@
-/** 通用文案 */
+/** Common strings */
 
 const enCommon = {
-  /** 与 zh/common.docTitle 及 index.html 首帧引导保持同值对应 */
+  /** Kept value-identical to zh/common.docTitle and index.html's
+   *  first-frame bootstrap */
   docTitle: 'AdGuard Home Console · Mobile Console',
   opFailed: 'Operation failed: {{msg}}',
   saved: 'Saved',

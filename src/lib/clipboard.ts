@@ -1,11 +1,12 @@
-/** 剪贴板复制:非安全上下文(LAN IP / WKWebView)下 navigator.clipboard 不可用,回退 execCommand */
+/** Clipboard copy: navigator.clipboard is unavailable in non-secure contexts
+ *  (LAN IP / WKWebView), fall back to execCommand */
 export async function copyText(text: string): Promise<boolean> {
   if (window.isSecureContext && navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(text)
       return true
     } catch {
-      /* 继续走降级 */
+      /* fall through to the degraded path */
     }
   }
   try {
