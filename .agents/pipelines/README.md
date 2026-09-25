@@ -30,6 +30,7 @@
 | 2026-09-25 | feature | [收敛下拉刷新触发范围并补上断网后的离线反馈](proposals/feature/2026-09-25-refresh-scope-and-offline-feedback.md) | implemented |
 | 2026-09-25 | process | [公开发布 web 版并建立三通道分发](proposals/process/2026-09-25-open-source-webui-release.md) | proposed |
 | 2026-09-25 | feature | [构建移动端增值层:系统级集成与授权分发](proposals/feature/2026-09-25-mobile-premium-tier.md) | proposed |
+| 2026-09-25 | feature | [语言设置增加跟随系统并改为下拉选择](proposals/feature/2026-09-25-language-follow-system.md) | implemented |
 
 ## 与 docs/ 的分工
 

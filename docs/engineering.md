@@ -15,7 +15,7 @@
 
 - 词典在 `src/lib/i18n/locales/`，按域拆文件（`common`、`nav`、`agh`、`charts`、`units`、`login`、`dashboard`、`clients`、`querylog`、`filters`、`protection`、`stats`、`settings`、`advanced`），`zh` 是基准语言，`en` 与其类型同构（`en: typeof zh`）：**en 缺 key 会在 `npm run check` 报错**，新增中文文案后必须同步补英文。
 - 组件经 `useTranslation()` 的 `t()` 取文案；非 React 上下文（`format.ts`、`auth.tsx`）用 `src/lib/i18n` 导出的 `i18n.t()`。带变量的 key 用 `{{name}}` 插值并显式传参（如 `t('clients.deleteConfirmTitle', { name })`），不要字符串拼接。
-- 语言解析链在 `src/lib/i18n` 的 `resolveLang()`：显式设置（`agh.console.lang.v1`）→ `navigator.languages` 顺序匹配 → **英文兜底**；`index.html` 首帧引导脚本持有一份同逻辑内联副本与同值文档标题，改动语言列表、存储键或标题时**两处必须同步**。
+- 语言解析链在 `src/lib/i18n` 的 `resolveLang()`：存储值 `zh|en|auto`（`agh.console.lang.v1`），`auto` 与缺省按 `navigator.languages` 顺序匹配 → **英文兜底**（浏览器跟随浏览器语言；iOS WKWebView 的 `navigator.languages` 跟随系统语言）；`index.html` 首帧引导脚本持有一份同逻辑内联副本与同值文档标题，改动语言列表、存储键或标题时**两处必须同步**。
 - 数字/日期经 `src/lib/format.ts` 走 `Intl` 并跟随当前语言；单位词（天/小时/分钟/秒等）在 `units` 域，时长/相对时间复数用 i18next 的 `_one/_other` 后缀，zh 两份同值（zh 基数规则恒为 other）。
 - AGH 枚举类标签（`REASON_META`、`LOG_FILTERS`）与 tab 标题存词典 key 而非文案，展示处 `t()` 翻译；Tauri 原生 TabBar 标题在语言切换后由 `useNativeTabBar` 的 `languageChanged` 副作用重新下发。
 - 代码注释、`docs/`、commit message 保持中文，不属于 i18n 范围；语言名（中文 / English）在语言选择器里以各自原文展示，不翻译。
