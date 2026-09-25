@@ -97,15 +97,16 @@ export function LogDetail({
       ) : null}
 
       <div className="mt-3 flex gap-2.5">
-        <Button variant="glass" size="md" onClick={copy} className="flex-1">
+        {/* nowrap + tighter padding keeps both labels on one line at 360px viewports */}
+        <Button variant="glass" size="md" onClick={copy} className="flex-1 whitespace-nowrap !px-3">
           <Copy size={15} /> {copied ? t('querylog.copied') : t('querylog.copyDomain')}
         </Button>
         {!blocked ? (
-          <Button variant="danger" size="md" className="flex-1" onClick={() => onSaveRule(`||${domain}^`, true)}>
+          <Button variant="danger" size="md" className="flex-1 whitespace-nowrap !px-3" onClick={() => onSaveRule(`||${domain}^`, true)}>
             <Ban size={15} /> {t('querylog.blockDomain')}
           </Button>
         ) : (
-          <Button variant="glass" size="md" className="flex-1" onClick={() => onSaveRule(`@@||${domain}^$important`, false)}>
+          <Button variant="glass" size="md" className="flex-1 whitespace-nowrap !px-3" onClick={() => onSaveRule(`@@||${domain}^$important`, false)}>
             <CheckCircle2 size={15} /> {t('querylog.whitelistDomain')}
           </Button>
         )}
