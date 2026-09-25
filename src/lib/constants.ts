@@ -58,5 +58,6 @@ export function qtypeColor(t: string): string {
  *  successful load */
 export const SERVICE_CACHE_KEY = 'agh.services.v1'
 
-export const APP_NAME = 'AdGuard Home Console'
+/** Display name; matches the Tauri shell productName in tauri.conf.json */
+export const APP_NAME = 'AGH Console'
 export const APP_VERSION = '1.0.0'
