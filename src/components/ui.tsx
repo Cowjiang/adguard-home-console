@@ -269,16 +269,16 @@ export function Button({
   // header:顶栏右侧槽位专用,移动端与返回胶囊同高(h-11),桌面与 sm 一致
   const sizes = { sm: 'h-8 px-3.5 text-[13px]', md: 'h-10 px-5 text-[14.5px]', lg: 'h-12 px-6 text-[16px]', header: 'h-11 px-4 text-[13px] lg:h-8 lg:px-3.5' }[size]
   const variants = {
-    primary: 'text-white shadow-lg',
+    primary: 'text-white',
     glass: 'glass text-t1',
     danger: 'bg-danger text-white',
     ghost: 'text-accent',
   }[variant]
   const style =
     variant === 'primary'
-      ? { background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-2)))', boxShadow: '0 8px 24px -8px color-mix(in srgb, var(--accent) 60%, transparent)' }
+      ? { background: 'linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-2)))' }
       : variant === 'danger'
-        ? { background: 'var(--danger)', boxShadow: '0 8px 24px -8px color-mix(in srgb, var(--danger) 55%, transparent)' }
+        ? { background: 'var(--danger)' }
         : undefined
   return (
     <button
