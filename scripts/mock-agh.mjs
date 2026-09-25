@@ -264,6 +264,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { data, oldest: items.length ? items[items.length - 1].time : null })
     }
     case 'GET /filtering/status': return json(res, 200, state.filtering)
+    case 'POST /filtering/config':
     case 'PUT /filtering/config': {
       if (typeof body.enabled === 'boolean') state.filtering.enabled = body.enabled
       if (Number.isFinite(Number(body.interval))) state.filtering.interval = Number(body.interval)

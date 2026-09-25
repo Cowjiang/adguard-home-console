@@ -16,6 +16,9 @@ import { IconBubble } from './Protection'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 
+// AGH /filtering interval is milliseconds; labels and picker options work in hours
+const HOUR_MS = 3_600_000
+
 
 /* ================= Blacklist / whitelist filters ================= */
 
@@ -74,7 +77,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   async function saveInterval(hours: number) {
     if (!cfg || !data) return
     try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: data.enabled, interval: hours } })
+      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: data.enabled, interval: hours * HOUR_MS } })
       mutate()
       toast(t('filters.intervalSaved'))
     } catch (e: any) {
@@ -115,7 +118,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 
   return (
     <Screen>
-      <PageHeader back title={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')} subtitle={t('filters.listCountSub', { n: filters.length, interval: data ? hoursLabel(data.interval) : '…' })} right={
+      <PageHeader back title={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')} subtitle={t('filters.listCountSub', { n: filters.length, interval: data ? hoursLabel(data.interval / HOUR_MS) : '…' })} right={
         <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
         </HeaderAction>
@@ -162,12 +165,12 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
         <Rows>
           <Row
             title={t('filters.intervalTitle')}
-            value={isAppleMobile() ? undefined : (data ? hoursLabel(data.interval) : '…')}
+            value={isAppleMobile() ? undefined : (data ? hoursLabel(data.interval / HOUR_MS) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
                 <PickSelect
                   className="field num !py-1.5 !pr-8 text-right"
-                  value={data?.interval}
+                  value={data ? data.interval / HOUR_MS : undefined}
                   options={[1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h }))}
                   onPick={(v) => saveInterval(v)}
                 />
@@ -178,7 +181,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
                 title: t('filters.intervalTitle'),
                 anchor: e.currentTarget,
                 align: 'right',
-                value: data?.interval,
+                value: data ? data.interval / HOUR_MS : undefined,
                 options: [1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h })),
                 onPick: (v) => saveInterval(v),
               })

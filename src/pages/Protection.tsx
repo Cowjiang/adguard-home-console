@@ -25,6 +25,9 @@ const SAFE_ENGINES = [
   { key: 'ecosia', label: 'Ecosia' },
 ] as const
 
+// AGH /filtering interval is milliseconds; labels and picker options work in hours
+const HOUR_MS = 3_600_000
+
 export default function Protection() {
   const pageIn = usePageInClass()
   const nav = useNavigate()
@@ -38,7 +41,7 @@ export default function Protection() {
   async function saveInterval(hours: number) {
     if (!cfg || !filtering) return
     try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours } })
+      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } })
       mFiltering()
       toast(t('filters.intervalSaved'))
     } catch (e: any) {
@@ -186,7 +189,7 @@ export default function Protection() {
           <div className="min-w-0">
             <div className="text-[12px] text-t2">{t('protection.lastUpdated')}</div>
             <div className="text-[20px] font-bold leading-tight num text-t1">{lastUpdated ? relTime(lastUpdated) : '—'}</div>
-            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? hoursLabel(filtering.interval) : '…' })}</div>
+            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? hoursLabel(filtering.interval / HOUR_MS) : '…' })}</div>
           </div>
           <div className="ml-auto">
             <Button variant="glass" loading={refreshing} onClick={refreshAllFilters}>
@@ -281,12 +284,12 @@ export default function Protection() {
           <Row
             icon={<IconBubble color="var(--t2)" bg="var(--glass)"><Timer size={17} /></IconBubble>}
             title={t('protection.intervalRow')}
-            value={isAppleMobile() ? undefined : (filtering ? hoursLabel(filtering.interval) : '…')}
+            value={isAppleMobile() ? undefined : (filtering ? hoursLabel(filtering.interval / HOUR_MS) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
                 <PickSelect
                   className="field num !py-1.5 !pr-8 text-right"
-                  value={filtering?.interval}
+                  value={filtering ? filtering.interval / HOUR_MS : undefined}
                   options={[1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h }))}
                   onPick={(v) => saveInterval(v)}
                 />
@@ -297,7 +300,7 @@ export default function Protection() {
                 title: t('protection.intervalRow'),
                 anchor: e.currentTarget,
                 align: 'right',
-                value: filtering?.interval,
+                value: filtering ? filtering.interval / HOUR_MS : undefined,
                 options: [1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h })),
                 onPick: (v) => saveInterval(v),
               })
