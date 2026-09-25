@@ -1,12 +1,14 @@
-/** Overview dashboard */
+/** Overview dashboard: hero + trend are shared; mobile keeps the tabbed top
+ *  lists and upstream quick list, desktop (>=lg) carries the full stats
+ *  analysis section merged from the former /stats page */
 import useSWR from 'swr'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowDownRight, ArrowUpRight, ChevronDown, Globe, Laptop, ShieldAlert, Zap, Database, Timer } from 'lucide-react'
+import { ChevronDown, Globe, Laptop, ShieldAlert, Users, Zap, Database, Timer, PieChart } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
-import { AreaChart, BarList, Donut, StatTile } from '../components/charts'
+import { AreaChart, BarList, Donut, RankTable, StatTile } from '../components/charts'
 import { usePageInClass, Card, Loading, Segmented, Badge, EmptyState, Button, usePick, PickSelect, TabContent } from '../components/ui'
 import { isAppleMobile } from '../lib/nativePickers'
 import { useTabJump } from '../lib/navMeta'
@@ -37,12 +39,17 @@ const RANGE_OPTS = [
 ] as const
 type RangeKey = (typeof RANGE_OPTS)[number]['value']
 
+const hourLabel = (hoursAgo: number) => {
+  const dte = new Date(Date.now() - hoursAgo * 3600_000)
+  return `${String(dte.getHours()).padStart(2, '0')}:00`
+}
+
 export default function Dashboard() {
   const pageIn = usePageInClass()
   // Mounted mid-slide-transition (e.g. gesture back landing) → skip the content-in
   // entrance, so a pending animation cannot leave the whole page blank during the gesture
   const enterSkip = useEnterSkip()
-  const { cfg, status } = useAuth()
+  const { cfg } = useAuth()
   const nav = useNavigate()
   // Cross-tab jump (tab root → another tab root): replace keeps it out of the history
   // stack (swipe-back cannot return across tabs) + push transition animation; hierarchical
@@ -58,8 +65,30 @@ export default function Dashboard() {
     refreshInterval: 60000,
   })
   const [range, setRange] = useState<RangeKey>('24h')
-  const pick = usePick()
   const { t } = useTranslation()
+
+  // Mobile trend legend: one row when it fits; when it doesn't, reflow as a
+  // symmetric 2×2 grid — a ragged 3+1 wrap reads badly next to the picker.
+  // Decided from the header box (content-width of items vs the space left
+  // beside title and picker) so both modes and live resizes recover; the
+  // callback ref re-attaches the observer when the card mounts with data
+  const [trendHeader, setTrendHeader] = useState<HTMLDivElement | null>(null)
+  const [legendGrid, setLegendGrid] = useState(false)
+  useEffect(() => {
+    if (!trendHeader) return
+    const decide = () => {
+      const kids = trendHeader.children as HTMLCollectionOf<HTMLElement>
+      const [title, legend, picker] = [kids[0], kids[1], kids[2]]
+      if (!legend || !picker) return
+      const oneLine = [...legend.children].reduce((w, c) => w + (c as HTMLElement).offsetWidth, 0) + 3 * 6
+      const avail = trendHeader.clientWidth - title.offsetWidth - picker.offsetWidth - 16
+      setLegendGrid(oneLine > avail)
+    }
+    const ro = new ResizeObserver(decide)
+    ro.observe(trendHeader)
+    decide()
+    return () => ro.disconnect()
+  }, [trendHeader])
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))
@@ -76,26 +105,20 @@ export default function Dashboard() {
     return {
       queries: q.slice(-len),
       blocked: b.slice(-len),
-      labels: Array.from({ length: len }, (_, i) => {
-        const dte = new Date(Date.now() - (len - 1 - i) * 3600_000)
-        return `${String(dte.getHours()).padStart(2, '0')}:00`
-      }),
+      // Raw 24h filter-block series; each consumer slices to its own range
+      safe: stats?.replaced_safebrowsing ?? [],
+      parental: stats?.replaced_parental ?? [],
+      labels: Array.from({ length: len }, (_, i) => hourLabel(len - 1 - i)),
     }
   }, [range, stats])
 
-  const rangeOpts = RANGE_OPTS.map((o) => ({ label: t(o.labelKey), value: o.value }))
-  const rangeOpt = RANGE_OPTS.find((o) => o.value === range)
-  const rangeLabel = rangeOpt ? t(rangeOpt.labelKey) : ''
-  const openRangePicker = (e: React.MouseEvent<HTMLElement>) => {
-    pick({
-      title: t('dashboard.rangeTitle'),
-      anchor: e.currentTarget,
-      align: 'right',
-      value: range,
-      options: rangeOpts,
-      onPick: setRange,
-    })
-  }
+  // Filtering-trend card keeps its own picker, mirroring the traffic trend
+  const [filterRange, setFilterRange] = useState<RangeKey>('24h')
+  const filterLen = filterRange === '6h' ? 6 : filterRange === '12h' ? 12 : 24
+  const filterLabels = useMemo(
+    () => Array.from({ length: filterLen }, (_, i) => hourLabel(filterLen - 1 - i)),
+    [filterLen]
+  )
 
   // All three branches share the same root div structure, so React reuses the node and
   // the page-in animation does not replay when switching
@@ -124,6 +147,16 @@ export default function Dashboard() {
 
   const blockedPct = fmtPct(stats.num_blocked_filtering, stats.num_dns_queries)
 
+  // Request composition donut, shared by the mobile card and the desktop
+  // analysis section
+  const compositionSegments = [
+    { label: t('dashboard.passed'), value: passed, color: 'var(--chart-1)' },
+    { label: t('dashboard.blocked'), value: stats.num_blocked_filtering, color: 'var(--danger)' },
+    { label: t('dashboard.safeBrowsing'), value: safeBrowsing, color: 'var(--warn)' },
+    { label: t('dashboard.safeSearch'), value: safeSearch, color: 'var(--accent-2)' },
+    { label: t('dashboard.parental'), value: parental, color: 'var(--violet)' },
+  ]
+
   return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className={enterSkip ? '' : 'content-in'}>
@@ -144,12 +177,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Traffic trend */}
+      {/* Traffic trend: mobile merges the filter-block series into the same
+          chart; its 4-entry legend sits right of the title as a 2×2 chip grid
+          aligned with the range picker — one inline row cannot fit 390px */}
       <Card className="mt-4 p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div ref={setTrendHeader} className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.trend')}</h2>
-            <div className="flex items-center gap-2 text-[10.5px] text-t2">
+            <h2 className="whitespace-nowrap text-[15.5px] font-bold text-t1">{t('dashboard.trend')}</h2>
+            <div className="hidden items-center gap-2 text-[10.5px] text-t2 lg:flex">
               <span className="flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
               </span>
@@ -158,31 +193,44 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          {isAppleMobile() ? (
-            <span className="press glass relative flex h-[30px] flex-none items-center gap-1 rounded-full pl-3 pr-7 text-[12.5px] font-semibold text-t1">
-              <PickSelect
-                className="absolute inset-0 h-[30px] w-full cursor-pointer appearance-none bg-transparent text-transparent"
-                value={range}
-                options={rangeOpts}
-                onPick={setRange}
-              />
-              <span className="pointer-events-none">{rangeLabel}</span>
-              <ChevronDown size={14} className="pointer-events-none absolute right-2 text-t2" />
+          {/* One row when it fits (wide phones), wraps right-aligned only
+              when the space between title and picker runs out */}
+          <div
+            className={`ml-auto items-center justify-end gap-x-1.5 gap-y-0.5 text-[10.5px] leading-tight text-t2 lg:hidden ${legendGrid ? 'grid grid-cols-2' : 'flex min-w-0 flex-wrap'}`}
+          >
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
             </span>
-          ) : (
-            <button
-              onClick={openRangePicker}
-              className="press glass flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-t1"
-            >
-              {rangeLabel}
-              <ChevronDown size={14} className="text-t2" />
-            </button>
-          )}
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
+            </span>
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warn)' }} /> {t('stats.malwareChart')}
+            </span>
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--violet)' }} /> {t('stats.adultChart')}
+            </span>
+          </div>
+          <RangePicker value={range} onChange={setRange} />
         </div>
-        <AreaChart series={{ queries: chart.queries, blocked: chart.blocked }} labels={chart.labels} height={160} />
+        <div className="hidden lg:block">
+          <AreaChart series={{ queries: chart.queries, blocked: chart.blocked }} labels={chart.labels} height={160} />
+        </div>
+        <div className="lg:hidden">
+          <AreaChart
+            series={{ queries: chart.queries, blocked: chart.blocked }}
+            labels={chart.labels}
+            height={160}
+            extra={[
+              { values: chart.safe.slice(-chart.queries.length), label: t('stats.malwareChart'), color: 'var(--warn)' },
+              { values: chart.parental.slice(-chart.queries.length), label: t('stats.adultChart'), color: 'var(--violet)' },
+            ]}
+          />
+        </div>
       </Card>
 
-      {/* Request composition (mobile; full version lives on the stats page) */}
+      {/* Request composition (mobile; the desktop analysis section below has
+          the full-size donut) */}
       <Card className="mt-4 p-4 lg:hidden">
         <h2 className="mb-3 text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
         <Donut
@@ -190,19 +238,14 @@ export default function Dashboard() {
           thickness={20}
           centerLabel={fmtCompact(stats.num_dns_queries)}
           centerSub={t('dashboard.totalRequests')}
-          segments={[
-            { label: t('dashboard.passed'), value: passed, color: 'var(--chart-1)' },
-            { label: t('dashboard.blocked'), value: stats.num_blocked_filtering, color: 'var(--danger)' },
-            { label: t('dashboard.safeBrowsing'), value: safeBrowsing, color: 'var(--warn)' },
-            { label: t('dashboard.safeSearch'), value: safeSearch, color: 'var(--accent-2)' },
-            { label: t('dashboard.parental'), value: parental, color: 'var(--violet)' },
-          ]}
+          segments={compositionSegments}
         />
       </Card>
 
-      {/* Top lists (2/3 width on desktop) + upstreams/server (right column) */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-2">
+      {/* Top lists + upstream quick list + server info: mobile layout only —
+          on desktop the analysis section below carries the richer equivalents */}
+      <div className="mt-4 grid gap-4 lg:hidden">
+        <Card className="p-4">
           <Segmented
             value={topTab}
             onChange={setTopTab}
@@ -247,41 +290,133 @@ export default function Dashboard() {
           </TabContent>
         </Card>
 
-        <div className="flex flex-col gap-4">
-          {/* Upstream DNS */}
-          <Card className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
-              <Database size={16} className="text-t3" />
-            </div>
-            <div className="flex flex-col gap-3">
-              {topN(stats.top_upstreams_responses, 6).map(([up, count]) => {
-                const avg = toMap(stats.top_upstreams_avg_time)[up]
-                return (
-                  <div key={up} className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px]" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
-                      <Globe size={15} />
-                    </div>
-                    <span className="w-0 min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
-                    <Badge kind="info">{fmtMs(avg)}</Badge>
-                    <span className="w-14 flex-none text-right text-[12.5px] num text-t2">{fmtNum(count)}</span>
+        {/* Upstream DNS quick list */}
+        <Card className="p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
+            <Database size={16} className="text-t3" />
+          </div>
+          <div className="flex flex-col gap-3">
+            {topN(stats.top_upstreams_responses, 6).map(([up, count]) => {
+              const avg = toMap(stats.top_upstreams_avg_time)[up]
+              return (
+                <div key={up} className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px]" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+                    <Globe size={15} />
                   </div>
-                )
-              })}
-              {!topN(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">{t('dashboard.noUpstreams')}</p>}
+                  <span className="w-0 min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
+                  <Badge kind="info">{fmtMs(avg)}</Badge>
+                  <span className="w-14 flex-none text-right text-[12.5px] num text-t2">{fmtNum(count)}</span>
+                </div>
+              )
+            })}
+            {!topN(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">{t('dashboard.noUpstreams')}</p>}
+          </div>
+        </Card>
+
+        <ServerInfoCard />
+      </div>
+
+      {/* Composition + filtering trends: a flex pair, not a fixed ratio — the
+          donut card hugs its content width (legend text never truncates) and
+          the trend chart takes the rest, shrinking freely with the viewport */}
+      <div className="mt-4 hidden items-start gap-4 lg:flex">
+        <Card className="flex-none p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <PieChart size={16} className="text-t2" />
+            <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
+          </div>
+          <Donut
+            centerLabel={fmtCompact(stats.num_dns_queries)}
+            centerSub={t('dashboard.totalRequests')}
+            segments={compositionSegments}
+          />
+        </Card>
+
+        {/* Malware/phishing + adult-site blocks in one chart, same header
+            form as the traffic trend: legend by the title, range picker right;
+            series colors remapped to the donut's segment colors */}
+        <Card className="min-w-0 flex-1 p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <h2 className="whitespace-nowrap text-[15.5px] font-bold text-t1">{t('stats.filterTrend')}</h2>
+              <div className="flex items-center gap-2 text-[10.5px] text-t2">
+                <span className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warn)' }} /> {t('stats.malwareChart')}
+                </span>
+                <span className="flex items-center gap-1 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--violet)' }} /> {t('stats.adultChart')}
+                </span>
+              </div>
             </div>
+            <RangePicker value={filterRange} onChange={setFilterRange} />
+          </div>
+          <div style={{ '--chart-1': 'var(--warn)', '--chart-2': 'var(--violet)' } as React.CSSProperties}>
+            <AreaChart
+              series={{ queries: chart.safe.slice(-filterLen), blocked: chart.parental.slice(-filterLen) }}
+              labels={filterLabels}
+              height={160}
+              tooltipLabels={[t('stats.malwareChart'), t('stats.adultChart')]}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* Rankings as two independent masonry columns: cards hug their own
+          height, so e.g. the upstream table follows the blocked list with no
+          forced row alignment against the left column */}
+      <div className="mt-4 hidden items-start gap-4 lg:grid lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          <Card className="p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Globe size={16} className="text-t2" />
+              <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topDomains15')}</h2>
+            </div>
+            <RankTable items={topN(stats.top_queried_domains, 15)} />
+            <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/queried')}>
+              {t('dashboard.viewMore')}
+            </Button>
           </Card>
 
-          {/* Server info */}
-          {status && (
-            <Card className="p-4">
-              <div className="grid grid-cols-3 gap-y-3 text-center">
-                <InfoCell icon={<Zap size={14} />} label={t('dashboard.status')} value={status.running ? t('dashboard.running') : t('dashboard.stopped')} good={status.running} />
-                <InfoCell icon={<Laptop size={14} />} label={t('dashboard.dnsPort')} value={String(status.dns_port)} />
-                <InfoCell icon={<Timer size={14} />} label={t('dashboard.uptime')} value={fmtUptime(status.start_time)} />
-              </div>
-            </Card>
-          )}
+          <Card className="p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Users size={16} className="text-t2" />
+              <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topClients10')}</h2>
+            </div>
+            <RankTable items={topN(stats.top_clients, 10)} color="var(--accent-2)" resolve={clientName} />
+            <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/clients')}>
+              {t('dashboard.viewMore')}
+            </Button>
+          </Card>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card className="p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <ShieldAlert size={16} className="text-t2" />
+              <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topBlocked15')}</h2>
+            </div>
+            {topN(stats.top_blocked_domains, 15).length ? (
+              <>
+                <RankTable items={topN(stats.top_blocked_domains, 15)} color="var(--danger)" />
+                <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/blocked')}>
+                  {t('dashboard.viewMore')}
+                </Button>
+              </>
+            ) : (
+              <EmptyState icon={<ShieldAlert size={30} className="text-t3" />} title={t('dashboard.noBlockedTitle')} subtitle={t('dashboard.noBlockedSub')} />
+            )}
+          </Card>
+
+          <Card className="p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Database size={16} className="text-t2" />
+              <h2 className="text-[15.5px] font-bold text-t1">{t('dashboard.upstreams')}</h2>
+            </div>
+            <UpstreamTable stats={stats} />
+          </Card>
+
+          <ServerInfoCard />
         </div>
       </div>
       </div>
@@ -305,13 +440,142 @@ function DashSkeleton() {
         </div>
       </div>
       <div className={`${block} mt-4 h-[228px]`} />
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className={`${block} h-[300px] lg:col-span-2`} />
+      {/* Mobile: tabbed top lists + upstreams + server info */}
+      <div className="mt-4 grid gap-4 lg:hidden">
+        <div className={`${block} h-[300px]`} />
+        <div className={`${block} h-[220px]`} />
+        <div className={`${block} h-[92px]`} />
+      </div>
+      {/* Desktop: analysis skeleton (adaptive composition/trends pair, then
+          two independent masonry ranking columns) */}
+      <div className="mt-4 hidden items-start gap-4 lg:flex">
+        <div className={`${block} h-[240px] w-[400px] flex-none`} />
+        <div className={`${block} h-[240px] min-w-0 flex-1`} />
+      </div>
+      <div className="mt-4 hidden items-start gap-4 lg:grid lg:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <div className={`${block} h-[220px]`} />
+          <div className={`${block} h-[620px]`} />
+          <div className={`${block} h-[500px]`} />
+        </div>
+        <div className="flex flex-col gap-4">
+          <div className={`${block} h-[500px]`} />
+          <div className={`${block} h-[400px]`} />
           <div className={`${block} h-[92px]`} />
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Trend range selector shared by the traffic-trend and filtering-trend
+ *  cards: anchored menu normally, native select overlay on Apple devices */
+function RangePicker({ value, onChange }: { value: RangeKey; onChange: (v: RangeKey) => void }) {
+  const { t } = useTranslation()
+  const pick = usePick()
+  const options = RANGE_OPTS.map((o) => ({ label: t(o.labelKey), value: o.value }))
+  const opt = RANGE_OPTS.find((o) => o.value === value)
+  const label = opt ? t(opt.labelKey) : ''
+  const open = (e: React.MouseEvent<HTMLElement>) => {
+    pick({
+      title: t('dashboard.rangeTitle'),
+      anchor: e.currentTarget,
+      align: 'right',
+      value,
+      options,
+      onPick: onChange,
+    })
+  }
+  if (isAppleMobile()) {
+    return (
+      <span className="press glass relative flex h-[30px] flex-none items-center gap-1 rounded-full pl-3 pr-7 text-[12.5px] font-semibold text-t1">
+        <PickSelect
+          className="absolute inset-0 h-[30px] w-full cursor-pointer appearance-none bg-transparent text-transparent"
+          value={value}
+          options={options}
+          onPick={onChange}
+        />
+        <span className="pointer-events-none">{label}</span>
+        <ChevronDown size={14} className="pointer-events-none absolute right-2 text-t2" />
+      </span>
+    )
+  }
+  return (
+    <button
+      onClick={open}
+      className="press glass flex flex-none items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-t1"
+    >
+      {label}
+      <ChevronDown size={14} className="text-t2" />
+    </button>
+  )
+}
+
+/** Running status / DNS port / uptime, shared by the mobile right column and
+ *  the desktop analysis right column */
+function ServerInfoCard() {
+  const { status } = useAuth()
+  const { t } = useTranslation()
+  if (!status) return null
+  return (
+    <Card className="p-4">
+      <div className="grid grid-cols-3 gap-y-3 text-center">
+        <InfoCell icon={<Zap size={14} />} label={t('dashboard.status')} value={status.running ? t('dashboard.running') : t('dashboard.stopped')} good={status.running} />
+        <InfoCell icon={<Laptop size={14} />} label={t('dashboard.dnsPort')} value={String(status.dns_port)} />
+        <InfoCell icon={<Timer size={14} />} label={t('dashboard.uptime')} value={fmtUptime(status.start_time)} />
+      </div>
+    </Card>
+  )
+}
+
+/** Upstream latency table: response-count bar + fastest-highlight avg time;
+ *  the desktop counterpart of the mobile upstream quick list */
+function UpstreamTable({ stats }: { stats: Stats }) {
+  const { t } = useTranslation()
+  const rows = topN(stats.top_upstreams_responses, 8).map(([up, count]) => {
+    const avg = toMap(stats.top_upstreams_avg_time)[up]
+    return [up, count, avg ?? 0] as [string, number, number]
+  })
+  if (!rows.length) return <p className="py-6 text-center text-[13px] text-t3">{t('charts.empty')}</p>
+  const maxCount = Math.max(1, ...rows.map((r) => r[1]))
+  const fastest = Math.min(...rows.filter((r) => r[2] > 0).map((r) => r[2]), Infinity)
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-3 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-t3">
+        <span className="min-w-0 flex-1">{t('stats.colUpstream')}</span>
+        <span className="w-20 text-right">{t('stats.colResponses')}</span>
+        <span className="w-24 text-right">{t('stats.colAvgTime')}</span>
+      </div>
+      {rows.map(([up, count, avg]) => (
+        <div key={up} className="flex items-center gap-3 rounded-lg px-2 py-[7px] transition-colors hover:bg-white/[0.04]">
+          <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+            <Database size={13} />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
+          <span className="flex w-20 flex-none items-center justify-end gap-2">
+            <span className="h-[6px] w-10 overflow-hidden rounded-full" style={{ background: 'var(--glass)' }}>
+              <span
+                className="block h-full rounded-full transition-all duration-500"
+                style={{ width: `${(count / maxCount) * 100}%`, background: 'var(--accent)' }}
+              />
+            </span>
+            <span className="w-10 text-right text-[12.5px] num text-t2">{fmtCompact(count)}</span>
+          </span>
+          <span className="w-24 flex-none text-right">
+            {avg > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] num font-semibold"
+                style={{
+                  color: avg <= fastest + 0.01 ? 'var(--ok)' : 'var(--t2)',
+                  background: avg <= fastest + 0.01 ? 'var(--ok-soft)' : 'transparent',
+                }}
+              >
+                {avg <= fastest + 0.01 && <Timer size={11} />}
+                {fmtMs(avg)}
+              </span>
+            )}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

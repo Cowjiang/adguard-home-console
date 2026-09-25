@@ -1,12 +1,10 @@
-/** Stats analysis page and the full-ranking sub-page */
+/** Overview ranking cards (merged from the former stats page) and the
+ *  full-ranking sub-page */
 
 const enStats = {
-  title: 'Statistics',
-  totalQueries: 'Total queries',
-  countSub: '{{n}} queries',
-  safeBrowsingSub: 'malicious domains replaced',
-  peakHour: 'Peak hour',
-  trend24h: '24-hour trend',
+  filterTrend: 'Filtering trends',
+  malwareChart: 'Malware & phishing',
+  adultChart: 'Adult websites',
   topDomains15: 'Top 15 domains',
   topBlocked15: 'Top 15 blocked',
   topClients10: 'Top 10 clients',

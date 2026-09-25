@@ -8,7 +8,6 @@ import { ToastHost } from './components/ui'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import StatsPage from './pages/StatsPage'
 import TopListPage from './pages/TopListPage'
 import QueryLog from './pages/QueryLog'
 import LogDetailPage from './pages/LogDetailPage'
@@ -86,7 +85,9 @@ export default function App() {
             <Route path="/login" element={<LoginRoute />} />
             <Route element={<Protected><Layout /></Protected>}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/stats" element={<StatsPage />} />
+              {/* Former /stats analysis page merged into the desktop overview;
+                  keep stale deep links working */}
+              <Route path="/stats" element={<Navigate to="/" replace />} />
               <Route path="/top/:kind" element={<TopListPage />} />
               <Route path="/logs" element={<QueryLog />} />
               <Route path="/logs/detail" element={<LogDetailPage />} />

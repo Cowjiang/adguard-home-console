@@ -1,7 +1,7 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-09-24
+**Updated:** 2026-09-26
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
@@ -16,7 +16,7 @@
 ## 路由
 
 - `/login` 公开；其余路由挂在 `<Protected><Layout/></Protected>` 下，未配置连接时重定向登录页。
-- 顶级页：`/`（概览）、`/stats`、`/top/:kind`、`/logs`、`/logs/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及九个子页；`*` 兜底回概览。
+- 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及九个子页；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
 - 顶级路由白名单在 `src/lib/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
 - 移动端的详情与表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。
 
@@ -40,8 +40,8 @@
 
 | 页面 | 职责 | 主要接口 |
 | --- | --- | --- |
-| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行 | `/stats`、`/clients`、`POST /protection` |
-| `src/pages/StatsPage.tsx`、`src/pages/TopListPage.tsx` | 完整统计与榜单全量 | `/stats` |
+| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行；桌面（≥lg）另带统计分析区块（构成环图、拦截趋势、Top 榜、上游耗时表，移动端把拦截序列并入流量趋势图） | `/stats`、`/clients`、`POST /protection` |
+| `src/pages/TopListPage.tsx` | 榜单全量 | `/stats` |
 | `src/pages/QueryLog.tsx`、`src/pages/LogDetailPage.tsx` | 实时日志、翻页、单条详情与一键加规则 | `/querylog`、`/filtering/status`、`POST /filtering/set_rules` |
 | `src/pages/Protection.tsx` | 过滤功能总览：开关、刷新、重写与服务拦截入口 | `/filtering/status`、`POST /filtering/config`、`POST /filtering/refresh` |
 | `src/pages/FiltersPages.tsx` | 过滤器与白名单 CRUD、自定义规则、服务拦截、DNS 重写、规则检测 | `/filtering/*`、`/blocked_services/*`、`/rewrite/*` |
@@ -63,7 +63,7 @@
 
 ## 契约归一化
 
-- `KVMap` 兼容字典与单键对象数组两种形态；`top_*` 的归一在概览、统计、榜单三处各自实现。
+- `KVMap` 兼容字典与单键对象数组两种形态；`top_*` 的归一在概览、榜单两处各自实现。
 - `top_clients` 的键可能是 `name`、`IP` 或 `name|IP`，由 `src/components/ClientDetail.tsx` 按候选键求和。
 - duration 与 interval 单位不统一：`POST /protection` 提交前把秒换成毫秒，`querylog`/`stats` 配置是毫秒，`filtering.interval` 直接按小时；`elapsedMs` 是字符串，用前先 `Number()`。
 - `/rewrite/list` 兼容裸数组与 `{total}`；`/clients` 的 `clients`/`auto_clients` 可空，统一按空数组处理；DHCP `lease_duration` 按秒展示与编辑。
