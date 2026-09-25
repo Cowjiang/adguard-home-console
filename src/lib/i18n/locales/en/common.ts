@@ -3,7 +3,7 @@
 const enCommon = {
   /** Kept value-identical to zh/common.docTitle and index.html's
    *  first-frame bootstrap */
-  docTitle: 'AdGuard Home Console · Mobile Console',
+  docTitle: 'AGH Console',
   opFailed: 'Operation failed: {{msg}}',
   saved: 'Saved',
   saveFailed: 'Failed to save: {{msg}}',

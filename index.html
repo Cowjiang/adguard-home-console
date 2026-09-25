@@ -40,7 +40,7 @@
         } catch (e) { /* Keep English if storage is unavailable */ }
         var zh = lang === 'zh';
         document.documentElement.lang = zh ? 'zh-CN' : 'en';
-        document.title = zh ? 'AdGuard Home Console · 移动控制台' : 'AdGuard Home Console · Mobile Console';
+        document.title = 'AGH Console';
         var desc = document.querySelector('meta[name="description"]');
         if (desc) desc.setAttribute('content', zh
           ? 'AdGuard Home 移动端控制台 — 现代玻璃质感的多平台 AdGuard Home 管理器'
@@ -51,7 +51,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="AdGuard Home mobile console — a modern, glassy multi-platform AdGuard Home manager" />
-    <title>AdGuard Home Console · Mobile Console</title>
+    <title>AGH Console</title>
   </head>
   <body>
     <div id="root"></div>
