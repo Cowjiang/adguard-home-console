@@ -67,19 +67,28 @@ export default function Dashboard() {
   const [range, setRange] = useState<RangeKey>('24h')
   const { t } = useTranslation()
 
-  // Mobile trend legend: one row when it fits; once it wraps, reflow as a
+  // Mobile trend legend: one row when it fits; when it doesn't, reflow as a
   // symmetric 2×2 grid — a ragged 3+1 wrap reads badly next to the picker.
-  // The container keeps flex-wrap so the observer can detect the wrap, then
-  // swaps to grid; both states are two-row-equal in height, so it settles
-  const trendLegendRef = useRef<HTMLDivElement>(null)
+  // Decided from the header box (content-width of items vs the space left
+  // beside title and picker) so both modes and live resizes recover; the
+  // callback ref re-attaches the observer when the card mounts with data
+  const [trendHeader, setTrendHeader] = useState<HTMLDivElement | null>(null)
   const [legendGrid, setLegendGrid] = useState(false)
   useEffect(() => {
-    const el = trendLegendRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setLegendGrid(el.clientHeight > 20))
-    ro.observe(el)
+    if (!trendHeader) return
+    const decide = () => {
+      const kids = trendHeader.children as HTMLCollectionOf<HTMLElement>
+      const [title, legend, picker] = [kids[0], kids[1], kids[2]]
+      if (!legend || !picker) return
+      const oneLine = [...legend.children].reduce((w, c) => w + (c as HTMLElement).offsetWidth, 0) + 3 * 6
+      const avail = trendHeader.clientWidth - title.offsetWidth - picker.offsetWidth - 16
+      setLegendGrid(oneLine > avail)
+    }
+    const ro = new ResizeObserver(decide)
+    ro.observe(trendHeader)
+    decide()
     return () => ro.disconnect()
-  }, [])
+  }, [trendHeader])
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))
@@ -172,7 +181,7 @@ export default function Dashboard() {
           chart; its 4-entry legend sits right of the title as a 2×2 chip grid
           aligned with the range picker — one inline row cannot fit 390px */}
       <Card className="mt-4 p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div ref={setTrendHeader} className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <h2 className="whitespace-nowrap text-[15.5px] font-bold text-t1">{t('dashboard.trend')}</h2>
             <div className="hidden items-center gap-2 text-[10.5px] text-t2 lg:flex">
@@ -187,19 +196,18 @@ export default function Dashboard() {
           {/* One row when it fits (wide phones), wraps right-aligned only
               when the space between title and picker runs out */}
           <div
-            ref={trendLegendRef}
             className={`ml-auto items-center justify-end gap-x-1.5 gap-y-0.5 text-[10.5px] leading-tight text-t2 lg:hidden ${legendGrid ? 'grid grid-cols-2' : 'flex min-w-0 flex-wrap'}`}
           >
-            <span className="flex items-center gap-1 whitespace-nowrap">
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
             </span>
-            <span className="flex items-center gap-1 whitespace-nowrap">
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
             </span>
-            <span className="flex items-center gap-1 whitespace-nowrap">
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warn)' }} /> {t('stats.malwareChart')}
             </span>
-            <span className="flex items-center gap-1 whitespace-nowrap">
+            <span className="flex w-max items-center gap-1 whitespace-nowrap">
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--violet)' }} /> {t('stats.adultChart')}
             </span>
           </div>

@@ -18,7 +18,7 @@
   - 桌面专属（`hidden lg:*`）：「请求构成 + 拦截趋势」自适应 flex 行——构成卡 `flex-none` 贴内容宽度（图例文本不截断），拦截趋势卡 `min-w-0 flex-1` 吃剩余宽度随视口收缩，无固定比例；排行榜为左右独立瀑布流两列（热门域名+活跃客户端 | 拦截域名+上游耗时表+运行状态），卡片各自贴合内容高度，不强制左右对齐。
 - 拦截趋势卡与流量趋势卡同构：图例跟标题、右侧独立的时间范围选择器（抽出共用 `RangePicker`），序列色映射构成图分段色（`--chart-1`/`--chart-2` 在包装层覆盖为 `--warn`/`--violet`）。
 - `AreaChart` 扩展：`extra` 附加序列（共享 queries 纵轴比例、独立渐变 id，`useId` 命名空间化避免多实例渐变冲突）、`tooltipLabels` 自定义悬浮文案；悬浮数据卡加 `whitespace-nowrap` 修复右侧悬停时文字换行。
-- 移动端流量趋势图例：默认单行，空间不足时以 ResizeObserver 检测换行并切为对称 2×2 网格（不允许 3+1 不对称换行）。
+- 移动端流量趋势图例：默认单行，按头部可用宽度（图例项内容总宽 vs 标题+选择器之外的余量，ResizeObserver 观察头部）放不下时切为对称 2×2 网格（不允许 3+1 不对称换行），变宽后自动恢复单行。
 - 路由：移除原统计页组件；`/stats` 重定向 `/`；`TOP_LEVEL_ROUTES` 移除 `/stats`；i18n 清理孤儿键（`nav.stats`、stats 页专属键），新增 `stats.filterTrend`/`malwareChart`/`adultChart`。
 
 ## Accept
