@@ -27,6 +27,41 @@ const DHCP_DEFAULT_STATUS = {
 }
 
 // ---------- In-memory state ----------
+// ---------- TLS ----------
+const TLS_DEFAULTS = {
+  enabled: false, server_name: '', force_https: false, serve_plain_dns: true,
+  port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 784,
+  certificate_chain: '', certificate_path: '', private_key: '', private_key_path: '', private_key_saved: false,
+}
+// 按 v0.107.79 语义推导校验状态：私钥可用 = 内容/路径/private_key_saved 任一；
+// 启用但缺证书或私钥时 valid_pair=false 并给出 warning_validation
+function tlsDerived(t) {
+  const hasCert = !!(t.certificate_chain || t.certificate_path)
+  const hasKey = !!(t.private_key || t.private_key_path || t.private_key_saved)
+  const out = { ...t }
+  if (!t.enabled) {
+    out.valid_cert = false; out.valid_chain = false; out.valid_key = false; out.valid_pair = false
+    out.warning_validation = ''
+    return out
+  }
+  out.valid_cert = hasCert
+  out.valid_chain = hasCert
+  out.valid_key = hasKey
+  out.valid_pair = hasCert && hasKey
+  if (out.valid_pair) {
+    out.warning_validation = ''
+    if (hasCert && !t.subject) {
+      out.subject = 'CN=dns.example.org'
+      out.issuer = 'CN=Mock CA,O=Mock,C=US'
+      out.not_before = new Date(Date.now() - 30 * 86400_000).toISOString()
+      out.not_after = new Date(Date.now() + 60 * 86400_000).toISOString()
+      out.dns_names = [t.server_name || 'dns.example.org']
+    }
+  } else {
+    out.warning_validation = !hasCert ? 'certificate is not set' : 'private key is not set'
+  }
+  return out
+}
 const state = {
   protectionEnabled: true,
   protectionDisabledUntil: null, // ISO string | null
@@ -80,6 +115,7 @@ const state = {
     { domain: 'printer.home.arpa', answer: '192.168.1.88', enabled: true },
   ],
   blockedServiceIds: ['youtube', 'tiktok'],
+  tls: { ...TLS_DEFAULTS, key_type: 'RSA 2048' },
   clients: [
     {
       name: 'Cindy-MacBook', ids: ['192.168.1.50'], use_global_settings: true, filtering_enabled: true,
@@ -362,9 +398,15 @@ const server = http.createServer(async (req, res) => {
     case 'GET /access/list': return json(res, 200, state.accessList)
     case 'POST /access/set':
     case 'PUT /access/set': state.accessList = { allowed_clients: body.allowed_clients || [], disallowed_clients: body.disallowed_clients || [], blocked_hosts: body.blocked_hosts || [] }; return json(res, 200, {})
-    case 'POST /tls/validate': return json(res, 200, { valid_pair: true, warning_validation: '' })
-    case 'POST /tls/configure': return json(res, 200, {})
-    case 'GET /tls/status': return json(res, 200, { enabled: false, server_name: '', force_https: false, serve_plain_dns: true, port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 853, valid_cert: false, valid_chain: false, valid_key: false, valid_pair: false })
+    case 'POST /tls/validate': return json(res, 200, tlsDerived({ ...state.tls, ...body }))
+    case 'POST /tls/configure': {
+      const merged = tlsDerived({ ...state.tls, ...body })
+      // 与真实一致：private_key_saved=true 时不回传私钥内容
+      if (merged.private_key_saved) merged.private_key = ''
+      state.tls = merged
+      return json(res, 200, {})
+    }
+    case 'GET /tls/status': return json(res, 200, state.tls)
     case 'GET /dhcp/status': return json(res, 200, state.dhcp.status)
     // 与真实 v0.107.79 一致：以接口名为键的裸对象，无 interfaces 包裹；
     // eth0 无 v6 地址、eth1 有,用于验证 IPv6 表单的可用性提示

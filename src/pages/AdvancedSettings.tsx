@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type DnsInfo, type TlsStatus, type DhcpStatus } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, useConfirm, useSheet, toast, Badge, EmptyState, usePick,
+  Loading, useConfirm, useSheet, toast, Badge, EmptyState, usePick, Segmented,
 } from '../components/ui'
 import { fmtBytes, fmtDate } from '../lib/format'
 
@@ -382,15 +382,30 @@ export function AccessSettings() {
 
 /* ================= Encryption settings ================= */
 
+// 原生 Encryption Form 的 defaultValues（端口为标准端口常量）
+const TLS_DEFAULTS = {
+  enabled: false, server_name: '', force_https: false, serve_plain_dns: true,
+  port_https: 443, port_dns_over_tls: 853, port_dns_over_quic: 784,
+  certificate_chain: '', certificate_path: '', private_key: '', private_key_path: '', private_key_saved: false,
+}
+
 export function EncryptionSettings() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
+  const confirm = useConfirm()
   const { data, mutate, isLoading } = useSWR<TlsStatus>(cfg ? ['tls', cfg, '/tls/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<null | Partial<TlsStatus>>(null)
   const [saving, setSaving] = useState(false)
+  // 原生 certificate_source / key_source radio：路径与内容互斥，保存时清空未选字段
+  const [certSource, setCertSource] = useState<'path' | 'content'>('path')
+  const [keySource, setKeySource] = useState<'path' | 'content'>('path')
 
   useEffect(() => {
-    if (data && draft === null) setDraft({ ...data })
+    if (data && draft === null) {
+      setDraft({ ...data })
+      setCertSource(data.certificate_chain ? 'content' : 'path')
+      setKeySource((data.private_key || data.private_key_saved) ? 'content' : 'path')
+    }
   }, [data, draft])
 
   const d = draft
@@ -399,24 +414,54 @@ export function EncryptionSettings() {
 
   async function save() {
     if (!cfg || !d) return
+    // 原生 form_error_equal：HTTPS 与 DoT 端口不得相同
+    if (d.port_https === d.port_dns_over_tls) return toast(t('advanced.portConflict'), 'err')
     setSaving(true)
     try {
+      // 原生 getSubmitValues 语义：只保留所选来源的字段；勾选已存私钥时不回传内容
+      const body: Partial<TlsStatus> = { ...d }
+      if (certSource === 'content') body.certificate_path = ''
+      else body.certificate_chain = ''
+      if (keySource === 'content') {
+        body.private_key_path = ''
+        if (body.private_key_saved) body.private_key = ''
+      } else {
+        body.private_key = ''
+      }
       // Validate first, then apply
-      const validate = await api<any>(cfg, '/tls/validate', { method: 'POST', body: d })
+      const validate = await api<any>(cfg, '/tls/validate', { method: 'POST', body })
       const hasError = validate?.warning_validation && !validate?.valid_pair
       if (hasError) {
         toast(t('advanced.validateFailed', { msg: validate.warning_validation }), 'err')
-        setSaving(false)
         return
       }
-      await api(cfg, '/tls/configure', { method: 'POST', body: d })
-      mutate()
-      setDraft(null)
+      await api(cfg, '/tls/configure', { method: 'POST', body })
+      // 等 refetch 拿到服务端新值再回填：先置 null 会立即用旧数据重填草稿，
+      // 之后数据更新不再同步，dirty 永远清不掉
+      const fresh = await mutate()
+      if (fresh) setDraft({ ...fresh })
       toast(t('advanced.savedEncryption'))
     } catch (e: any) {
       toast(t('common.saveFailed', { msg: e.message }), 'err')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 原生 clearFields：确认后向服务端下发默认配置（不是仅清空表单）
+  async function resetEncryption() {
+    if (!cfg) return
+    try {
+      await api(cfg, '/tls/configure', { method: 'POST', body: TLS_DEFAULTS })
+      const fresh = await mutate()
+      if (fresh) {
+        setDraft({ ...fresh })
+        setCertSource('path')
+        setKeySource('path')
+      }
+      toast(t('advanced.resetEncryptionDone'))
+    } catch (e: any) {
+      toast(t('common.saveFailed', { msg: e.message }), 'err')
     }
   }
 
@@ -436,7 +481,8 @@ export function EncryptionSettings() {
           <div className="min-w-0 flex-1">
             <p className="text-[15.5px] font-bold text-t1">{data.enabled ? t('advanced.enabledTitle') : t('advanced.disabledTitle')}</p>
             <p className="text-[12.5px] text-t2">
-              {t('advanced.chainState', { chain: data.valid_chain ? t('advanced.valid') : t('advanced.invalid'), key: data.valid_key ? t('advanced.valid') : t('advanced.invalid') })}{data.key_type ? ` · ${data.key_type}` : ''}
+              {/* key_type 中的空格用不换行空格,避免 "RSA 2048" 断成两行 */}
+              {t('advanced.chainState', { chain: data.valid_chain ? t('advanced.valid') : t('advanced.invalid'), key: data.valid_key ? t('advanced.valid') : t('advanced.invalid') })}{data.key_type ? ` · ${data.key_type.replace(' ', '\u00A0')}` : ''}
             </p>
           </div>
           <Badge kind={!data.valid_pair || expiring ? 'warn' : 'ok'}>{!data.valid_pair ? t('advanced.pairInvalid') : expiring ? t('advanced.expiring') : t('advanced.certValid')}</Badge>
@@ -505,32 +551,83 @@ export function EncryptionSettings() {
           <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">{t('advanced.sniHint')}</span>
         </div>
         <div className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.certPathLabel')}</span>
-          <input className="field num !py-2.5 !text-[13px]" value={d.certificate_path ?? ''} onChange={(e) => set('certificate_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/cert.pem" autoCapitalize="off" spellCheck={false} />
-          <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">{t('advanced.certPathHint', { chain: data.valid_chain ? t('advanced.valid') : t('advanced.invalid'), cert: data.valid_cert ? t('advanced.valid') : t('advanced.invalid') })}</span>
-        </div>
-        <div className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.certContentLabel')}</span>
-          <textarea className="field" style={{ minHeight: 72 }} value={d.certificate_chain ?? ''} onChange={(e) => set('certificate_chain', e.target.value)} spellCheck={false} placeholder={t('advanced.certContentPlaceholder')} />
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-t2">{t('advanced.certSource')}</span>
+            <Segmented
+              fit
+              size="sm"
+              value={certSource}
+              onChange={setCertSource}
+              options={[
+                { value: 'path' as const, label: t('advanced.srcPath') },
+                { value: 'content' as const, label: t('advanced.srcContent') },
+              ]}
+            />
+          </div>
+          <span className="mb-2 block text-[11.5px] leading-relaxed text-t3">{t('advanced.sourceClearHint')}</span>
+          {certSource === 'path' ? (
+            <>
+              <input className="field num !py-2.5 !text-[13px]" value={d.certificate_path ?? ''} onChange={(e) => set('certificate_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/cert.pem" autoCapitalize="off" spellCheck={false} />
+              <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">{t('advanced.certPathHint', { chain: data.valid_chain ? t('advanced.valid') : t('advanced.invalid'), cert: data.valid_cert ? t('advanced.valid') : t('advanced.invalid') })}</span>
+            </>
+          ) : (
+            <textarea className="field" style={{ minHeight: 128 }} value={d.certificate_chain ?? ''} onChange={(e) => set('certificate_chain', e.target.value)} spellCheck={false} placeholder={t('advanced.certContentPlaceholder')} />
+          )}
         </div>
       </Card>
 
           <GroupTitle>{t('advanced.keyGroup')}</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
         <div className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.keyPathLabel')}</span>
-          <input className="field num !py-2.5 !text-[13px]" value={d.private_key_path ?? ''} onChange={(e) => set('private_key_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/key.pem" autoCapitalize="off" spellCheck={false} />
-          <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">
-            {t('advanced.keyPathHint', {
-              keyType: data.key_type ? t('advanced.keyTypeNamed', { type: data.key_type }) : t('advanced.privateKey'),
-              state: data.valid_key ? t('advanced.valid') : t('advanced.invalid'),
-              saved: data.private_key_saved ? t('advanced.keySaved') : '',
-            })}
-          </span>
-        </div>
-        <div className="block">
-          <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.keyContentLabel')}</span>
-          <textarea className="field" style={{ minHeight: 72 }} value={d.private_key ?? ''} onChange={(e) => set('private_key', e.target.value)} spellCheck={false} placeholder={t('advanced.keyContentPlaceholder')} />
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-[12.5px] text-t2">{t('advanced.keySource')}</span>
+            <Segmented
+              fit
+              size="sm"
+              value={keySource}
+              onChange={setKeySource}
+              options={[
+                { value: 'path' as const, label: t('advanced.srcPath') },
+                { value: 'content' as const, label: t('advanced.srcContent') },
+              ]}
+            />
+          </div>
+          <span className="mb-2 block text-[11.5px] leading-relaxed text-t3">{t('advanced.sourceClearHint')}</span>
+          {keySource === 'path' ? (
+            <>
+              <input className="field num !py-2.5 !text-[13px]" value={d.private_key_path ?? ''} onChange={(e) => set('private_key_path', e.target.value)} placeholder="/opt/adguardhome/conf/ssl/key.pem" autoCapitalize="off" spellCheck={false} />
+              <span className="mt-1.5 block text-[11.5px] leading-relaxed text-t3">
+                {t('advanced.keyPathHint', {
+                  keyType: data.key_type ? t('advanced.keyTypeNamed', { type: data.key_type }) : t('advanced.privateKey'),
+                  state: data.valid_key ? t('advanced.valid') : t('advanced.invalid'),
+                  saved: data.private_key_saved ? t('advanced.keySaved') : '',
+                })}
+              </span>
+            </>
+          ) : (
+            <>
+              {data.private_key_saved && (
+                <div className="mb-2.5 flex items-center gap-3 rounded-2xl px-3.5 py-2.5" style={{ background: 'var(--glass)' }}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13.5px] font-medium text-t1">{t('advanced.useSavedKey')}</p>
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-t2">{t('advanced.useSavedKeySub')}</p>
+                  </div>
+                  {/* 原生 use_saved_key：勾选即清空 private_key,由服务端沿用已存私钥 */}
+                  <Switch on={!!d.private_key_saved} onChange={(v) => { set('private_key_saved', v); if (v) set('private_key', '') }} />
+                </div>
+              )}
+              {/* 禁用态是状态说明而非输入提示,避免"留空则…"教用户做做不到的事 */}
+              <textarea
+                className="field"
+                style={{ minHeight: 128 }}
+                value={d.private_key ?? ''}
+                onChange={(e) => set('private_key', e.target.value)}
+                spellCheck={false}
+                placeholder={d.private_key_saved ? t('advanced.savedKeyPlaceholder') : t('advanced.keyContentPlaceholder')}
+                disabled={!!d.private_key_saved}
+              />
+            </>
+          )}
         </div>
         <p className="text-[11.5px] leading-relaxed text-t3">{t('advanced.encryptionNote')}</p>
       </Card>
@@ -543,6 +640,23 @@ export function EncryptionSettings() {
           <Button className="flex-1" loading={saving} onClick={save}>{t('advanced.validateAndSave')}</Button>
         </div>
       )}
+
+      {/* 全宽收束页底(与 DHCP 危险行同款);与 dirty 双按钮拉开间距,避免危险操作像挂在保存动作下 */}
+      <Card className="mt-6">
+        <Row
+          title={t('advanced.resetEncryption')}
+          subtitle={t('advanced.resetEncryptionSub')}
+          danger
+          onClick={() => confirm({
+            title: t('advanced.resetEncryptionTitle'),
+            message: dirty ? t('advanced.resetEncryptionMsgDirty') : t('advanced.resetEncryptionMsg'),
+            destructive: true,
+            confirmText: t('advanced.resetAction'),
+            onConfirm: resetEncryption,
+          })}
+          last
+        />
+      </Card>
     </Screen>
   )
 }
