@@ -10,7 +10,6 @@ const enProtection = {
   pauseTitle: 'Pause protection',
   pauseFor: 'Pause for {{label}}',
   pauseAction: 'Timed pause',
-  refresh: 'Refresh',
   untilManual: 'Until turned back on',
   totalRules: 'Total rules',
   rulesCustomSub: 'incl. {{n}} custom',

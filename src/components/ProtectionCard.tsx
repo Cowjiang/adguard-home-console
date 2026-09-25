@@ -1,6 +1,6 @@
 /** Master protection switch card (shared by Dashboard / Protection pages) */
 import { useEffect, useMemo, useState } from 'react'
-import { ShieldCheck, ShieldOff, Clock3, RefreshCw } from 'lucide-react'
+import { ShieldCheck, ShieldOff, Clock3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
@@ -129,9 +129,6 @@ export function ProtectionCard() {
       <div className="mt-4 flex gap-2">
         <Button variant="glass" size="sm" onClick={(e) => openPausePicker(e)}>
           <Clock3 size={14} /> {t('protection.pauseAction')}
-        </Button>
-        <Button variant="glass" size="sm" loading={busy} onClick={() => refreshStatus()}>
-          <RefreshCw size={14} /> {t('protection.refresh')}
         </Button>
       </div>
     </div>

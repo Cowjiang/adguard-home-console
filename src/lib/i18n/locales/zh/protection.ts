@@ -9,7 +9,6 @@ const zhProtection = {
   pauseTitle: '暂停防护',
   pauseFor: '暂停 {{label}}',
   pauseAction: '定时暂停',
-  refresh: '刷新状态',
   untilManual: '直到手动开启',
   totalRules: '规则总数',
   rulesCustomSub: '含 {{n}} 条自定义',
