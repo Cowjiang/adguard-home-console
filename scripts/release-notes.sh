@@ -15,7 +15,7 @@ is_ancestor() {
 
 previous_tag() {
   local candidate
-  for candidate in $(git tag --list 'v*.*.*' --sort=-v:refname); do
+  for candidate in $(git tag --list 'v0.1.0-dev.*' --sort=-v:refname); do
     if [ -n "$tag" ] && [ "$candidate" = "$tag" ]; then
       continue
     fi
