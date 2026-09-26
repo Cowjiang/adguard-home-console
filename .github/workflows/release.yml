@@ -1,12 +1,11 @@
 name: Release
 
+# Release channel per 2026-09-25-open-source-webui-release: a semver tag
+# produces the release tarball. GHCR image and npm package jobs land with the
+# full release pipeline; pushes to branches no longer create releases.
 on:
   push:
-    branches: [main, master]
-    paths-ignore:
-      - 'docs/**'
-      - '.agents/**'
-      - '**.md'
+    tags: ['v*.*.*']
   workflow_dispatch:
 
 permissions:
@@ -36,34 +35,19 @@ jobs:
       - name: Package
         run: tar czf agh-console.tar.gz dist server package.json
 
-      - name: Compute version tag
-        id: ver
-        run: echo "tag=v0.1.0-dev.$(date +%Y%m%d).$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-
       - name: Prepare release notes
         env:
-          BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
-          TAG: ${{ steps.ver.outputs.tag }}
+          TAG: ${{ github.ref_name }}
           BRANCH: ${{ github.ref_name }}
         run: bash scripts/release-notes.sh
 
-      - name: Check for an existing release
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
+      # Manual dispatches run the build for verification but only publish from a tag
       - name: Create release
-        if: steps.check.outputs.exists == 'false'
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          name: ${{ steps.ver.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body_path: release-notes.md
           files: agh-console.tar.gz
