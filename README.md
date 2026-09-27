@@ -44,7 +44,21 @@ AdGuard Home has no CORS headers, so a browser cannot talk to its API directly �
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 ```
 
-Multi-arch (amd64 / arm64). The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+Multi-arch (amd64 / arm64), published on semver releases. Image tags: `latest`, `X.Y.Z`, and `X.Y`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+
+Or with Docker Compose:
+
+```yaml
+services:
+  agh-console:
+    image: ghcr.io/cowjiang/agh-console:latest
+    container_name: agh-console
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    # environment:
+    #   AGH_DEFAULT_URL: http://192.168.1.2:3000
+```
 
 ### npx
 
