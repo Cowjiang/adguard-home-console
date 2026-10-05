@@ -29,6 +29,14 @@ AdGuard Home 的 API 不返回 CORS 头，浏览器无法直连——所有第�
 
 ![过滤器](../images/filters-dark.png)
 
+打包为原生 iOS 应用（Tauri 2 外壳）后：底部玻璃标签栏、原生返回手势与下拉刷新，界面语言跟随系统（截图为英文系统下的效果）。
+
+<div align="center">
+  <img src="../images/ios-query-log.png" width="220" alt="iOS 查询日志" />
+  <img src="../images/ios-filters.png" width="220" alt="iOS 过滤器" />
+  <img src="../images/ios-settings.png" width="220" alt="iOS 设置" />
+</div>
+
 ## 功能速览
 
 - **概览**：防护开关与定时暂停、查询/拦截统计、24 小时趋势图、热门榜单、上游延迟与运行时长
