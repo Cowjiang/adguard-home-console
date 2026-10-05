@@ -1,0 +1,17 @@
+# Keep the build context to what `npm ci` + `vite build` need
+.git
+.github
+.agents
+.impeccable
+.local-backup
+.playwright-mcp
+_probe
+dist
+node_modules
+docs
+scripts
+src-tauri
+.zcodeignore
+.env*
+*.md
+!README.md

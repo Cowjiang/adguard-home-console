@@ -7,6 +7,7 @@
 
 | 主题 | 入口 | 内容 |
 | --- | --- | --- |
+| 项目简介（中文） | [assets/README.zh-CN.md](assets/README.zh-CN.md) | 项目定位、界面预览、功能速览与快速上手 |
 | 结构与接缝 | [architecture/README.md](architecture/README.md) | 两条交付线、请求路径、各端结构与构建发布；该目录自成一册，页面不在此展开 |
 | AdGuard Home v0.107.79 契约 | [agh-api.md](agh-api.md) | `/control/*` 的字段、单位与枚举 |
 | Web 端布局与交互 | [web-interaction.md](web-interaction.md) | 响应式结构、弹层与选择器、页面行为、路由转场 |
