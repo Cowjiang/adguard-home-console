@@ -122,6 +122,14 @@ Credentials are stored only in your browser's `localStorage`; requests are forwa
 
 The same repository carries a [Tauri 2](https://tauri.app) shell for desktop and iOS/Android packaging, including a Rust proxy and this repo's own Tauri plugins (native glass header components, pull-to-refresh, and more). See [docs/native-platforms.md](docs/native-platforms.md) for platform details.
 
+<div align="center">
+  <img src="docs/images/ios-query-log.png" width="270" alt="Live query log in the iOS app" />
+  <img src="docs/images/ios-filters.png" width="270" alt="Blocklist filters in the iOS app" />
+  <img src="docs/images/ios-settings.png" width="270" alt="Settings in the iOS app" />
+  <br />
+  <sub>iOS app — live query log, blocklist filters, settings</sub>
+</div>
+
 ## Development
 
 ```bash
