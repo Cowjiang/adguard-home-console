@@ -13,7 +13,8 @@ import {
 import { useAuth } from '../lib/auth'
 import { api, swrFetcher, type ClientsData, type AghClient, type AutoClient, type Stats } from '../lib/api'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { ClientDetail, kvCount, type ClientDetailData } from '../components/ClientDetail'
+import { ClientDetail, type ClientDetailData } from '../components/ClientDetail'
+import { kvCount } from '../lib/stats'
 import { fmtNum } from '../lib/format'
 import { isAppleMobile } from '../lib/nativePickers'
 import {

@@ -3,7 +3,8 @@
 //!   short paths such as `/control/...` or `/status` directly)
 //! - Manually follows 301/302/307/308 up to 3 times; location uses the **origin**
 //!   only (swap the whole origin, keep the original request path — Express
-//!   semantics)
+//!   semantics), and only while the hostname stays the same: replaying the
+//!   Authorization header to another host would hand it the admin password
 //! - Timeouts: 120s for `/filtering/refresh`, 25s otherwise; timeout/network
 //!   errors → 502 `{"error":"..."}`
 //! - Responses are returned as-is as text + content-type; JSON is not parsed or
@@ -73,15 +74,21 @@ fn upstream_url(target: &str, path_with_query: &str) -> Result<Url, String> {
         .map_err(|_| "目标地址无效".to_string())
 }
 
-/// Origin replacement for 308-style redirects: `new URL(location, upstream).origin`
-fn redirect_origin(current: &Url, location: &str) -> Result<String, String> {
+/// Redirect target for 308-style redirects: `new URL(location, upstream).origin`.
+/// Same hostname only (scheme and port may change): Authorization is replayed on
+/// every hop, so following another host would leak the admin password
+fn redirect_target(current: &Url, location: &str, origin_host: Option<&str>) -> Result<String, String> {
     let loc = Url::parse(location)
         .or_else(|_| current.join(location))
         .map_err(|_| "重定向地址无效".to_string())?;
-    match loc.origin() {
-        url::Origin::Tuple(_, _, _) => Ok(loc.origin().ascii_serialization()),
-        url::Origin::Opaque(_) => Err("重定向地址无效".into()),
+    if !matches!(loc.origin(), url::Origin::Tuple(_, _, _)) {
+        return Err("重定向地址无效".into());
     }
+    let host = loc.host_str().map(|h| h.to_ascii_lowercase());
+    if host.is_none() || host.as_deref() != origin_host {
+        return Err("上游重定向到其他主机,已拒绝转发凭据".into());
+    }
+    Ok(loc.origin().ascii_serialization())
 }
 
 /// Timeout tiers: Express keys on `req.path.includes('/filtering/refresh')`
@@ -122,8 +129,11 @@ pub async fn agh_fetch_impl(
         Err(msg) => return AghFetchResult::error(502, &msg),
     };
 
-    // Manual redirect following: take only the origin from location, keep the
-    // request path unchanged (Express semantics)
+    // Manual redirect following: same hostname only, origin swap with the request
+    // path kept unchanged (Express semantics). The caller's target pins the host.
+    let origin_host = Url::parse(target.trim())
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_ascii_lowercase()));
     let mut redirects: usize = 0;
     let mut current_target = target.to_string();
     loop {
@@ -172,7 +182,7 @@ pub async fn agh_fetch_impl(
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or_default()
                 .to_string();
-            match redirect_origin(&upstream, &loc) {
+            match redirect_target(&upstream, &loc, origin_host.as_deref()) {
                 Ok(origin) => {
                     current_target = origin;
                     redirects += 1;
@@ -258,23 +268,22 @@ mod tests {
     }
 
     #[test]
-    fn redirect_origin_cases() {
+    fn redirect_same_host_only() {
         let cur = Url::parse("http://a.example:8080/control/status").unwrap();
-        // Absolute location: swap the whole origin (port included); URL origin
-        // serialization has no trailing slash (same as new URL().origin)
+        // Same host with another scheme/port: allowed (the http->https upgrade is why
+        // redirects are followed at all); origin serialization has no trailing slash
         assert_eq!(
-            redirect_origin(&cur, "https://b.example:8443/other").unwrap(),
-            "https://b.example:8443"
+            redirect_target(&cur, "https://a.example:8443/other", Some("a.example")).unwrap(),
+            "https://a.example:8443"
         );
-        // Relative location: resolve against the current upstream, take origin
+        // Relative location resolves against the current upstream: same host
         assert_eq!(
-            redirect_origin(&cur, "//c.example/control").unwrap(),
-            "http://c.example"
+            redirect_target(&cur, "/control/other", Some("a.example")).unwrap(),
+            "http://a.example:8080"
         );
-        assert_eq!(
-            redirect_origin(&cur, "https://d.example").unwrap(),
-            "https://d.example"
-        );
+        // Another host: refused, Authorization would be replayed to it
+        assert!(redirect_target(&cur, "https://b.example/x", Some("a.example")).is_err());
+        assert!(redirect_target(&cur, "//c.example/control", Some("a.example")).is_err());
     }
 
     #[test]
@@ -345,8 +354,8 @@ mod tests {
         assert!(s.body_text.contains("\"protection_enabled\":true"));
     }
 
-    // ---- 308 redirect: spin up mini HTTP servers to verify "swap the whole
-    // origin, keep the original request path" ----
+    // ---- Redirects: spin up mini HTTP servers to verify the same-host rule and
+    // "swap the whole origin, keep the original request path" ----
 
     async fn spawn_origin_server(port: u16, reply: &'static str) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
@@ -390,6 +399,28 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(150)).await;
         let r = agh_fetch_impl("GET", "http://127.0.0.1:39803", "", "/status", None).await;
         assert_eq!(r.status, 308, "3 跳后应原样返回 308 而不是继续跟随");
+    }
+
+    #[tokio::test]
+    async fn redirect_cross_host_is_refused() {
+        // 127.0.0.2 is a different hostname, so the hop must be refused before the
+        // Authorization header goes anywhere
+        let _a = spawn_origin_server(
+            39811,
+            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.2:39812/control/status\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let r = agh_fetch_impl(
+            "GET",
+            "http://127.0.0.1:39811",
+            "Basic YWRtaW46ZGVtbw==",
+            "/status",
+            None,
+        )
+        .await;
+        assert_eq!(r.status, 502, "{}", r.body_text);
+        assert!(r.body_text.contains("其他主机"), "{}", r.body_text);
     }
 
     #[tokio::test]

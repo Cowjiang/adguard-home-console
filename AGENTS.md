@@ -36,9 +36,10 @@ Take the global constraints from this file; open only the next layer relevant to
 
 ## Code conventions
 
-- The repo has no linter/formatter; style relies on convention plus `npm run check` (`tsconfig.json` has `strict` on): TS/TSX uses 2-space indent, single quotes, and no trailing semicolons; Rust keeps 4 spaces.
+- The repo has no linter/formatter; style relies on convention plus `pnpm check` (`tsconfig.json` has `strict` on): TS/TSX uses 2-space indent, single quotes, and no trailing semicolons; Rust keeps 4 spaces.
 - Code comments are in English and kept concise: state what the code does, the constraints it works under, and the motivation behind it; no lengthy explanations unless they are genuinely needed.
 - Place new code in the existing layers: pages go in `src/pages/`, shared components and base controls in `src/components/`, requests, state, and utilities in `src/lib/`; Rust keeps one concern per file.
+- Package manager is pnpm (pinned in `package.json#packageManager`); do not add a `package-lock.json`. pnpm 12's supply-chain policy rejects freshly published versions — see `docs/engineering.md`.
 - All AGH requests go through `api()` in `src/lib/api.ts`; SWR uses only `swrFetcher` with keys shaped like `['<short-name>', cfg, path]`. Never place React Hooks after a conditional return.
 - AGH time fields are milliseconds throughout; `stats.top_*` are single-key object arrays — normalize before consuming. Endpoints, enums, and units follow `docs/agh-api.md`; other implementation constraints live in `docs/engineering.md`.
 - Commit messages use English conventional commits (`feat(scope):`, `fix(scope):`, `docs:`, `refactor(scope):`, `ci:`). Conversations with the user are in Chinese; `docs/` and `.agents/` pages are written in Chinese, while this file and `README.md` are English — match the language of the file you are editing.
@@ -47,7 +48,7 @@ Take the global constraints from this file; open only the next layer relevant to
 
 Run the checks that match the scope of your change:
 
-- Web frontend: `npm run check` (`tsconfig.json` has `strict` on) and `npm run build`.
+- Web frontend: `pnpm check` (`tsconfig.json` has `strict` on), `pnpm test`, and `pnpm build`.
 - Rust: start `node scripts/mock-agh.mjs` first, then `cd src-tauri && cargo test`; when the mock is not running, cases that depend on it exit silently and still report ok.
 - iOS: generate and build the project via `scripts/ios-signing.sh` (it validates project settings after generation and automatically rebuilds a missing project before building); do not bypass the script by calling `xcodegen` or `tauri ios init` directly.
 - Docs and proposals: `node scripts/verify-proposals.mjs`; add `--links` when referenced paths change.

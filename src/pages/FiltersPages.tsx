@@ -31,7 +31,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const { data, mutate, isLoading } = useSWR<FilteringStatus>(
-    cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 20000 }
+    cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 20000 }
   )
 
   const filters = (whitelist ? data?.whitelist_filters : data?.filters) ?? []
@@ -204,7 +204,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 export function RulesPage() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
-  const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher)
+  const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 

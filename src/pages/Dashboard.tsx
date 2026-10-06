@@ -15,22 +15,7 @@ import { useTabJump } from '../lib/navMeta'
 import { useEnterSkip } from '../lib/routeTransition'
 import { ProtectionCard } from '../components/ProtectionCard'
 import { fmtCompact, fmtNum, fmtPct, fmtMs, fmtUptime } from '../lib/format'
-
-
-/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
- *  shape */
-function toMap(v: unknown): Record<string, number> {
-  if (Array.isArray(v)) {
-    return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))
-  }
-  return (v as Record<string, number>) ?? {}
-}
-
-function topN(obj: unknown, n: number): [string, number][] {
-  return Object.entries(toMap(obj))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-}
+import { toMap, topEntries } from '../lib/stats'
 
 const RANGE_OPTS = [
   { value: '6h', labelKey: 'dashboard.range6h' },
@@ -258,16 +243,16 @@ export default function Dashboard() {
           <TabContent value={topTab} className="mt-4">
             {topTab === 'domains' && (
               <>
-                <BarList items={topN(stats.top_queried_domains, 10)} />
+                <BarList items={topEntries(stats.top_queried_domains, 10)} />
                 <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/queried')}>
                   {t('dashboard.viewMore')}
                 </Button>
               </>
             )}
             {topTab === 'blocked' && (
-              topN(stats.top_blocked_domains, 10).length ? (
+              topEntries(stats.top_blocked_domains, 10).length ? (
                 <>
-                  <BarList items={topN(stats.top_blocked_domains, 10)} color="var(--danger)" />
+                  <BarList items={topEntries(stats.top_blocked_domains, 10)} color="var(--danger)" />
                   <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/blocked')}>
                     {t('dashboard.viewMore')}
                   </Button>
@@ -279,7 +264,7 @@ export default function Dashboard() {
             {topTab === 'clients' && (
               <>
                 <BarList
-                  items={topN(stats.top_clients, 10).map(([ip, v]) => [clientName(ip), v] as [string, number])}
+                  items={topEntries(stats.top_clients, 10).map(([ip, v]) => [clientName(ip), v] as [string, number])}
                   color="var(--accent-2)"
                 />
                 <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/clients')}>
@@ -297,7 +282,7 @@ export default function Dashboard() {
             <Database size={16} className="text-t3" />
           </div>
           <div className="flex flex-col gap-3">
-            {topN(stats.top_upstreams_responses, 6).map(([up, count]) => {
+            {topEntries(stats.top_upstreams_responses, 6).map(([up, count]) => {
               const avg = toMap(stats.top_upstreams_avg_time)[up]
               return (
                 <div key={up} className="flex items-center gap-3">
@@ -310,7 +295,7 @@ export default function Dashboard() {
                 </div>
               )
             })}
-            {!topN(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">{t('dashboard.noUpstreams')}</p>}
+            {!topEntries(stats.top_upstreams_responses, 1).length && <p className="py-2 text-center text-[13px] text-t3">{t('dashboard.noUpstreams')}</p>}
           </div>
         </Card>
 
@@ -372,7 +357,7 @@ export default function Dashboard() {
               <Globe size={16} className="text-t2" />
               <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topDomains15')}</h2>
             </div>
-            <RankTable items={topN(stats.top_queried_domains, 15)} />
+            <RankTable items={topEntries(stats.top_queried_domains, 15)} />
             <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/queried')}>
               {t('dashboard.viewMore')}
             </Button>
@@ -383,7 +368,7 @@ export default function Dashboard() {
               <Users size={16} className="text-t2" />
               <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topClients10')}</h2>
             </div>
-            <RankTable items={topN(stats.top_clients, 10)} color="var(--accent-2)" resolve={clientName} />
+            <RankTable items={topEntries(stats.top_clients, 10)} color="var(--accent-2)" resolve={clientName} />
             <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/clients')}>
               {t('dashboard.viewMore')}
             </Button>
@@ -396,9 +381,9 @@ export default function Dashboard() {
               <ShieldAlert size={16} className="text-t2" />
               <h2 className="text-[15.5px] font-bold text-t1">{t('stats.topBlocked15')}</h2>
             </div>
-            {topN(stats.top_blocked_domains, 15).length ? (
+            {topEntries(stats.top_blocked_domains, 15).length ? (
               <>
-                <RankTable items={topN(stats.top_blocked_domains, 15)} color="var(--danger)" />
+                <RankTable items={topEntries(stats.top_blocked_domains, 15)} color="var(--danger)" />
                 <Button variant="glass" size="sm" className="mt-3 w-full" onClick={() => nav('/top/blocked')}>
                   {t('dashboard.viewMore')}
                 </Button>
@@ -531,7 +516,7 @@ function ServerInfoCard() {
  *  the desktop counterpart of the mobile upstream quick list */
 function UpstreamTable({ stats }: { stats: Stats }) {
   const { t } = useTranslation()
-  const rows = topN(stats.top_upstreams_responses, 8).map(([up, count]) => {
+  const rows = topEntries(stats.top_upstreams_responses, 8).map(([up, count]) => {
     const avg = toMap(stats.top_upstreams_avg_time)[up]
     return [up, count, avg ?? 0] as [string, number, number]
   })

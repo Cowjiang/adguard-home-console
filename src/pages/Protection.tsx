@@ -36,7 +36,7 @@ export default function Protection() {
   const sheet = useSheet()
   const pick = usePick()
   const [refreshing, setRefreshing] = useState(false)
-  const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
+  const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
   async function saveInterval(hours: number) {
     if (!cfg || !filtering) return

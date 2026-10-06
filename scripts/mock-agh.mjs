@@ -2,9 +2,23 @@
  * Local mock AdGuard Home v0.107.79 — for the iOS line (Tauri shell) and offline
  * local integration testing.
  * Usage: node scripts/mock-agh.mjs  → listens on 127.0.0.1:3990
+ * Env knobs (all optional; defaults reproduce the single-instance behavior):
+ *   PORT, HOST               listen address (HOST defaults to loopback; set it to
+ *                            e.g. a LAN IP to reach the mock from a device)
+ *   MOCK_SCALE               multiplies every /stats count (default 1)
+ *   MOCK_AVG_TIME            avg_processing_time in seconds (default 0.0234)
+ *   MOCK_REVERSE             reverses top_* ordering (merge/ranking checks)
+ *   MOCK_VERSION             /status.version (default 0.107.79)
+ *   MOCK_TIME_UNITS          hours|days, also sizes the series (default hours)
+ *   MOCK_STATS_INTERVAL      /stats/config.interval in ms (default 24h)
+ *   MOCK_REDIRECT_TO         test seam only, see GET /__redirect-test
+ * Run a second instance with a different PORT plus these knobs to give the two
+ * instances distinguishable data (see docs/engineering.md).
+ * The blocked-services catalog is identical on every instance; only the
+ * version and the numbers differ.
  * Auth: any non-empty Basic credentials (missing Authorization → 401);
  * used to exercise the 401 branch.
- * Contract source: src/lib/api.ts + docs/agh-api.md
+ * Contract source: src/lib/api.ts + docs/agh-api.md + the official openapi.yaml
  *   - interval/duration in ms; avg_processing_time and top_upstreams_avg_time
  *     in seconds (float)
  *   - stats top_* are single-key object arrays (new format); reason has 12 string enums
@@ -13,7 +27,15 @@
  */
 import http from 'node:http'
 
-const PORT = 3990
+const PORT = Number(process.env.PORT || 3990)
+const HOST = process.env.HOST || '127.0.0.1'
+const SCALE = Number(process.env.MOCK_SCALE || 1)
+const AVG_TIME = Number(process.env.MOCK_AVG_TIME || 0.0234)
+const REVERSE = !!process.env.MOCK_REVERSE
+const VERSION = process.env.MOCK_VERSION || '0.107.79'
+const TIME_UNITS = process.env.MOCK_TIME_UNITS === 'days' ? 'days' : 'hours'
+const STATS_INTERVAL = Number(process.env.MOCK_STATS_INTERVAL || 24 * 3600_000)
+const REDIRECT_TO = process.env.MOCK_REDIRECT_TO || ''
 const startedAt = Date.now() - 3 * 3600_000 - 42 * 60_000
 
 // DHCP 默认配置(/dhcp/reset 也恢复到这里);expires 为 RFC3339
@@ -67,7 +89,7 @@ const state = {
   protectionDisabledUntil: null, // ISO string | null
   protectionDisabledDuration: 0, // ms
   querylogConfig: { enabled: true, interval: 6 * 3600_000, anonymize_client_ip: false, ignored: [], ignored_enabled: false },
-  statsConfig: { enabled: true, interval: 24 * 3600_000, ignored: [], ignored_enabled: false },
+  statsConfig: { enabled: true, interval: STATS_INTERVAL, ignored: [], ignored_enabled: false },
   dnsInfo: {
     upstream_dns: ['https://dns.google/dns-query', 'https://cloudflare-dns.com/dns-query', '223.5.5.5'],
     bootstrap_dns: ['223.5.5.5', '119.29.29.29'],
@@ -161,30 +183,39 @@ function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 
 function pick(arr) { return arr[Math.floor(rnd() * arr.length)] }
 function int(lo, hi) { return lo + Math.floor(rnd() * (hi - lo + 1)) }
 
-// 24h stats (oldest→newest)
-const hourQueries = Array.from({ length: 24 }, (_, i) => 380 + int(0, 260) + Math.round(120 * Math.sin(i / 3.4)))
+// Time series (oldest→newest); MOCK_SCALE shifts every count so a second instance
+// is distinguishable from the first in aggregated views
+const BUCKETS = TIME_UNITS === 'days' ? 30 : 24
+const hourQueries = Array.from({ length: BUCKETS }, (_, i) =>
+  Math.max(0, Math.round((380 + int(0, 260) + Math.round(120 * Math.sin(i / 3.4))) * SCALE))
+)
 const hourBlocked = hourQueries.map((q, i) => Math.round(q * (0.09 + 0.13 * Math.abs(Math.sin(i / 5)))))
+// top_* as single-key object arrays; MOCK_REVERSE flips the ordering so a merged
+// ranking is not just the first instance's order
+function topKv(pairs) {
+  return (REVERSE ? [...pairs].reverse() : pairs).map(([k, v]) => ({ [k]: Math.round(v * SCALE) }))
+}
 const stats = {
-  time_units: 'hours',
+  time_units: TIME_UNITS,
   num_dns_queries: hourQueries.reduce((a, b) => a + b, 0),
   num_blocked_filtering: hourBlocked.reduce((a, b) => a + b, 0),
-  num_replaced_safebrowsing: 17,
-  num_replaced_safesearch: 9,
-  num_replaced_parental: 4,
-  avg_processing_time: 0.0234, // seconds (float); frontend fmtMs converts
+  num_replaced_safebrowsing: Math.round(17 * SCALE),
+  num_replaced_safesearch: Math.round(9 * SCALE),
+  num_replaced_parental: Math.round(4 * SCALE),
+  avg_processing_time: AVG_TIME, // seconds (float); frontend fmtMs converts
   dns_queries: hourQueries,
   blocked_filtering: hourBlocked,
-  replaced_safebrowsing: hourQueries.map((_, i) => (i % 7 === 3 ? 2 : 0)),
+  replaced_safebrowsing: hourQueries.map((_, i) => (i % 7 === 3 ? Math.round(2 * SCALE) : 0)),
   replaced_parental: hourQueries.map(() => 0),
-  top_queried_domains: DOMAINS.slice(0, 12).map((d, i) => ({ [d]: 900 - i * 47 + int(0, 30) })),
-  top_blocked_domains: BLOCKED.map((d, i) => ({ [d]: 420 - i * 38 + int(0, 20) })),
-  top_clients: CLIENT_IPS.map((ip, i) => ({ [ip]: 1500 - i * 260 + int(0, 90) })),
-  top_upstreams_responses: [
-    { 'https://dns.google/dns-query': 5230 },
-    { 'https://cloudflare-dns.com/dns-query': 3110 },
-    { '223.5.5.5:53': 1890 },
-    { 'https://doh.pub/dns-query': 742 },
-  ],
+  top_queried_domains: topKv(DOMAINS.slice(0, 12).map((d, i) => [d, 900 - i * 47 + int(0, 30)])),
+  top_blocked_domains: topKv(BLOCKED.map((d, i) => [d, 420 - i * 38 + int(0, 20)])),
+  top_clients: topKv(CLIENT_IPS.map((ip, i) => [ip, 1500 - i * 260 + int(0, 90)])),
+  top_upstreams_responses: topKv([
+    ['https://dns.google/dns-query', 5230],
+    ['https://cloudflare-dns.com/dns-query', 3110],
+    ['223.5.5.5:53', 1890],
+    ['https://doh.pub/dns-query', 742],
+  ]),
   top_upstreams_avg_time: [ // seconds (float)
     { 'https://dns.google/dns-query': 0.0312 },
     { 'https://cloudflare-dns.com/dns-query': 0.0181 },
@@ -246,7 +277,7 @@ const BLOCKED_SERVICES = [
 // ---------- Derived status ----------
 function statusPayload() {
   const s = {
-    version: '0.107.79',
+    version: VERSION,
     language: 'zh-cn',
     dns_addresses: ['127.0.0.1', '192.168.1.10', '100.101.102.103'],
     dns_port: 53,
@@ -373,7 +404,7 @@ const server = http.createServer(async (req, res) => {
       state.clients = state.clients.filter((c) => c.name !== body.name)
       return json(res, 200, {})
     }
-    case 'GET /rewrite': return json(res, 200, { servers: state.rewrites })
+    case 'GET /rewrite/list': return json(res, 200, state.rewrites)
     case 'GET /rewrite/settings': return json(res, 200, state.rewriteSettings)
     case 'PUT /rewrite/settings/update': state.rewriteSettings = { enabled: !!body.enabled }; return json(res, 200, {})
     case 'POST /rewrite/add': state.rewrites.push({ domain: body.domain, answer: body.answer, enabled: true }); return json(res, 200, {})
@@ -471,9 +502,20 @@ const server = http.createServer(async (req, res) => {
     case 'POST /cache_clear': return json(res, 200, {})
     case 'POST /version.json': return json(res, 200, { disabled: true })
     case 'POST /update': return json(res, 200, {})
+    // Test seam, not part of the AGH contract: exercises the proxy redirect policy.
+    // MOCK_REDIRECT_TO=<origin> answers 302 to that origin; the proxy keeps the
+    // original request path, so point it at a second instance serving this path.
+    // Without the env var the path answers 200, which proves where a redirect landed.
+    case 'GET /__redirect-test': {
+      if (REDIRECT_TO) {
+        res.writeHead(302, { Location: REDIRECT_TO, 'Content-Length': 0 })
+        return res.end()
+      }
+      return json(res, 200, { via: 'direct', port: PORT })
+    }
     default: return json(res, 400, { error: `mock 未实现: ${req.method} /control${p}` })
   }
 })
 
-server.listen(PORT, '127.0.0.1', () => console.log(`[mock-agh] listening on http://127.0.0.1:${PORT} (any non-empty Basic credentials accepted)`))
+server.listen(PORT, HOST, () => console.log(`[mock-agh] listening on http://${HOST}:${PORT} (any non-empty Basic credentials accepted)`))
 process.on('uncaughtException', (e) => console.error('[mock-agh] uncaught:', e.message))

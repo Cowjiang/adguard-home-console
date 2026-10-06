@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-09-25
+**Updated:** 2026-10-06
 
 ## 实现约束
 
@@ -13,7 +13,7 @@
 
 ## i18n 约定
 
-- 词典在 `src/lib/i18n/locales/`，按域拆文件（`common`、`nav`、`agh`、`charts`、`units`、`login`、`dashboard`、`clients`、`querylog`、`filters`、`protection`、`stats`、`settings`、`advanced`），`zh` 是基准语言，`en` 与其类型同构（`en: typeof zh`）：**en 缺 key 会在 `npm run check` 报错**，新增中文文案后必须同步补英文。
+- 词典在 `src/lib/i18n/locales/`，按域拆文件（`common`、`nav`、`agh`、`charts`、`units`、`login`、`dashboard`、`clients`、`querylog`、`filters`、`protection`、`stats`、`settings`、`advanced`），`zh` 是基准语言，`en` 与其类型同构（`en: typeof zh`）：**en 缺 key 会在 `pnpm check` 报错**，新增中文文案后必须同步补英文。
 - 组件经 `useTranslation()` 的 `t()` 取文案；非 React 上下文（`format.ts`、`auth.tsx`）用 `src/lib/i18n` 导出的 `i18n.t()`。带变量的 key 用 `{{name}}` 插值并显式传参（如 `t('clients.deleteConfirmTitle', { name })`），不要字符串拼接。
 - 语言解析链在 `src/lib/i18n` 的 `resolveLang()`：存储值 `zh|en|auto`（`agh.console.lang.v1`），`auto` 与缺省按 `navigator.languages` 顺序匹配 → **英文兜底**（浏览器跟随浏览器语言；iOS WKWebView 的 `navigator.languages` 跟随系统语言）；`index.html` 首帧引导脚本持有一份同逻辑内联副本与同值文档标题，改动语言列表、存储键或标题时**两处必须同步**。
 - 数字/日期经 `src/lib/format.ts` 走 `Intl` 并跟随当前语言；单位词（天/小时/分钟/秒等）在 `units` 域，时长/相对时间复数用 i18next 的 `_one/_other` 后缀，zh 两份同值（zh 基数规则恒为 other）。
@@ -42,8 +42,10 @@
 
 ## 验证入口
 
-- 初次安装：`npm install`。Web 开发使用 `npm run dev:all`，同时启动 Vite 与 API 代理；生产模式先 `npm run build`，再 `npm start`。
+- 初次安装：`pnpm install`（包管理器是 pnpm，版本钉在 `package.json#packageManager`，`corepack enable` 即可；不再有 `package-lock.json`）。Web 开发使用 `pnpm dev:all`，同时启动 Vite 与 API 代理；生产模式先 `pnpm build`，再 `pnpm start`。
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
-- Web 代码：`npm run check`、`npm run build`。
+- Web 代码：`pnpm check`、`pnpm test`、`pnpm build`。测试用 vitest，覆盖纯逻辑（契约归一、存储迁移等）；测试文件与被测源文件同目录（`*.test.ts`），随 `pnpm check` 一起做类型检查；组件渲染与端到端仍靠手测与 mock。
+- pnpm 12 默认启用供应链策略：**发布未满 `minimumReleaseAge` 的版本会被拒绝安装**（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`）。这不是 lockfile 坏了，也不要关策略：`pnpm clean --lockfile && pnpm install` 重新解析会挑隔离期外的版本，或等窗口过去。`--frozen-lockfile`（CI 与 Docker）安装时会复检该策略。
 - Rust 测试：先运行 `node scripts/mock-agh.mjs`，再运行 `cd src-tauri && cargo test`。有三个测试在 mock 不可用时会跳过实际请求。
+- 多实例与代理策略验证：再起一个 `node scripts/mock-agh.mjs`，用 `PORT`/`HOST` 换监听地址（默认仍是 127.0.0.1:3990；真机访问需要显式设 `HOST`），并用 `MOCK_SCALE`、`MOCK_REVERSE`、`MOCK_AVG_TIME`、`MOCK_VERSION`、`MOCK_TIME_UNITS`、`MOCK_STATS_INTERVAL` 让第二实例的数据可区分。`MOCK_REDIRECT_TO` 配合 `GET /__redirect-test` 用于验证代理的跨主机重定向拒绝（该路径仅测试用，不属于 AGH 契约）。
 - iOS 工程生成与构建使用 `scripts/ios-signing.sh`：生成后校验 pbxproj 的关键设置（图标、签名、bundle id、部署目标、XcodeGen 预设哨兵），构建前缺工程时自动重建；机器专属的构建故障与修复记录在 `.agents/reviews/`，不作为通用构建步骤。
