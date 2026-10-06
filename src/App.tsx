@@ -52,11 +52,21 @@ function DebugAutoLogin() {
           password?: string
           autoconnect?: boolean
           route?: string | null
+          second?: { url?: string; username?: string; password?: string } | null
         } | null
         if (!c?.autoconnect || !c.url || !c.username) return
-        void connect({ url: c.url, username: c.username, password: c.password || '' }).then((ok) => {
-          if (ok) nav(c.route || '/', { replace: true })
-        })
+        void (async () => {
+          if (!(await connect({ url: c.url!, username: c.username!, password: c.password || '' }))) return
+          // Optional second instance for multi-instance acceptance runs; the
+          // primary stays active
+          if (c.second?.url && c.second.username) {
+            await connect(
+              { url: c.second.url, username: c.second.username, password: c.second.password || '' },
+              { activate: false }
+            )
+          }
+          nav(c.route || '/', { replace: true })
+        })()
       })
       .catch(() => {})
   }, [cfg, connect, nav])
