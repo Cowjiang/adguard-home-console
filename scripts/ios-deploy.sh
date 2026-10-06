@@ -12,7 +12,7 @@ if [ -z "$UDID" ]; then
 fi
 
 if [ ! -f "$IPA" ]; then
-	echo "找不到 $IPA,先跑 npm run ios:build" >&2
+	echo "找不到 $IPA,先跑 pnpm ios:build" >&2
 	exit 1
 fi
 

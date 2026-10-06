@@ -1,7 +1,7 @@
 name: Docker
 
 # GHCR channel of the release plan: a semver tag (v*.*.*) publishes the
-# multi-arch image (amd64+arm64, node:22-alpine) to ghcr.io/cowjiang/agh-console.
+# multi-arch image (amd64+arm64, node:24-alpine) to ghcr.io/cowjiang/agh-console.
 # Manual dispatches build without pushing as a smoke test. The tarball channel
 # stays in release.yml; retiring its dev-tag scheme is tracked separately.
 on:

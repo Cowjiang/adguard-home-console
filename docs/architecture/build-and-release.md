@@ -1,7 +1,7 @@
 # 构建与发布
 
 **Status:** current
-**Updated:** 2026-09-24
+**Updated:** 2026-10-06
 
 两条交付线共用一份 Web 构建产物；发布走 GitHub Release，服务器只拉取产物，不在服务器上构建。
 
@@ -11,17 +11,18 @@
 
 | 目的 | 命令 |
 | --- | --- |
-| 安装依赖 | `npm install` |
-| Web 开发 | `npm run dev:all`（或 `npm run dev` + `npm run dev:server`） |
-| 前端构建 | `npm run build`（Vite → `dist/`） |
-| 类型检查 | `npm run check` |
+| 安装依赖 | `pnpm install`（`corepack enable` 即可，版本钉在 `package.json#packageManager`） |
+| Web 开发 | `pnpm dev:all`（或 `pnpm dev` + `pnpm dev:server`） |
+| 前端构建 | `pnpm build`（Vite → `dist/`） |
+| 类型检查 | `pnpm check` |
+| 单元测试 | `pnpm test`（vitest） |
 | Rust 测试 | 先 `node scripts/mock-agh.mjs`，再 `cd src-tauri && cargo test` |
 | 提案校验 | `node scripts/verify-proposals.mjs`（加 `--links` 核对路径） |
-| iOS 工程与构建 | `./scripts/ios-signing.sh generate tauri`、`npm run ios:build`（生成后校验工程，缺工程时构建前自动重建） |
+| iOS 工程与构建 | `./scripts/ios-signing.sh generate tauri`、`pnpm ios:build`（生成后校验工程，缺工程时构建前自动重建） |
 
 ## 发布产物
 
-`.github/workflows/release.yml` 在 `main` 收到含源码的推送时运行：`npm ci` → `npm run build` → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 创建 Release 并附上产物。
+`.github/workflows/release.yml` 在 `main` 收到含源码的推送时运行：`pnpm install --frozen-lockfile` → `pnpm build` → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 创建 Release 并附上产物。
 
 - 纯 `docs/**`、`.agents/**`、`**.md` 推送被 `paths-ignore` 跳过，可用 `workflow_dispatch` 手动补发。
 - tag 形如 `v0.1.0-dev.<YYYYMMDD>.<短 sha>`，与分支名和提交绑定。

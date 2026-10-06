@@ -122,7 +122,7 @@ app.use((req, res, next) => {
   if (fs.existsSync(index)) return res.sendFile(index)
   res
     .status(503)
-    .send('<h3>前端尚未构建</h3><p>请先执行 <code>npm run build</code>,或开发模式下访问 5173 端口。</p>')
+    .send('<h3>前端尚未构建</h3><p>请先执行 <code>pnpm build</code>,或开发模式下访问 5173 端口。</p>')
 })
 
 // HOSTS: comma-separated; entries can be IPs or interface names (e.g. tailscale0, tun0).

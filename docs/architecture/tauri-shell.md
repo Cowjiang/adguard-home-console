@@ -50,7 +50,7 @@
 ## 窗口与构建
 
 - `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.adguardhome.console`、单窗口 `main`（960×640，最小 400×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。
-- `beforeDevCommand`/`beforeBuildCommand` 复用 npm 脚本，壳与 Web 构建同一份 `dist/`。
+- `beforeDevCommand`/`beforeBuildCommand` 复用 pnpm 脚本，壳与 Web 构建同一份 `dist/`。
 - iOS 在 setup 中禁用 WKWebView 的前进/后退手势，页面转场由前端自己负责（见 `docs/web-interaction.md`）。
 - `src-tauri/gen/` 只生成 apple 一套工程且不入库；生成与构建统一走 `./scripts/ios-signing.sh`，签名值来自被忽略的 `.env.signing`。
 - `scripts/ios-deploy.sh` 安装 `src-tauri/gen/apple/build/arm64/AGH Console.ipa` 到已连接的真机。

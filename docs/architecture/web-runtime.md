@@ -9,7 +9,7 @@
 
 ## 进程与监听
 
-- 默认端口 8787，由 `PORT` 覆盖；`npm run start` 与 `npm run dev:server` 都是 `node server/index.mjs`。
+- 默认端口 8787，由 `PORT` 覆盖；`pnpm start` 与 `pnpm dev:server` 都是 `node server/index.mjs`。
 - `HOSTS` 是逗号分隔的绑定地址，既接受 IPv4 字面量也接受网卡名（如 `tailscale0`）；为空时监听全部网卡。
 - 网卡名条目经 `os.networkInterfaces()` 解析；地址变化时每 60 秒轮询并重新绑定，网卡暂无 IPv4 或端口占用时 10 秒后重试。
 - 启动前加载仓库根 `.env`，不覆盖已存在的环境变量；`AGH_DEFAULT_URL` 经 `GET /api/config` 作为默认实例地址下发给前端。
@@ -40,9 +40,9 @@
 
 | 场景 | 命令 | 组成 |
 | --- | --- | --- |
-| 开发 | `npm run dev:all` | Vite 5173 + 后端 8787；Vite 把 `/api` 代理到 `127.0.0.1:8787` |
-| 只调前端 | `npm run dev` | 只有 5173，没有 API 代理 |
-| 生产 | `npm run build` + `npm start` | 8787 托管 `dist/` 并代理 `/api/agh` |
+| 开发 | `pnpm dev:all` | Vite 5173 + 后端 8787；Vite 把 `/api` 代理到 `127.0.0.1:8787` |
+| 只调前端 | `pnpm dev` | 只有 5173，没有 API 代理 |
+| 生产 | `pnpm build` + `pnpm start` | 8787 托管 `dist/` 并代理 `/api/agh` |
 
 - `TAURI_DEV_HOST` 让 Vite 监听局域网地址供真机壳调试，并把 HMR 指向 5174。
 - 仓库没有 Web App Manifest、service worker 或离线缓存；`index.html` 在首帧前读 `agh.console.theme.v1` 写入主题，并挂了启动错误面板。
