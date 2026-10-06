@@ -1,7 +1,7 @@
 # Tauri 2 壳
 
 **Status:** current
-**Updated:** 2026-09-24
+**Updated:** 2026-10-06
 
 `src-tauri/` 把同一个 React 前端装进系统 WebView，并用 Rust 复刻 Express 代理的传输语义，使 Web 与壳内共用页面，同时不依赖浏览器的同源代理。
 
@@ -28,7 +28,7 @@
 - target 必须是 http(s)，只取 origin，target 自带路径丢弃；
 - 路径归一：`/api/agh` 前缀换成 `/control`，已带 `/control` 的原样，其余补 `/control/` 前缀；
 - 只发 `Authorization`（非空时）与 `Content-Type: application/json`（非 GET/HEAD），body 缺省 `{}`；
-- 上游 301/302/307/308 手动跟随最多 3 跳，只更换 origin；
+- 上游 301/302/307/308 手动跟随最多 3 跳，只更换 origin 且**仅限同主机名**（scheme/port 可变）；跨主机的跳转返回 502，不把 `Authorization` 重放给别的主机；
 - 超时 25 秒，路径含 `/filtering/refresh` 时 120 秒；
 - 失败不返回 `Err`，而是产出 `{error}` JSON 与 400/502 状态码，由前端统一处理；响应体原样透传，不在 Rust 解析 JSON。
 

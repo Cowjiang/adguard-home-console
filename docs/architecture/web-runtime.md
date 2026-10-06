@@ -1,7 +1,7 @@
 # Web/PWA 运行时
 
 **Status:** current
-**Updated:** 2026-09-23
+**Updated:** 2026-10-06
 
 生产形态只有一个 Node 进程：`server/index.mjs` 托管 `dist/` 并把 `/api/agh/*` 反代到目标 AGH。开发形态是 Vite dev server 加同一个进程。
 
@@ -32,7 +32,7 @@
 - 路径映射为 `<origin>/control/<path>`，query 原样保留。
 - 只向 AGH 转发 `Authorization` 与 `Content-Type`；非 GET/HEAD 且客户端未给 Content-Type 时补 `application/json`。
 - 请求体经 `express.json` 解析后重新序列化，响应体全量读取后透传——两端都不是流式。
-- 上游 301/302/307/308 手动跟随，最多 3 次；跟随只取 `location` 的 origin，原 path 与 query 丢弃。
+- 上游 301/302/307/308 手动跟随，最多 3 次；跟随只取 `location` 的 origin（原 path 与 query 丢弃），且**仅限同主机**：每次跟随都会重放 `Authorization`，跳到别的主机等于把管理密码交给对方，因此跨主机重定向直接 502。
 - 超时 25 秒；路径含 `/filtering/refresh` 时放宽到 120 秒。
 - 连接与超时错误统一映射为 502，超时给固定文案；密码与 `Authorization` 不写日志。
 

@@ -58,12 +58,14 @@ app.get('/api/config', (_req, res) => {
 // —— AGH reverse proxy ——
 const MAX_REDIRECTS = 3
 
-async function proxyAGH(req, res, target, authHeader, redirects = 0) {
+async function proxyAGH(req, res, target, authHeader, redirects = 0, originHost) {
   try {
     const targetUrl = new URL(target)
     if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
       return res.status(400).json({ error: '目标地址必须是 http:// 或 https://' })
     }
+    // First hop pins the host; every later hop must stay on it (see the redirect branch)
+    const pinnedHost = originHost ?? targetUrl.hostname
     const upstream = new URL(req.originalUrl.replace(/^\/api\/agh/, '/control'), targetUrl.origin)
 
     const headers = {}
@@ -86,10 +88,15 @@ async function proxyAGH(req, res, target, authHeader, redirects = 0) {
       signal: AbortSignal.timeout(req.path.includes('/filtering/refresh') ? 120_000 : 25_000),
     })
 
-    // Follow upstream redirects (e.g. http->https 308)
+    // Follow upstream redirects (e.g. http->https 308). Only same-host hops: replaying
+    // Authorization to another host would hand the admin password to that host; the
+    // scheme/port may change, the hostname may not
     if ([301, 302, 307, 308].includes(r.status) && r.headers.get('location') && redirects < MAX_REDIRECTS) {
-      const loc = new URL(r.headers.get('location'), upstream).origin
-      return proxyAGH(req, res, loc, authHeader, redirects + 1)
+      const loc = new URL(r.headers.get('location'), upstream)
+      if (loc.hostname !== pinnedHost) {
+        return res.status(502).json({ error: '上游重定向到其他主机,已拒绝转发凭据' })
+      }
+      return proxyAGH(req, res, loc.origin, authHeader, redirects + 1, pinnedHost)
     }
 
     const text = await r.text()
