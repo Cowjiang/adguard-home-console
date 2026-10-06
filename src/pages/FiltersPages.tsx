@@ -274,18 +274,21 @@ const SERVICE_GROUPS: { id: string; labelKey: 'filters.svcStreaming' | 'filters.
 ]
 
 export function ServicesPage() {
-  const { cfg } = useAuth()
+  const { cfg, activeId } = useAuth()
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState<string>('all')
   const [pending, setPending] = useState<Set<string> | null>(null)
+  // Catalog content depends on the AGH version, so the local cache is keyed
+  // per instance instead of shared app-wide
+  const cacheKey = activeId ? `${SERVICE_CACHE_KEY}.${activeId}` : SERVICE_CACHE_KEY
   const { data: catalog } = useSWR<{ blocked_services: BlockedService[] }>(
     cfg ? ['bsAll', cfg, '/blocked_services/all'] : null,
     async ([_k, c, p]) => {
-      const cached = localStorage.getItem(SERVICE_CACHE_KEY)
+      const cached = localStorage.getItem(cacheKey)
       try {
         const fresh = await api<{ blocked_services: BlockedService[] }>(c as SvrConfig, p as string)
-        localStorage.setItem(SERVICE_CACHE_KEY, JSON.stringify(fresh))
+        localStorage.setItem(cacheKey, JSON.stringify(fresh))
         return fresh
       } catch {
         return cached ? JSON.parse(cached) : { blocked_services: [] }
