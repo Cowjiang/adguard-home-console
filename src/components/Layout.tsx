@@ -46,6 +46,7 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
   const { status, offline, instances, activeId } = useAuth()
   const { t } = useTranslation()
   const { pathname } = useLocation()
+  const nav = useNavigate()
   const sheet = useSheet()
   // CSS snapshot transition pop back onto a tab root: fade in synced with the page's
   // rt-pop-in — the pill is covered by the z-50 exit snapshot and gradually revealed as
@@ -70,7 +71,11 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
       <NavScrim />
       <button
         className={`glass-nav relative flex items-center gap-2 rounded-full px-3.5 py-1.5 ${dimmed ? '' : 'pointer-events-auto'}`}
-        onClick={() => sheet.open(<InstanceSwitchList onClose={sheet.close} />, { title: t('settings.instancesSwitch') })}
+        onClick={() =>
+          sheet.open(<InstanceSwitchList onClose={sheet.close} onManage={() => nav('/settings/server')} />, {
+            title: t('settings.instancesSwitch'),
+          })
+        }
       >
         <span
           className={`h-2 w-2 rounded-full ${protected_ && !offlinePill ? 'pulse-dot' : ''}`}
@@ -89,11 +94,11 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
 /** Instance switcher content (desktop sidebar card / mobile status pill):
  *  rows switch instantly — status/offline derive from the per-instance probe
  *  session and SWR keys hash by cfg content, so visited instances come back
- *  from cache without a reload */
-function InstanceSwitchList({ onClose }: { onClose: () => void }) {
+ *  from cache without a reload. The sheet portals outside <BrowserRouter>,
+ *  so navigation is injected by Layout instead of useNavigate */
+function InstanceSwitchList({ onClose, onManage }: { onClose: () => void; onManage: () => void }) {
   const { instances, activeId, switchInstance } = useAuth()
   const { t } = useTranslation()
-  const nav = useNavigate()
   return (
     <div className="flex flex-col gap-1">
       {instances.map((it) => (
@@ -118,7 +123,7 @@ function InstanceSwitchList({ onClose }: { onClose: () => void }) {
         className="mt-2 w-full"
         onClick={() => {
           onClose()
-          nav('/settings/server')
+          onManage()
         }}
       >
         <Settings2 size={15} /> {t('settings.instancesManage')}
@@ -220,6 +225,7 @@ function Sidebar() {
   const { pathname } = useLocation()
   const { status, offline, instances, activeId } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
@@ -263,7 +269,11 @@ function Sidebar() {
       <div className="flex-1" />
       <button
         className="glass flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-3 text-left active:bg-white/5"
-        onClick={() => sheet.open(<InstanceSwitchList onClose={sheet.close} />, { title: t('settings.instancesSwitch') })}
+        onClick={() =>
+          sheet.open(<InstanceSwitchList onClose={sheet.close} onManage={() => nav('/settings/server')} />, {
+            title: t('settings.instancesSwitch'),
+          })
+        }
       >
         <span
           className={`h-2 w-2 flex-none rounded-full ${!offlinePill && protected_ ? 'pulse-dot' : ''}`}
