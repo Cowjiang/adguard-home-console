@@ -1,19 +1,20 @@
-/** Settings hub + general settings + system management + appearance / server connection / about */
+/** Settings hub + general settings + system management + appearance / instances / about */
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import useSWR from 'swr'
 import {
   ScrollText, Network, Lock, Wifi, Wrench,
-  Trash, RotateCcw, DownloadCloud, Server, LogOut, SunMoon,
+  Trash, RotateCcw, DownloadCloud, Server, Plus, SunMoon,
   Info, Eraser, ShieldQuestion,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
+import { activeEndpoint, labelFromUrl } from '../lib/instances'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
 import { setAppLang, getLangSetting, type LangSetting } from '../lib/i18n'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, useConfirm, toast, Badge, usePick, PickSelect,
+  Loading, useConfirm, toast, Badge, usePick, PickSelect, ErrorBox,
 } from '../components/ui'
 import { IconBubble } from './Protection'
 import { isAppleMobile } from '../lib/nativePickers'
@@ -502,27 +503,103 @@ export function AppearanceSettings() {
   )
 }
 
-/* ================= Server connection ================= */
+/* ================= Instances ================= */
 
+/** Instance list: online badge per instance (from /status probes), tap to edit */
 export function ServerSettings() {
-  const { cfg, connect, logout } = useAuth()
+  const { instances, activeId } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
-  const [url, setUrl] = useState(cfg?.url ?? '')
-  const [username, setUsername] = useState(cfg?.username ?? '')
-  const [password, setPassword] = useState(cfg?.password ?? '')
-  const [saving, setSaving] = useState(false)
-
-  async function saveServer() {
-    setSaving(true)
-    const ok = await connect({ url: url.trim().replace(/\/+$/, ''), username: username.trim(), password })
-    setSaving(false)
-    if (ok) toast(t('settings.serverSaved'))
-  }
 
   return (
     <Screen>
       <PageHeader back title={t('settings.serverTitle')} />
+
+      <GroupTitle>{t('settings.instancesGroup')}</GroupTitle>
+      <Group>
+        <Rows>
+          {instances.map((it, i) => (
+            <Row
+              key={it.id}
+              icon={
+                <IconBubble color={it.online === 'ok' ? 'var(--ok)' : it.online === 'down' ? 'var(--danger)' : 'var(--t3)'} bg="color-mix(in srgb, currentColor 12%, transparent)">
+                  <Server size={17} />
+                </IconBubble>
+              }
+              title={it.label}
+              subtitle={it.url}
+              value={it.id === activeId ? t('settings.instancesActive') : undefined}
+              onClick={() => nav(`/settings/server/edit?id=${it.id}`)}
+              last={i === instances.length - 1}
+            />
+          ))}
+        </Rows>
+      </Group>
+
+      <Button variant="glass" className="mt-4 w-full" onClick={() => nav('/settings/server/edit')}>
+        <Plus size={15} /> {t('settings.instancesAdd')}
+      </Button>
+
+      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">{t('settings.instancesListNote')}</p>
+    </Screen>
+  )
+}
+
+/** Add / edit one instance: the form verifies connectivity via /status before
+ *  saving (connect()), delete falls back to the first remaining instance */
+export function InstanceEdit() {
+  const { store, activeId, connect, removeInstance, connecting, error } = useAuth()
+  const { t } = useTranslation()
+  const nav = useNavigate()
+  const confirm = useConfirm()
+  const [params] = useSearchParams()
+  const editId = params.get('id') ?? undefined
+  const target = editId ? store?.instances.find((x) => x.id === editId) : undefined
+  const ep = target ? activeEndpoint(target) : undefined
+  const isNew = !editId
+
+  const [url, setUrl] = useState(ep?.url ?? '')
+  const [username, setUsername] = useState(ep?.username ?? '')
+  const [password, setPassword] = useState(ep?.password ?? '')
+  // Empty name = derived from the address on save
+  const [label, setLabel] = useState(
+    target && ep && target.label !== labelFromUrl(ep.url) ? target.label : ''
+  )
+
+  // Deep link to an instance that no longer exists: back to the list
+  useEffect(() => {
+    if (editId && !target) nav('/settings/server', { replace: true })
+  }, [editId, target, nav])
+
+  async function save() {
+    const ok = await connect(
+      { url: url.trim().replace(/\/+$/, ''), username: username.trim(), password },
+      { id: editId, label: label.trim() || undefined, activate: isNew }
+    )
+    if (ok) {
+      toast(t('settings.serverSaved'))
+      nav('/settings/server', { replace: true })
+    }
+  }
+
+  function del() {
+    if (!editId || !target) return
+    const isLast = (store?.instances.length ?? 0) === 1
+    confirm({
+      title: t('settings.instancesDeleteTitle'),
+      message: isLast ? t('settings.instancesDeleteLastMsg') : t('settings.instancesDeleteMsg', { name: target.label }),
+      destructive: true,
+      confirmText: t('settings.instancesDelete'),
+      onConfirm: () => {
+        removeInstance(editId)
+        nav('/settings/server', { replace: true })
+      },
+    })
+  }
+
+  return (
+    <Screen>
+      <PageHeader back title={isNew ? t('settings.instancesAddTitle') : t('settings.instancesEditTitle')} />
 
       <GroupTitle>{t('settings.connectionGroup')}</GroupTitle>
       <Card className="p-4">
@@ -532,20 +609,22 @@ export function ServerSettings() {
             <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t('settings.usernamePlaceholder')} autoCapitalize="off" />
             <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('settings.passwordPlaceholder')} />
           </div>
+          <input className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('settings.instancesNamePlaceholder')} autoCapitalize="off" />
+          {error && <ErrorBox>{error}</ErrorBox>}
           <div className="flex gap-2.5">
-            <Button className="flex-1" loading={saving} onClick={saveServer}>
-              <Server size={15} /> {t('settings.reconnect')}
+            <Button className="flex-1" loading={connecting} disabled={!url.trim() || !username.trim()} onClick={save}>
+              <Server size={15} /> {t('common.save')}
             </Button>
-            <Button variant="glass" className="flex-1" onClick={() => { logout(); nav('/login', { replace: true }) }}>
-              <LogOut size={15} /> {t('settings.logout')}
-            </Button>
+            {!isNew && (
+              <Button variant="glass" className="flex-1" onClick={del}>
+                <Trash size={15} /> {t('settings.instancesDelete')}
+              </Button>
+            )}
           </div>
         </div>
       </Card>
 
-      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
-        {t('settings.serverNote')}
-      </p>
+      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">{t('settings.serverNote')}</p>
     </Screen>
   )
 }

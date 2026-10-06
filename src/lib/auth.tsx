@@ -61,10 +61,14 @@ interface AuthCtx {
   // Multi-instance
   instances: InstanceView[]
   activeId: string | null
+  /** Full store; the edit page reads endpoint credentials from here */
+  store: InstanceStoreData | null
   switchInstance: (id: string) => void
-  /** Verify via /status, then add a new instance or update the endpoint of
-   *  the instance matching url+username; activates it unless told otherwise */
-  connect: (cfg: SvrConfig, opts?: { activate?: boolean }) => Promise<boolean>
+  /** Verify via /status, then: with `id` update that instance in place
+   *  (keeping the active pointer), otherwise add a new instance or update the
+   *  endpoint of the instance matching url+username; activates unless told
+   *  otherwise */
+  connect: (cfg: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }) => Promise<boolean>
   /** Remove one instance; the active one falls back to the first remaining */
   removeInstance: (id: string) => void
   /** Legacy logout: forget every instance (and the migrated v1 copy) */
@@ -295,7 +299,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const connect = useCallback(
-    async (next: SvrConfig, opts?: { activate?: boolean }): Promise<boolean> => {
+    async (next: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }): Promise<boolean> => {
       const activate = opts?.activate ?? true
       setConnecting(true)
       setError(null)
@@ -307,19 +311,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const s = await api<Status>(clean, '/status')
         if (!s || !s.version) throw new Error(i18n.t('login.notAgh'))
         const prev = storeRef.current
+        // With an explicit id: edit that instance in place. Otherwise add a
+        // new one or update the instance already pointing at the same
+        // url+username
+        const editId =
+          opts?.id && prev?.instances.some((x) => x.id === opts.id) ? opts.id : undefined
         const targetId =
+          editId ??
           prev?.instances.find((i) => {
             const e = activeEndpoint(i)
             return e && e.url === clean.url && e.username === clean.username
-          })?.id ?? newId()
-        const entry: Instance = { id: targetId, label: labelFromUrl(clean.url), endpoints: [{ ...clean }] }
+          })?.id ??
+          newId()
+        const entry: Instance = {
+          id: targetId,
+          label: opts?.label?.trim() || labelFromUrl(clean.url),
+          endpoints: [{ ...clean }],
+        }
         const instances = prev ? [...prev.instances] : []
         const idx = instances.findIndex((x) => x.id === targetId)
         if (idx >= 0) instances[idx] = entry
         else instances.push(entry)
         const nextStore: InstanceStoreData = {
           instances,
-          activeId: activate ? targetId : prev ? prev.activeId : targetId,
+          // Editing never moves the pointer; adding activates the new entry
+          // unless asked not to (debug auto-login of a second instance)
+          activeId: editId
+            ? prev
+              ? prev.activeId
+              : targetId
+            : activate || !prev
+              ? targetId
+              : prev.activeId,
         }
         saveStore(nextStore)
         setStore(nextStore)
@@ -408,7 +431,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       cfg, status, offline, connecting, error, theme, setTheme,
-      instances, activeId: store?.activeId ?? null,
+      instances, store, activeId: store?.activeId ?? null,
       switchInstance, connect, removeInstance, logout,
       probeAll: () => probeAll(true),
       refreshActiveData, refreshStatus,

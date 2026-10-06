@@ -678,6 +678,18 @@ export function Badge({ children, kind = 'ok' }: { children: ReactNode; kind?: '
   )
 }
 
+/** Online dot for an instance's /status probe result (shared by the switcher
+ *  and the instance list); ok pulses like the protection dot */
+export function StatusDot({ online, size = 10 }: { online: 'ok' | 'down' | 'unknown'; size?: number }) {
+  const color = online === 'ok' ? 'var(--ok)' : online === 'down' ? 'var(--danger)' : 'var(--t3)'
+  return (
+    <span
+      className={`inline-block flex-none rounded-full ${online === 'ok' ? 'pulse-dot' : ''}`}
+      style={{ width: size, height: size, background: color }}
+    />
+  )
+}
+
 /* ---------- Source badges (client origin; a color per source) ---------- */
 
 const SOURCE_STYLE: Record<string, { c: string; bg: string }> = {
