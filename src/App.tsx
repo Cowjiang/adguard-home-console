@@ -15,7 +15,7 @@ import ClientDetailPage from './pages/ClientDetailPage'
 import ClientFormPage from './pages/ClientFormPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
-import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, AboutSettings } from './pages/Settings'
+import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, InstanceEdit, AboutSettings } from './pages/Settings'
 import { FiltersPage, RulesPage, ServicesPage, RewritesPage, CheckHostPage } from './pages/FiltersPages'
 import { DnsSettings, AccessSettings, EncryptionSettings, DhcpSettings } from './pages/AdvancedSettings'
 
@@ -52,11 +52,21 @@ function DebugAutoLogin() {
           password?: string
           autoconnect?: boolean
           route?: string | null
+          second?: { url?: string; username?: string; password?: string } | null
         } | null
         if (!c?.autoconnect || !c.url || !c.username) return
-        void connect({ url: c.url, username: c.username, password: c.password || '' }).then((ok) => {
-          if (ok) nav(c.route || '/', { replace: true })
-        })
+        void (async () => {
+          if (!(await connect({ url: c.url!, username: c.username!, password: c.password || '' }))) return
+          // Optional second instance for multi-instance acceptance runs; the
+          // primary stays active
+          if (c.second?.url && c.second.username) {
+            await connect(
+              { url: c.second.url, username: c.second.username, password: c.second.password || '' },
+              { activate: false }
+            )
+          }
+          nav(c.route || '/', { replace: true })
+        })()
       })
       .catch(() => {})
   }, [cfg, connect, nav])
@@ -110,6 +120,7 @@ export default function App() {
               <Route path="/settings/system" element={<SystemPage />} />
               <Route path="/settings/appearance" element={<AppearanceSettings />} />
               <Route path="/settings/server" element={<ServerSettings />} />
+              <Route path="/settings/server/edit" element={<InstanceEdit />} />
               <Route path="/settings/about" element={<AboutSettings />} />
               <Route path="/settings/app" element={<Navigate to="/settings" replace />} />
             </Route>

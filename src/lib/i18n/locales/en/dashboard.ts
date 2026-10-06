@@ -36,6 +36,7 @@ const enDashboard = {
   stopped: 'Stopped',
   dnsPort: 'DNS port',
   uptime: 'Uptime',
+  aggregateNote: 'Totals and leaderboards merge {{n}} instances; trends show the selected instance only.'
 }
 
 export default enDashboard

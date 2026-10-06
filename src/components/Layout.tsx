@@ -1,10 +1,9 @@
 /** Global layout: ambient background + mobile floating glass tab bar /
  *  desktop fixed sidebar (≥lg) */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { mutate } from 'swr'
-import { Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
+import { Check, ChevronUp, Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { usePullToRefresh } from '../lib/pullToRefresh'
 import { scrollToTop } from '../lib/scrollToTop'
@@ -13,7 +12,7 @@ import { useNativeBackButton } from '../lib/nativeBackButton'
 import { TransitionArea, useArrivalPopAnim } from '../lib/routeTransition'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
-import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button } from './ui'
+import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button, StatusDot, useSheet } from './ui'
 
 type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.clients'; icon: typeof Home; match?: string[] }
 
@@ -41,11 +40,14 @@ export function Ambient() {
 
 /** Floating status pill (mobile tab root pages only: secondary pages are headed by the fixed
  *  nav bar, see docs/web-interaction.md). Fades out during pull-to-refresh: the refresh
- *  whitespace band is where the indicator sits, the pill would overlap the circle */
+ *  whitespace band is where the indicator sits, the pill would overlap the circle.
+ *  Tapping it opens the instance switcher sheet */
 function TopBar({ dimmed }: { dimmed?: boolean }) {
-  const { status, offline } = useAuth()
+  const { status, offline, instances, activeId } = useAuth()
   const { t } = useTranslation()
   const { pathname } = useLocation()
+  const nav = useNavigate()
+  const sheet = useSheet()
   // CSS snapshot transition pop back onto a tab root: fade in synced with the page's
   // rt-pop-in — the pill is covered by the z-50 exit snapshot and gradually revealed as
   // it slides away, so a pure fade has no hard cut; on swipe-commit / no-anim back the
@@ -54,6 +56,7 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
   const popIn = useArrivalPopAnim(pathname)
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
+  const activeLabel = instances.find((x) => x.id === activeId)?.label
   if (!TAB_ROOT_ROUTES.includes(pathname)) return null
   return (
     <header
@@ -66,7 +69,14 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
       }}
     >
       <NavScrim />
-      <div className="glass-nav relative flex items-center gap-2 rounded-full px-3.5 py-1.5">
+      <button
+        className={`glass-nav relative flex items-center gap-2 rounded-full px-3.5 py-1.5 ${dimmed ? '' : 'pointer-events-auto'}`}
+        onClick={() =>
+          sheet.open(<InstanceSwitchList onClose={sheet.close} onManage={() => nav('/settings/server')} />, {
+            title: t('settings.instancesSwitch'),
+          })
+        }
+      >
         <span
           className={`h-2 w-2 rounded-full ${protected_ && !offlinePill ? 'pulse-dot' : ''}`}
           style={{ background: !offlinePill && protected_ ? 'var(--ok)' : 'var(--danger)' }}
@@ -75,9 +85,50 @@ function TopBar({ dimmed }: { dimmed?: boolean }) {
           {offlinePill ? t('nav.statusOffline') : protected_ ? t('nav.statusOn') : t('nav.statusOff')}
         </span>
         <span className="h-3 w-px" style={{ background: 'var(--glass-border-strong)' }} />
-        <span className="text-[12px] text-t3">{APP_NAME}</span>
-      </div>
+        <span className="text-[12px] text-t3">{instances.length > 1 ? activeLabel : APP_NAME}</span>
+      </button>
     </header>
+  )
+}
+
+/** Instance switcher content (desktop sidebar card / mobile status pill):
+ *  rows switch instantly — status/offline derive from the per-instance probe
+ *  session and SWR keys hash by cfg content, so visited instances come back
+ *  from cache without a reload. The sheet portals outside <BrowserRouter>,
+ *  so navigation is injected by Layout instead of useNavigate */
+function InstanceSwitchList({ onClose, onManage }: { onClose: () => void; onManage: () => void }) {
+  const { instances, activeId, switchInstance } = useAuth()
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-1">
+      {instances.map((it) => (
+        <button
+          key={it.id}
+          className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left active:bg-white/5"
+          onClick={() => {
+            switchInstance(it.id)
+            onClose()
+          }}
+        >
+          <StatusDot online={it.online} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold text-t1">{it.label}</span>
+            <span className="num block truncate text-[12px] text-t3">{it.url}</span>
+          </span>
+          {it.id === activeId && <Check size={17} className="flex-none text-accent" />}
+        </button>
+      ))}
+      <Button
+        variant="glass"
+        className="mt-2 w-full"
+        onClick={() => {
+          onClose()
+          onManage()
+        }}
+      >
+        <Settings2 size={15} /> {t('settings.instancesManage')}
+      </Button>
+    </div>
   )
 }
 
@@ -169,13 +220,16 @@ function TabBar() {
 }
 
 /** Desktop sidebar (≥lg): solid panel continuing the dark design system; hosts the
- *  protection status at the bottom */
+ *  protection status at the bottom (tap to open the instance switcher) */
 function Sidebar() {
   const { pathname } = useLocation()
-  const { status, offline } = useAuth()
+  const { status, offline, instances, activeId } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
+  const sheet = useSheet()
   const protected_ = status?.protection_enabled
   const offlinePill = offline || !status?.running
+  const activeLabel = instances.find((x) => x.id === activeId)?.label
   return (
     <aside
       className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col px-3 py-5 lg:flex"
@@ -213,18 +267,28 @@ function Sidebar() {
         })}
       </nav>
       <div className="flex-1" />
-      <div className="glass flex items-center gap-2.5 rounded-2xl px-3.5 py-3">
+      <button
+        className="glass flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-3 text-left active:bg-white/5"
+        onClick={() =>
+          sheet.open(<InstanceSwitchList onClose={sheet.close} onManage={() => nav('/settings/server')} />, {
+            title: t('settings.instancesSwitch'),
+          })
+        }
+      >
         <span
           className={`h-2 w-2 flex-none rounded-full ${!offlinePill && protected_ ? 'pulse-dot' : ''}`}
           style={{ background: offlinePill ? 'var(--t3)' : protected_ ? 'var(--ok)' : 'var(--danger)' }}
         />
-        <div className="min-w-0">
-          <div className="text-[12.5px] font-semibold text-t1">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12.5px] font-semibold text-t1">
             {offlinePill ? t('nav.statusOffline') : protected_ ? t('nav.statusOn') : t('nav.statusOff')}
-          </div>
-          <div className="num text-[11px] text-t3">{APP_NAME}</div>
-        </div>
-      </div>
+          </span>
+          <span className="num block truncate text-[11px] text-t3">
+            {instances.length > 1 ? activeLabel : APP_NAME}
+          </span>
+        </span>
+        {instances.length > 1 && <ChevronUp size={14} className="flex-none text-t3" />}
+      </button>
     </aside>
   )
 }
@@ -288,15 +352,17 @@ export default function Layout() {
   const isDesktop = useIsDesktop()
   useNativeBackButton(nativeBar && !isDesktop)
   useTabLandStatusRefresh()
-  // Pull-to-refresh: status re-probe + full SWR revalidation; only on mobile layout,
-  // coarse-pointer (touch) devices, and tab root pages (secondary pages opt out).
-  // mutate uses the global binding (default cache), not the SWRConfig context
-  const { refreshStatus, offline } = useAuth()
+  // Pull-to-refresh: active /status re-probe + all instances' badges + only the
+  // active instance's SWR keys (multi-instance: no N× data refetch); only on
+  // mobile layout, coarse-pointer (touch) devices, and tab root pages
+  // (secondary pages opt out). mutate uses the global binding (default cache),
+  // not the SWRConfig context
+  const { refreshStatus, refreshActiveData, probeAll, offline } = useAuth()
   const { pathname } = useLocation()
   const [coarse] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
   const isTabRoot = TAB_ROOT_ROUTES.includes(pathname)
   const refreshAll = useCallback((): Promise<unknown> => {
-    const work = Promise.allSettled([refreshStatus(), mutate(() => true)])
+    const work = Promise.allSettled([refreshStatus(), Promise.resolve(probeAll()), refreshActiveData()])
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<undefined>((resolve) => {
       timer = setTimeout(() => resolve(undefined), REFRESH_DEADLINE_MS)

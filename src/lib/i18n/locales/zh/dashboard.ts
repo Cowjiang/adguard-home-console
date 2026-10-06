@@ -36,6 +36,7 @@ const zhDashboard = {
   stopped: '停止',
   dnsPort: 'DNS 端口',
   uptime: '已运行',
+  aggregateNote: '总量与榜单为 {{n}} 台实例的合并结果;曲线按所选实例单独展示。'
 }
 
 export default zhDashboard
