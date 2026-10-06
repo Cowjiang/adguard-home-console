@@ -1,7 +1,7 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-09-26
+**Updated:** 2026-10-06
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
@@ -33,7 +33,7 @@
 - 壳内判据是 `window.__TAURI_INTERNALS__`，命中则 `invoke('agh_fetch', …)`，IPC 层失败映射为 502。
 - 浏览器分支请求 `/api/agh<path>`，带 `X-AGH-Target` 与 Basic `Authorization`。
 - 非 2xx 抛 `ApiError`，正文按 `error`、`message`、前 200 字节、`HTTP <n>` 依次取。
-- SWR 统一 fetcher 是 `swrFetcher`，key 形态 `['<简称>', cfg, '<agh path>']`；`qs()` 生成 query，数组值重复追加、空值跳过。
+- SWR 统一 fetcher 是 `swrFetcher`，key 形态 `['<简称>', cfg, '<agh path>']`，同一端点只用一个键名；`qs()` 生成 query，数组值重复追加、空值跳过。
 - AGH 响应类型集中在 `src/lib/api.ts`，字段契约见 `docs/agh-api.md`。
 
 ## 页面
@@ -63,8 +63,8 @@
 
 ## 契约归一化
 
-- `KVMap` 兼容字典与单键对象数组两种形态；`top_*` 的归一在概览、榜单两处各自实现。
-- `top_clients` 的键可能是 `name`、`IP` 或 `name|IP`，由 `src/components/ClientDetail.tsx` 按候选键求和。
+- `KVMap` 兼容字典与单键对象数组两种形态；归一与候选键求和在 `src/lib/stats.ts`（`toMap`、`topEntries`、`kvCount`），概览、榜单、客户端列表与详情共用。
+- `top_clients` 的键可能是 `name`、`IP` 或 `name|IP`，用 `kvCount` 按候选键求和。
 - duration 与 interval 单位不统一：`POST /protection` 提交前把秒换成毫秒，`querylog`/`stats` 配置是毫秒，`filtering.interval` 直接按小时；`elapsedMs` 是字符串，用前先 `Number()`。
 - `/rewrite/list` 兼容裸数组与 `{total}`；`/clients` 的 `clients`/`auto_clients` 可空，统一按空数组处理；DHCP `lease_duration` 按秒展示与编辑。
 - 拦截服务目录失败时回退 localStorage 缓存；日志的 reason 元数据与筛选分组集中在 `src/lib/constants.ts`。

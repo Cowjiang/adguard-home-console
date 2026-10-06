@@ -11,6 +11,7 @@ import { Laptop, Pencil, Smartphone, UserRound } from 'lucide-react'
 import { api, swrFetcher, type AghClient, type Stats } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { fmtCompact, fmtNum } from '../lib/format'
+import { kvCount } from '../lib/stats'
 import { Badge, Button, CopyIconButton, Group, GroupTitle, Row, Rows, Switch, toast } from './ui'
 
 export interface ClientDetailData {
@@ -20,20 +21,6 @@ export interface ClientDetailData {
   whois?: Record<string, string>
   /** Full config carried along when a persistent client matches */
   persistent?: AghClient
-}
-
-/** top_clients keys can be "name" / "IP" / "name|IP"; sum recent query counts by candidate
- *  keys (shared with the list page) */
-export function kvCount(map: Stats['top_clients'] | undefined, keys: (string | undefined)[]): number | undefined {
-  if (!map) return undefined
-  const want = keys.filter((x): x is string => !!x)
-  let total: number | undefined
-  for (const o of Array.isArray(map) ? map : [map]) {
-    for (const k in o) {
-      if (want.includes(k) || want.includes(k.split('|')[0])) total = (total ?? 0) + o[k]
-    }
-  }
-  return total
 }
 
 /** on/off indicator: green badge when on, gray text when off (read-only display under
