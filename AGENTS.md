@@ -47,7 +47,7 @@ Take the global constraints from this file; open only the next layer relevant to
 
 Run the checks that match the scope of your change:
 
-- Web frontend: `npm run check` (`tsconfig.json` has `strict` on) and `npm run build`.
+- Web frontend: `npm run check` (`tsconfig.json` has `strict` on), `npm test`, and `npm run build`.
 - Rust: start `node scripts/mock-agh.mjs` first, then `cd src-tauri && cargo test`; when the mock is not running, cases that depend on it exit silently and still report ok.
 - iOS: generate and build the project via `scripts/ios-signing.sh` (it validates project settings after generation and automatically rebuilds a missing project before building); do not bypass the script by calling `xcodegen` or `tauri ios init` directly.
 - Docs and proposals: `node scripts/verify-proposals.mjs`; add `--links` when referenced paths change.
