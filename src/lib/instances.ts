@@ -5,10 +5,13 @@
  * MVP: every instance holds exactly one endpoint; the array is reserved for
  * Away Connection.
  */
-import type { SvrConfig } from './auth'
 
-/** Flat runtime connection config (the shape api() and all pages consume) */
-export type { SvrConfig }
+/** Flat runtime connection config — the shape api() and all pages consume */
+export interface SvrConfig {
+  url: string
+  username: string
+  password: string
+}
 
 export interface Endpoint extends SvrConfig {
   /** Accept self-signed TLS certificates; reserved, not implemented yet */

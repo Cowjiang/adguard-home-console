@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { mutate } from 'swr'
 import { Home, ListFilter, ScrollText, Settings2, ShieldCheck, Users, WifiOff } from 'lucide-react'
 import { useAuth } from '../lib/auth'
 import { usePullToRefresh } from '../lib/pullToRefresh'
@@ -288,15 +287,17 @@ export default function Layout() {
   const isDesktop = useIsDesktop()
   useNativeBackButton(nativeBar && !isDesktop)
   useTabLandStatusRefresh()
-  // Pull-to-refresh: status re-probe + full SWR revalidation; only on mobile layout,
-  // coarse-pointer (touch) devices, and tab root pages (secondary pages opt out).
-  // mutate uses the global binding (default cache), not the SWRConfig context
-  const { refreshStatus, offline } = useAuth()
+  // Pull-to-refresh: active /status re-probe + all instances' badges + only the
+  // active instance's SWR keys (multi-instance: no N× data refetch); only on
+  // mobile layout, coarse-pointer (touch) devices, and tab root pages
+  // (secondary pages opt out). mutate uses the global binding (default cache),
+  // not the SWRConfig context
+  const { refreshStatus, refreshActiveData, probeAll, offline } = useAuth()
   const { pathname } = useLocation()
   const [coarse] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false)
   const isTabRoot = TAB_ROOT_ROUTES.includes(pathname)
   const refreshAll = useCallback((): Promise<unknown> => {
-    const work = Promise.allSettled([refreshStatus(), mutate(() => true)])
+    const work = Promise.allSettled([refreshStatus(), Promise.resolve(probeAll()), refreshActiveData()])
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<undefined>((resolve) => {
       timer = setTimeout(() => resolve(undefined), REFRESH_DEADLINE_MS)
