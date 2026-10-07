@@ -40,7 +40,8 @@
 - nightly 是 prerelease，所以 `releases/latest`、npm `latest` 与镜像 `:latest` 都留在 stable；`dev` 相对上一个 nightly tag 没有新提交时整条跳过。
 - 定时任务的定义文件必须在默认分支（`main`）上才会触发，且 `schedule` 报的 ref 是默认分支——workflow 里因此显式把构建 ref 解析成 `dev`，并把 Release tag 的 `target_commitish` 指到那个 commit。
 - 发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` 并推送；推送 `main` 本身不发布任何东西。手推非 `vX.Y.Z` 的 tag 会被 `prepare` 直接拒绝，避免 nightly tag 被当成稳定版顶掉 `:latest`。
-- nightly 走测试门（`pnpm check` / `pnpm test` / `test:server` / `test:release`）之后才打包。
+- nightly 走测试门（`pnpm check` / `pnpm test` / `test:server` / `test:release`）之后才打包；手动 `workflow_dispatch` 另有 `force`，勾上时忽略「`dev` 未移动」的空转判定以重跑同一提交。
+- 镜像 tag 是**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 读成 Docker Hub 名字，首次真实 nightly 因此在 `library/0.1.0-nightly…` 上 401。
 - npm 渠道发布的就是 build 校验过的那个 tgz（`agh-console`，`files` 只含 `dist`、`server`），`NPM_TOKEN` 未配置时告警跳过。私有仓库不生成 provenance，故不加 `--provenance`；npm 的 `latest` 要等第一个 stable 才存在。
 - 镜像由 `Dockerfile` 自行构建，保证 `docker build .` 可独立复现；构建阶段跑在 builder 平台上，arm64 不再走 QEMU 编译前端。GHCR 包继承仓库可见性，设为 public 才能匿名拉取。
 - `concurrency` 按 ref 串行，不取消进行中的运行；Release 与 tag 都不删除，既是回滚点，也是「相对上一版」变更列表的基线。

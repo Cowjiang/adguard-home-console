@@ -28,6 +28,10 @@ on:
         description: 'Publish to the GitHub Release, npm and GHCR (default: dry run)'
         type: boolean
         default: false
+      force:
+        description: 'Rebuild even when dev has not moved since the last nightly'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -89,7 +93,8 @@ jobs:
       # version. Tags come from the full-history checkout above.
       - name: Skip an unchanged nightly
         id: changed
-        if: steps.plan.outputs.channel == 'nightly'
+        # force is the manual escape hatch: a dispatch is deliberate, the timer is not
+        if: steps.plan.outputs.channel == 'nightly' && !inputs.force
         env:
           SHA: ${{ steps.commit.outputs.sha }}
         run: |

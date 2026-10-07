@@ -27,9 +27,17 @@ const SHA = /^[0-9a-f]{7,40}$/;
 // The integration branch the scheduled nightly builds from; a dispatch from
 // anywhere else still works but says so out loud.
 const NIGHTLY_REF = 'dev';
+// Published image. buildx reads a bare tag as a Docker Hub name (it tried to
+// push library/0.1.0-nightly… on the first real run), so every image tag is
+// emitted as a full ghcr.io reference.
+const IMAGE = 'ghcr.io/cowjiang/agh-console';
 
 function fail(message) {
   throw new Error(`release-plan: ${message}`);
+}
+
+function imageTags(tags) {
+  return tags.map((tag) => `${IMAGE}:${tag}`);
 }
 
 export function plan(input) {
@@ -57,7 +65,7 @@ export function plan(input) {
       releaseTag: refName,
       packageName,
       npmTag: 'latest',
-      dockerTags: [version, `${match[1]}.${match[2]}`, 'latest', `sha-${shortSha}`],
+      dockerTags: imageTags([version, `${match[1]}.${match[2]}`, 'latest', `sha-${shortSha}`]),
       prerelease: false,
       publish,
       warnings,
@@ -78,7 +86,7 @@ export function plan(input) {
     packageName,
     npmTag: 'nightly',
     // No `latest` here on purpose: nightly must not shadow the stable channel
-    dockerTags: [version, 'nightly', `sha-${shortSha}`],
+    dockerTags: imageTags([version, 'nightly', `sha-${shortSha}`]),
     prerelease: true,
     publish,
     warnings,
@@ -145,7 +153,11 @@ function selfTest() {
     releaseTag: 'v0.1.0-nightly.20261007.abc1234',
     packageName: 'agh-console',
     npmTag: 'nightly',
-    dockerTags: ['0.1.0-nightly.20261007.abc1234', 'nightly', 'sha-abc1234'],
+    dockerTags: [
+      'ghcr.io/cowjiang/agh-console:0.1.0-nightly.20261007.abc1234',
+      'ghcr.io/cowjiang/agh-console:nightly',
+      'ghcr.io/cowjiang/agh-console:sha-abc1234',
+    ],
     prerelease: true,
     publish: true,
     warnings: [],
@@ -157,7 +169,12 @@ function selfTest() {
     releaseTag: 'v1.2.3',
     packageName: 'agh-console',
     npmTag: 'latest',
-    dockerTags: ['1.2.3', '1.2', 'latest', 'sha-abc1234'],
+    dockerTags: [
+      'ghcr.io/cowjiang/agh-console:1.2.3',
+      'ghcr.io/cowjiang/agh-console:1.2',
+      'ghcr.io/cowjiang/agh-console:latest',
+      'ghcr.io/cowjiang/agh-console:sha-abc1234',
+    ],
     prerelease: false,
     publish: true,
     warnings: [],
@@ -186,6 +203,13 @@ function selfTest() {
   assert.equal(dispatchedStable.channel, 'stable');
   assert.equal(dispatchedStable.publish, true);
 
+  // Every image tag must be a full reference: buildx reads a bare tag as Docker Hub.
+  for (const result of [plan(base), plan({ ...base, refType: 'tag', refName: 'v1.2.3', baseVersion: '1.2.3' })]) {
+    for (const tag of result.dockerTags) {
+      assert.ok(tag.startsWith(`${IMAGE}:`), `image tag is not fully qualified: ${tag}`);
+    }
+  }
+
   // A prerelease base keeps its core version; the nightly line stays semver-clean.
   assert.equal(plan({ ...base, baseVersion: '1.0.0-rc.1' }).version, '1.0.0-nightly.20261007.abc1234');
 
@@ -196,7 +220,7 @@ function selfTest() {
   assert.throws(() => plan({ ...base, baseVersion: 'nope' }), /不是 semver/);
   assert.throws(() => plan({ ...base, date: '2026-10-07' }), /不是 YYYYMMDD/);
 
-  console.log('release-plan: self-test ok（nightly/stable/dispatch/tag 拒绝 共 16 项断言）');
+  console.log('release-plan: self-test ok（nightly/stable/dispatch、非法 tag/semver/sha 拒绝、镜像引用全限定）');
 }
 
 const [flag, value] = process.argv.slice(2);
