@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/session/auth'
 import { Button } from '../components/ui/primitives'
 import { ErrorBox } from '../components/ui/atoms'
-import { Ambient } from '../components/Layout'
+import { Ambient } from '../components/layout/Layout'
 import { APP_NAME } from '../lib/constants'
 
 export default function Login() {
