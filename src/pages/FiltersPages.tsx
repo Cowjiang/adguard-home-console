@@ -13,7 +13,7 @@ import { toast } from '../components/ui/toast'
 import { Loading, EmptyState, SearchBar, Badge, Chip } from '../components/ui/atoms'
 import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
-import { IconBubble } from './Protection'
+import { IconBubble } from '../components/ui/atoms'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 

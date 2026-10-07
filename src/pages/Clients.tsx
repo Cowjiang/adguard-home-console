@@ -14,6 +14,8 @@ import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type ClientsData, type AghClient, type AutoClient, type Stats } from '../lib/api'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { ClientDetail, type ClientDetailData } from '../components/clients/ClientDetail'
+import { ClientTable, IconB, type SortKey, type ClientRowModel } from '../components/clients/ClientTable'
+import { ClientForm, emptyClient } from '../components/clients/ClientForm'
 import { kvCount } from '../lib/stats'
 import { fmtNum } from '../lib/format'
 import { isAppleMobile } from '../lib/native/shell'
@@ -24,23 +26,8 @@ import { Loading, EmptyState, SearchBar, Badge, SourceBadge, Pagination } from '
 import { usePick, PickSelect } from '../components/ui/menu'
 
 
-export const emptyClient = (): Partial<AghClient> => ({
-  name: '',
-  ids: [],
-  use_global_settings: true,
-  filtering_enabled: true,
-  safebrowsing_enabled: false,
-  parental_enabled: false,
-  use_global_blocked_services: true,
-  blocked_services: [],
-  tags: [],
-  ignore_querylog: false,
-  ignore_statistics: false,
-})
-
 /* ---------- Sorting ---------- */
 
-type SortKey = 'requests' | 'name' | 'source'
 const SORT_OPTIONS = [
   { value: 'requests-desc', labelKey: 'clients.sortRequestsDesc' },
   { value: 'requests-asc', labelKey: 'clients.sortRequestsAsc' },
@@ -48,22 +35,6 @@ const SORT_OPTIONS = [
   { value: 'name-desc', labelKey: 'clients.sortNameDesc' },
   { value: 'source-asc', labelKey: 'clients.sortSourceAsc' },
 ] as const
-
-/** Row model shared by both platforms: merged display view of persistent + auto-detected
- *  clients */
-interface ClientRowModel {
-  key: string
-  name: string
-  ip?: string
-  ids: string[]
-  source?: string
-  whois?: Record<string, string>
-  /** Country + ISP, same style as the official UI: "CN CHINANET-GD" */
-  whoisText?: string
-  /** Request count within the stats period (from /stats top_clients) */
-  requests?: number
-  persistent?: AghClient
-}
 
 function sortRows(rows: ClientRowModel[], sortKey: SortKey, sortAsc: boolean): ClientRowModel[] {
   const dir = sortAsc ? 1 : -1
@@ -445,201 +416,5 @@ export default function Clients() {
         <EmptyState icon={<Laptop size={30} className="text-t3" />} title={t('clients.noClientsTitle')} subtitle={t('clients.noClientsSub')} />
       )}
     </Screen>
-  )
-}
-
-function IconB({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: 'var(--glass)', color: 'var(--t2)' }}>
-      {children}
-    </div>
-  )
-}
-
-/* ---------- Desktop table view ---------- */
-
-const TBL_COLS = 'grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_104px_minmax(0,1.1fr)_88px_92px] items-center gap-3'
-
-function SortTh({ label, k, sortKey, sortAsc, onSort, align }: {
-  label: string; k: SortKey; sortKey: SortKey; sortAsc: boolean; onSort: (k: SortKey) => void; align?: 'right'
-}) {
-  const active = sortKey === k
-  return (
-    <button
-      onClick={() => onSort(k)}
-      className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''} ${active ? 'text-accent' : 'hover:text-t1'}`}
-    >
-      {label}
-      {active && (sortAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-    </button>
-  )
-}
-
-/** Desktop client table: click a row to open the detail modal; name/source/requests are
- *  sortable */
-function ClientTable({ rows, sortKey, sortAsc, onSort, onRow }: {
-  rows: ClientRowModel[]
-  sortKey: SortKey
-  sortAsc: boolean
-  onSort: (k: SortKey) => void
-  onRow: (r: ClientRowModel) => void
-}) {
-  const { t } = useTranslation()
-  return (
-    <Card className="overflow-hidden !rounded-2xl">
-      <div className="overflow-x-auto">
-        <div style={{ minWidth: 880 }}>
-          <div
-            className={`${TBL_COLS} px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-t3`}
-            style={{ borderBottom: '1px solid var(--glass-border)' }}
-          >
-            <SortTh label={t('clients.colName')} k="name" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
-            <span>{t('clients.colIds')}</span>
-            <SortTh label={t('clients.colSource')} k="source" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} />
-            <span>WHOIS</span>
-            <SortTh label={t('clients.colRequests')} k="requests" sortKey={sortKey} sortAsc={sortAsc} onSort={onSort} align="right" />
-            <span className="flex justify-end">{t('clients.colStatus')}</span>
-          </div>
-          {rows.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => onRow(r)}
-              className={`${TBL_COLS} w-full px-4 py-2.5 text-left transition-colors hover:bg-white/[0.035]`}
-              style={{ borderBottom: '1px solid var(--glass-border)' }}
-            >
-              <span className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className="flex h-7 w-7 flex-none items-center justify-center rounded-[9px]"
-                  style={r.persistent
-                    ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-                    : { background: 'var(--glass)', color: 'var(--t2)' }}
-                >
-                  {/phone|mobile|iphone|android|pad/i.test(r.name) ? <Smartphone size={14} /> : r.persistent ? <Laptop size={14} /> : <UserRound size={14} />}
-                </span>
-                <span className="truncate text-[13.5px] font-medium text-t1">{r.name}</span>
-              </span>
-              <span className="num truncate text-[12.5px] text-t2">{r.ids.join(' · ')}</span>
-              <span>{r.source ? <SourceBadge source={r.source} /> : <span className="text-[12.5px] text-t3">–</span>}</span>
-              <span className="truncate text-[12.5px] text-t2" title={r.whoisText}>{r.whoisText || '–'}</span>
-              <span className="num text-right text-[12.5px] text-t2">{r.requests != null ? fmtNum(r.requests) : '–'}</span>
-              <span className="flex justify-end">
-                {r.persistent ? <Badge kind="ok">{t('clients.configuredBadge')}</Badge> : <Badge kind="warn">{t('clients.unsetBadge')}</Badge>}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-/* ---------- Client edit form (desktop centered modal / mobile standalone subpage) ---------- */
-
-export function ClientForm({
-  initial, isNew, onClose, onSaved, showTitle = true,
-}: {
-  initial: Partial<AghClient>
-  isNew: boolean
-  onClose: () => void
-  onSaved: () => void
-  /** Page form: the title comes from PageHeader; disable the form's built-in title to
-   *  avoid duplication */
-  showTitle?: boolean
-}) {
-  const { cfg } = useAuth()
-  const { t } = useTranslation()
-  const [c, setC] = useState<Partial<AghClient>>({ ...initial })
-  const [idsText, setIdsText] = useState((initial.ids ?? []).join(', '))
-  const [saving, setSaving] = useState(false)
-  const set = <K extends keyof AghClient>(k: K, v: AghClient[K]) => setC((s) => ({ ...s, [k]: v }))
-
-  async function save() {
-    if (!cfg) return
-    if (!c.name?.trim()) return toast(t('clients.nameRequired'), 'err')
-    const ids = idsText.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
-    if (!ids.length) return toast(t('clients.idsRequired'), 'err')
-    setSaving(true)
-    const payload: AghClient = {
-      name: c.name.trim(),
-      ids,
-      use_global_settings: !!c.use_global_settings,
-      filtering_enabled: c.filtering_enabled ?? true,
-      safebrowsing_enabled: !!c.safebrowsing_enabled,
-      parental_enabled: !!c.parental_enabled,
-      use_global_blocked_services: c.use_global_blocked_services ?? true,
-      blocked_services: c.blocked_services ?? [],
-      tags: c.tags ?? [],
-      ignore_querylog: !!c.ignore_querylog,
-      ignore_statistics: !!c.ignore_statistics,
-      upstreams_cache_enabled: false,
-      upstreams_cache_size: 64 * 1024,
-    }
-    try {
-      if (isNew) {
-        await api(cfg, '/clients/add', { method: 'POST', body: payload })
-      } else {
-        await api(cfg, '/clients/update', { method: 'POST', body: { name: initial.name, data: payload } })
-      }
-      onSaved()
-      toast(isNew ? t('clients.added') : t('common.saved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div style={{ maxHeight: '72vh', overflowY: 'auto' }}>
-      {showTitle && <p className="mb-4 text-center text-[17px] font-bold text-t1">{isNew ? t('clients.formAddTitle') : t('clients.formEditTitle')}</p>}
-
-      <div className="flex flex-col gap-3">
-        <input className="field" placeholder={t('clients.namePlaceholder')} value={c.name ?? ''} onChange={(e) => set('name', e.target.value)} />
-        <input className="field" placeholder={t('clients.idsPlaceholder')} value={idsText} onChange={(e) => setIdsText(e.target.value)} autoCapitalize="off" />
-
-        <div className="glass flex items-center justify-between rounded-2xl px-4 py-3">
-          <div>
-            <p className="text-[14.5px] font-medium text-t1">{t('clients.useGlobal')}</p>
-            <p className="text-[11.5px] text-t2">{t('clients.useGlobalSub')}</p>
-          </div>
-          <Switch on={!!c.use_global_settings} onChange={(v) => set('use_global_settings', v)} />
-        </div>
-
-        {c.use_global_settings === false && (
-          <div className="glass rounded-2xl px-4">
-            {[
-              { k: 'filtering_enabled' as const, label: t('clients.filterLabel'), icon: <Globe size={15} /> },
-              { k: 'safebrowsing_enabled' as const, label: t('clients.safeBrowsingLabel'), icon: <ShieldAlert size={15} /> },
-              { k: 'parental_enabled' as const, label: t('clients.parentalLabel'), icon: <Baby size={15} /> },
-            ].map(({ k, label, icon }, i) => (
-              <div key={k}>
-                {i > 0 && <div className="h-px" style={{ background: 'var(--glass-border)' }} />}
-                <div className="flex items-center justify-between py-3">
-                  <span className="flex items-center gap-2 text-[14.5px] text-t1">{icon} {label}</span>
-                  <Switch on={!!c[k]} onChange={(v) => set(k, v as never)} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="glass flex items-center justify-between rounded-2xl px-4 py-3">
-          <div>
-            <p className="text-[14.5px] font-medium text-t1">{t('clients.useGlobalServices')}</p>
-            <p className="text-[11.5px] text-t2">{t('clients.useGlobalServicesSub')}</p>
-          </div>
-          <Switch on={c.use_global_blocked_services !== false} onChange={(v) => set('use_global_blocked_services', v)} />
-        </div>
-
-        <div className="flex gap-2.5 pt-1">
-          <Button variant="glass" size="lg" className="flex-1" onClick={onClose}>
-            {t('common.cancel')}
-          </Button>
-          <Button size="lg" className="flex-1" loading={saving} onClick={save}>
-            {t('common.save')}
-          </Button>
-        </div>
-      </div>
-    </div>
   )
 }

@@ -223,3 +223,12 @@ export function ErrorBox({ children, onRetry }: { children: ReactNode; onRetry?:
     </div>
   )
 }
+
+/** Rounded icon bubble used across status rows and entry cards */
+export function IconBubble({ children, color, bg }: { children: ReactNode; color: string; bg: string }) {
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ color, background: bg }}>
+      {children}
+    </div>
+  )
+}
