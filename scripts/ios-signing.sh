@@ -11,7 +11,7 @@ usage() {
 用法: scripts/ios-signing.sh <命令> [参数...]
 
   generate tauri    用本地签名重新生成 Tauri iOS 工程（xcodegen，src-tauri/gen/apple）
-  tauri <参数...>   以本地签名执行 npx tauri ios <参数...>
+  tauri <参数...>   以本地签名执行 pnpm exec tauri ios <参数...>
                     （例: scripts/ios-signing.sh tauri build --target aarch64）
 
 签名从 .env.signing 读取（已在 .gitignore 中），必需变量:
@@ -136,7 +136,7 @@ case "$cmd" in
 			rebuilt=1
 		fi
 		[ "$rebuilt" -eq 1 ] || verify_project
-		exec npx tauri ios "$@" --config "$TAURI_CONFIG"
+		exec pnpm exec tauri ios "$@" --config "$TAURI_CONFIG"
 		;;
 	*)
 		usage >&2

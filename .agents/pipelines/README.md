@@ -23,6 +23,11 @@
 | 2026-09-24 | simplification | [弃用并移除 SwiftUI 原生 iOS 线](proposals/simplification/2026-09-24-retire-swift-ios-line.md) | implemented |
 | 2026-09-24 | process | [给 iOS 工程生成加门禁，并把可控项移进 tauri 配置](proposals/process/2026-09-24-ios-project-generation-gate.md) | implemented |
 | 2026-09-24 | bug-fix | [把 Rust 静态库从 app 包的资源阶段摘掉](proposals/bug-fix/2026-09-24-ios-bundle-ships-libapp-archive.md) | implemented |
+| 2026-09-24 | bug-fix | [让移动端客户端页获得原生返回按钮与侧滑返回](proposals/bug-fix/2026-09-24-clients-back-nav.md) | implemented |
+| 2026-09-24 | bug-fix | [顶栏右侧按钮高度统一对齐返回胶囊](proposals/bug-fix/2026-09-24-header-action-height.md) | implemented |
+| 2026-09-24 | bug-fix | [日志页筛选状态同步进 URL，避免返回时被旧筛选覆盖](proposals/bug-fix/2026-09-24-log-filter-url-sync.md) | implemented |
+| 2026-09-24 | bug-fix | [修掉原生选择器覆盖层撑宽文档导致的页面横向拖动](proposals/bug-fix/2026-09-24-native-select-doc-overflow.md) | implemented |
+| 2026-09-24 | feature | [把 iOS 壳的顶栏操作按钮改成原生液态玻璃](proposals/feature/2026-09-24-native-glass-header-actions.md) | implemented |
 | 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
 | 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
 | 2026-09-24 | feature | [为 React UI 引入中英双语](proposals/feature/2026-09-24-ui-i18n.md) | implemented |
@@ -33,6 +38,13 @@
 | 2026-09-26 | feature | [补齐常规设置页「被忽略的域名」功能](proposals/feature/2026-09-26-general-settings-ignored-domains.md) | implemented |
 | 2026-09-26 | feature | [补齐加密设置页与 AGH 原生功能的差距](proposals/feature/2026-09-26-encryption-page-parity.md) | implemented |
 | 2026-09-26 | feature | [将统计分析页合并进概览页（仅桌面）](proposals/feature/2026-09-26-merge-stats-into-overview.md) | implemented |
+| 2026-10-06 | architecture | [上移 AGH 代理契约为前端持有的接口，Express/Rust 作为可替换实现](proposals/architecture/2026-10-06-proxy-contract-ownership.md) | implemented |
+| 2026-10-06 | simplification | [收敛 src/ 页面层的重复编排、探测状态机与超载文件](proposals/simplification/2026-10-06-src-layer-consolidation.md) | implemented |
+| 2026-10-07 | simplification | [收干净 Rust 壳与插件 fork 的失修项：失效配置、构建生成物与不可复现的 delta](proposals/simplification/2026-10-07-rust-shell-fork-consolidation.md) | implemented |
+| 2026-10-07 | bug-fix | [对齐 tauri crate 与 npm 的版本，退掉第三方 tao 补丁](proposals/bug-fix/2026-10-07-tauri-version-align.md) | implemented |
+| 2026-10-07 | bug-fix | [修回 iOS 工程的 pre-build 脚本调用方式，让 Xcode 阶段不再 panic](proposals/bug-fix/2026-10-07-ios-xcode-script-phase.md) | implemented |
+| 2026-10-07 | bug-fix | [修回 iOS release 构建的 Swift 静态链接](proposals/bug-fix/2026-10-07-ios-release-swift-link.md) | implemented |
+| 2026-10-07 | process | [把发版拆成 GitHub Release / npm / GHCR 三个消费者](proposals/process/2026-10-07-multi-channel-release.md) | implemented |
 
 ## 与 docs/ 的分工
 

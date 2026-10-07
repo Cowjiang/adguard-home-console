@@ -15,7 +15,8 @@ is_ancestor() {
 
 previous_tag() {
   local candidate
-  for candidate in $(git tag --list 'v0.1.0-dev.*' --sort=-v:refname); do
+  # Any release tag is a baseline: nightly (v<version>-nightly.<date>.<sha>) and stable (vX.Y.Z)
+  for candidate in $(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname); do
     if [ -n "$tag" ] && [ "$candidate" = "$tag" ]; then
       continue
     fi

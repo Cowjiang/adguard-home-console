@@ -5,10 +5,13 @@ import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { Laptop } from 'lucide-react'
 import { api, swrFetcher, type ClientsData } from '../lib/api'
-import { useAuth } from '../lib/auth'
-import { navBack } from '../lib/backNav'
-import { ClientDetail, type ClientDetailData } from '../components/ClientDetail'
-import { PageHeader, EmptyState, useConfirm, toast } from '../components/ui'
+import { useAuth } from '../lib/session/auth'
+import { navBack } from '../lib/nav/backNav'
+import { ClientDetail, type ClientDetailData } from '../components/clients/ClientDetail'
+import { PageHeader } from '../components/ui/primitives'
+import { EmptyState } from '../components/ui/atoms'
+import { useConfirm } from '../components/ui/sheet'
+import { runMutation } from '../lib/mutation'
 
 export default function ClientDetailPage() {
   const { t } = useTranslation()
@@ -37,14 +40,13 @@ export default function ClientDetailPage() {
 
   async function remove() {
     if (!cfg || !c) return
-    try {
-      await api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } })
-      mutate()
-      toast(t('clients.deleted'))
-      navBack(nav, pathname)
-    } catch (e: any) {
-      toast(t('common.deleteFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } }),
+      invalidate: mutate,
+      okKey: 'clients.deleted',
+      failKey: 'common.deleteFailed',
+    })
+    if (ok) navBack(nav, pathname)
   }
 
   return (

@@ -5,16 +5,18 @@ import useSWR from 'swr'
 import {
   Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
-import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
-  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect, TabContent,
-} from '../components/ui'
-import { isAppleMobile } from '../lib/nativePickers'
-import { IconBubble } from './Protection'
+import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction, TabContent } from '../components/ui/primitives'
+import { useSheet, useConfirm } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { Loading, EmptyState, SearchBar, Badge, Chip } from '../components/ui/atoms'
+import { usePick, PickSelect } from '../components/ui/menu'
+import { isAppleMobile } from '../lib/native/shell'
+import { IconBubble } from '../components/ui/atoms'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
+import { runMutation } from '../lib/mutation'
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -31,58 +33,51 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const { data, mutate, isLoading } = useSWR<FilteringStatus>(
-    cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 20000 }
+    cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 20000 }
   )
 
   const filters = (whitelist ? data?.whitelist_filters : data?.filters) ?? []
 
   async function toggleFilter(f: Filter, enabled: boolean) {
     if (!cfg) return
-    try {
-      await api(cfg, '/filtering/set_url', {
+    await runMutation({
+      action: () => api(cfg, '/filtering/set_url', {
         method: 'POST',
         body: { url: f.url, whitelist, data: { url: f.url, name: f.name, enabled } },
-      })
-      mutate()
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
+      }),
+      invalidate: mutate,
+      failKey: 'common.opFailed',
+    })
   }
 
   async function removeFilter(f: Filter) {
     if (!cfg) return
-    try {
-      await api(cfg, '/filtering/remove_url', { method: 'POST', body: { url: f.url, whitelist } })
-      mutate()
-      toast(t('filters.deleted'))
-    } catch (e: any) {
-      toast(t('common.deleteFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/remove_url', { method: 'POST', body: { url: f.url, whitelist } }),
+      invalidate: mutate,
+      okKey: 'filters.deleted',
+      failKey: 'common.deleteFailed',
+    })
   }
 
   async function refreshAll() {
     if (!cfg) return
-    setRefreshing(true)
-    try {
-      await api(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist } })
-      mutate()
-      toast(t('filters.refreshed'))
-    } catch (e: any) {
-      toast(t('common.updateFailed', { msg: e.message }), 'err')
-    } finally {
-      setRefreshing(false)
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist } }),
+      invalidate: mutate,
+      okKey: 'filters.refreshed',
+      failKey: 'common.updateFailed',
+      setBusy: setRefreshing,
+    })
   }
 
   async function saveInterval(hours: number) {
     if (!cfg || !data) return
-    try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: data.enabled, interval: hours * HOUR_MS } })
-      mutate()
-      toast(t('filters.intervalSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled: data.enabled, interval: hours * HOUR_MS } }),
+      invalidate: mutate,
+      okKey: 'filters.intervalSaved',
+    })
   }
 
   function openAddSheet() {
@@ -99,14 +94,13 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
             className="mt-1"
             onClick={async () => {
               if (!url.trim()) return toast(t('filters.urlRequired'), 'err')
-              try {
-                await api(cfg!, '/filtering/add_url', { method: 'POST', body: { name: name.trim(), url: url.trim(), whitelist } })
-                mutate()
-                sheet.close()
-                toast(t('filters.added'))
-              } catch (e: any) {
-                toast(t('common.addFailed', { msg: e.message }), 'err')
-              }
+              const ok = await runMutation({
+                action: () => api(cfg!, '/filtering/add_url', { method: 'POST', body: { name: name.trim(), url: url.trim(), whitelist } }),
+                invalidate: mutate,
+                okKey: 'filters.added',
+                failKey: 'common.addFailed',
+              })
+              if (ok) sheet.close()
             }}
           >
             {t('common.add')}
@@ -204,7 +198,7 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 export function RulesPage() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
-  const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher)
+  const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -216,18 +210,15 @@ export function RulesPage() {
 
   async function save() {
     if (!cfg) return
-    setSaving(true)
-    try {
-      const rules = text.split('\n').map((s) => s.trim()).filter(Boolean)
-      await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
-      setDraft(null)
-      mutate()
-      toast(t('filters.rulesSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
+    const rules = text.split('\n').map((s) => s.trim()).filter(Boolean)
+    const ok = await runMutation({
+      action: () => api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } }),
+      invalidate: mutate,
+      okKey: 'filters.rulesSaved',
+      setBusy: setSaving,
+    })
+    // Back to following the server copy once the save landed
+    if (ok) setDraft(null)
   }
 
   return (
@@ -274,18 +265,21 @@ const SERVICE_GROUPS: { id: string; labelKey: 'filters.svcStreaming' | 'filters.
 ]
 
 export function ServicesPage() {
-  const { cfg } = useAuth()
+  const { cfg, activeId } = useAuth()
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [group, setGroup] = useState<string>('all')
   const [pending, setPending] = useState<Set<string> | null>(null)
+  // Catalog content depends on the AGH version, so the local cache is keyed
+  // per instance instead of shared app-wide
+  const cacheKey = activeId ? `${SERVICE_CACHE_KEY}.${activeId}` : SERVICE_CACHE_KEY
   const { data: catalog } = useSWR<{ blocked_services: BlockedService[] }>(
     cfg ? ['bsAll', cfg, '/blocked_services/all'] : null,
     async ([_k, c, p]) => {
-      const cached = localStorage.getItem(SERVICE_CACHE_KEY)
+      const cached = localStorage.getItem(cacheKey)
       try {
         const fresh = await api<{ blocked_services: BlockedService[] }>(c as SvrConfig, p as string)
-        localStorage.setItem(SERVICE_CACHE_KEY, JSON.stringify(fresh))
+        localStorage.setItem(cacheKey, JSON.stringify(fresh))
         return fresh
       } catch {
         return cached ? JSON.parse(cached) : { blocked_services: [] }
@@ -431,38 +425,35 @@ export function RewritesPage() {
 
   async function add(domain: string, answer: string) {
     if (!cfg) return
-    try {
-      await api(cfg, '/rewrite/add', { method: 'POST', body: { domain: domain.trim(), answer: answer.trim() } })
-      mutate()
-      sheet.close()
-      toast(t('filters.rwAdded'))
-    } catch (e: any) {
-      toast(t('common.addFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/rewrite/add', { method: 'POST', body: { domain: domain.trim(), answer: answer.trim() } }),
+      invalidate: mutate,
+      okKey: 'filters.rwAdded',
+      failKey: 'common.addFailed',
+    })
+    if (ok) sheet.close()
   }
 
   async function remove(entry: any) {
     if (!cfg) return
-    try {
-      await api(cfg, '/rewrite/delete', { method: 'POST', body: { domain: entry.domain, answer: entry.answer } })
-      mutate()
-      toast(t('filters.rwDeleted'))
-    } catch (e: any) {
-      toast(t('common.deleteFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/rewrite/delete', { method: 'POST', body: { domain: entry.domain, answer: entry.answer } }),
+      invalidate: mutate,
+      okKey: 'filters.rwDeleted',
+      failKey: 'common.deleteFailed',
+    })
   }
 
   async function toggle(entry: any, enabled: boolean) {
     if (!cfg) return
-    try {
-      await api(cfg, '/rewrite/update', {
+    await runMutation({
+      action: () => api(cfg, '/rewrite/update', {
         method: 'PUT',
         body: { target: { domain: entry.domain, answer: entry.answer }, update: { domain: entry.domain, answer: entry.answer, enabled } },
-      })
-      mutate()
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
+      }),
+      invalidate: mutate,
+      failKey: 'common.opFailed',
+    })
   }
 
   function openAdd() {
@@ -500,13 +491,12 @@ export function RewritesPage() {
           <Row
             title={t('filters.rwEnable')}
             subtitle={t('filters.rwEnableSub')}
-            right={<Switch on={!!settings?.enabled} onChange={async (v) => {
-              try {
-                await api(cfg!, '/rewrite/settings/update', { method: 'PUT', body: { enabled: v } })
-                mSettings()
-              } catch (e: any) {
-                toast(t('common.opFailed', { msg: e.message }), 'err')
-              }
+            right={<Switch on={!!settings?.enabled} onChange={(v) => {
+              void runMutation({
+                action: () => api(cfg!, '/rewrite/settings/update', { method: 'PUT', body: { enabled: v } }),
+                invalidate: mSettings,
+                failKey: 'common.opFailed',
+              })
             }} />}
             last
           />

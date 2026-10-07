@@ -8,22 +8,19 @@ import {
   ListFilter, CheckCircle, FileCode2, AppWindow, ArrowLeftRight, ScanSearch,
   ShieldAlert, Baby, SearchCheck, Timer, RefreshCw,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type RewriteEntry } from '../lib/api'
-import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
-import { isAppleMobile } from '../lib/nativePickers'
+import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Button } from '../components/ui/primitives'
+import { IconBubble } from '../components/ui/atoms'
+import { SafeSearchSheet, SAFE_ENGINES } from '../components/protection/SafeSearchSheet'
+import { Badge } from '../components/ui/atoms'
+import { useSheet } from '../components/ui/sheet'
+import { usePick, PickSelect } from '../components/ui/menu'
+import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
+import { runMutation } from '../lib/mutation'
 
 
-const SAFE_ENGINES = [
-  { key: 'google', label: 'Google' },
-  { key: 'bing', label: 'Bing' },
-  { key: 'duckduckgo', label: 'DuckDuckGo' },
-  { key: 'yandex', label: 'Yandex' },
-  { key: 'youtube', label: 'YouTube' },
-  { key: 'pixabay', label: 'Pixabay' },
-  { key: 'ecosia', label: 'Ecosia' },
-] as const
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -36,17 +33,15 @@ export default function Protection() {
   const sheet = useSheet()
   const pick = usePick()
   const [refreshing, setRefreshing] = useState(false)
-  const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['fs', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
+  const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
   async function saveInterval(hours: number) {
     if (!cfg || !filtering) return
-    try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } })
-      mFiltering()
-      toast(t('filters.intervalSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } }),
+      invalidate: mFiltering,
+      okKey: 'filters.intervalSaved',
+    })
   }
   const { data: rewrites } = useSWR<{ total: number } | RewriteEntry[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
   const { data: bsCurrent } = useSWR<{ ids: string[] }>(cfg ? ['bsg', cfg, '/blocked_services/get'] : null, swrFetcher)
@@ -71,50 +66,49 @@ export default function Protection() {
 
   async function toggleFiltering(enabled: boolean) {
     if (!cfg || !filtering) return
-    try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled, interval: filtering.interval } })
-      mFiltering()
-      toast(enabled ? t('protection.filteringOn') : t('protection.filteringOff'))
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled, interval: filtering.interval } }),
+      invalidate: mFiltering,
+      okKey: enabled ? 'protection.filteringOn' : 'protection.filteringOff',
+      failKey: 'common.opFailed',
+    })
   }
 
   async function refreshAllFilters() {
     if (!cfg) return
-    setRefreshing(true)
-    try {
-      // /filtering/refresh refreshes one side at a time, so call it once per list
-      const [a, b] = await Promise.all([
-        api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: false } }),
-        api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: true } }),
-      ])
-      mFiltering()
-      toast(t('protection.refreshedToast', { n: (a?.updated ?? 0) + (b?.updated ?? 0) }))
-    } catch (e: any) {
-      toast(t('common.updateFailed', { msg: e.message }), 'err')
-    } finally {
-      setRefreshing(false)
-    }
+    // /filtering/refresh refreshes one side at a time, so call it once per list
+    await runMutation({
+      action: async () => {
+        const [a, b] = await Promise.all([
+          api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: false } }),
+          api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: true } }),
+        ])
+        return { n: (a?.updated ?? 0) + (b?.updated ?? 0) }
+      },
+      invalidate: mFiltering,
+      okKey: 'protection.refreshedToast',
+      okVars: ({ n }) => ({ n }),
+      failKey: 'common.updateFailed',
+      setBusy: setRefreshing,
+    })
   }
 
   async function toggleEndpoint(path: string, on: boolean, mutate: () => void) {
     if (!cfg) return
-    try {
-      await api(cfg, `/${path}/${on ? 'enable' : 'disable'}`, { method: 'POST', body: {} })
-      mutate()
-      toast(on ? t('protection.turnedOn') : t('protection.turnedOff'))
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
-  }  async function saveSafeSearch(enabled: boolean, engines: Record<string, boolean>) {
+    await runMutation({
+      action: () => api(cfg, `/${path}/${on ? 'enable' : 'disable'}`, { method: 'POST', body: {} }),
+      invalidate: mutate,
+      okKey: on ? 'protection.turnedOn' : 'protection.turnedOff',
+      failKey: 'common.opFailed',
+    })
+  }
+
+  async function saveSafeSearch(enabled: boolean, engines: Record<string, boolean>) {
     if (!cfg) return
-    try {
-      await api(cfg, '/safesearch/settings', { method: 'PUT', body: { enabled, ...engines } })
-      toast(t('protection.safeSearchSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/safesearch/settings', { method: 'PUT', body: { enabled, ...engines } }),
+      okKey: 'protection.safeSearchSaved',
+    })
   }
 
   function openSafeSearchSheet() {
@@ -311,63 +305,6 @@ export default function Protection() {
           </Group>
         </div>
       </div>
-    </div>
-  )
-}
-
-function SafeSearchSheet({
-  initial, engines, onChange, onSave,
-}: {
-  initial: boolean
-  engines: Record<string, boolean>
-  onChange: (enabled: boolean, engines: Record<string, boolean>) => void
-  onSave: () => void
-}) {
-  const { t } = useTranslation()
-  const [enabled, setEnabled] = useState(initial)
-  const [eng, setEng] = useState({ ...engines })
-  return (
-    <div>
-      <div className="glass mb-3 flex items-center justify-between rounded-2xl px-4 py-3">
-        <span className="text-[15px] font-medium text-t1">{t('protection.safeSearchEnable')}</span>
-        <Switch
-          on={enabled}
-          onChange={(v) => {
-            setEnabled(v)
-            onChange(v, eng)
-          }}
-        />
-      </div>
-      <p className="mb-1.5 px-2 text-[12.5px] font-semibold text-t3">{t('protection.safeSearchEngines')}</p>
-      <div className="glass mb-4 rounded-2xl px-4">
-        {SAFE_ENGINES.map((e, i) => (
-          <div key={e.key}>
-            {i > 0 && <div className="h-px" style={{ background: 'var(--glass-border)' }} />}
-            <div className="flex items-center justify-between py-2.5">
-              <span className="text-[14.5px] text-t1">{e.label}</span>
-              <Switch
-                on={eng[e.key]}
-                onChange={(v) => {
-                  const next = { ...eng, [e.key]: v }
-                  setEng(next)
-                  onChange(enabled, next)
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <Button className="w-full" size="lg" onClick={onSave}>
-        {t('common.save')}
-      </Button>
-    </div>
-  )
-}
-
-export function IconBubble({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) {
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ color, background: bg }}>
-      {children}
     </div>
   )
 }

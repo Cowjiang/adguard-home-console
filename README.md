@@ -13,7 +13,7 @@ English | [简体中文简介](docs/assets/README.zh-CN.md)
 [![CI](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml/badge.svg)](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml)
 [![Release](https://img.shields.io/github/v/release/Cowjiang/adguard-home-console?include_prereleases)](https://github.com/Cowjiang/adguard-home-console/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20with%20Commons%20Clause-blue)](#license)
-[![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
 <img src="docs/images/dashboard-dark.png" alt="AdGuard Home Console dashboard (dark)" width="900" />
 
@@ -44,7 +44,9 @@ AdGuard Home has no CORS headers, so a browser cannot talk to its API directly �
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 ```
 
-Multi-arch (amd64 / arm64), published on semver releases. Image tags: `latest`, `X.Y.Z`, and `X.Y`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+Multi-arch (amd64 / arm64). A stable `vX.Y.Z` tag publishes `latest`, `X.Y.Z` and `X.Y`; the nightly built from `dev` publishes `nightly` and `sha-<commit>`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+
+The GHCR package inherits the repository's visibility: while the repository is private, `docker login ghcr.io` (token with `read:packages`) is required; switching the package to public in its settings removes that step.
 
 Or with Docker Compose:
 
@@ -62,11 +64,14 @@ services:
 
 ### npx
 
-Requires Node.js ≥ 18:
+Requires Node.js ≥ 24. The package ships the built UI together with the server, so it starts the same process as the other channels:
 
 ```bash
 npx agh-console
+PORT=9000 npx agh-console     # configuration goes in the environment
 ```
+
+Stable versions sit on the default `latest` dist-tag; the nightly from `dev` is on `nightly` (`npx agh-console@nightly`).
 
 ### Release tarball
 
@@ -75,26 +80,28 @@ Download `agh-console.tar.gz` from the [latest release](https://github.com/Cowji
 ```bash
 mkdir agh-console && cd agh-console
 tar xzf /path/to/agh-console.tar.gz
-npm install --omit=dev
-npm start
+pnpm install --prod
+pnpm start
 ```
 
 ### Build from source
 
+Requires Node.js ≥ 24 and pnpm (`corepack enable` is enough; both versions are pinned in `package.json`).
+
 ```bash
 git clone https://github.com/Cowjiang/adguard-home-console.git
 cd adguard-home-console
-npm install
+pnpm install
 
-npm run dev:all              # development: frontend on 5173, proxied to the server on 8787
-npm run build && npm start   # production: built assets served by Express on 8787
+pnpm dev:all                 # development: frontend on 5173, proxied to the server on 8787
+pnpm build && pnpm start     # production: built assets served by Express on 8787
 ```
 
 Open **http://localhost:5173** (development) or **http://localhost:8787** (production) and enter your AdGuard Home address, username, and password.
 
 ## Configuration
 
-All environment variables are optional. The server also reads a `.env` file in the project root.
+All environment variables are optional. The server also reads a `.env` file in the project root when it runs from a source checkout or an unpacked tarball; under npx or Docker, pass the variables in the environment.
 
 | Variable | Default | Description |
 | --- | --- | --- |
@@ -113,7 +120,7 @@ Browser ──┬── static assets (dist) ───────────�
           └── /api/agh/* ── forwarded ──▶  AdGuard Home /control/*
                  (target set via the X-AGH-Target header,
                   Authorization Basic passed through,
-                  308 redirects followed automatically)
+                  same-host 308 redirects followed automatically)
 ```
 
 Credentials are stored only in your browser's `localStorage`; requests are forwarded by your own local server and never pass through a third party.
@@ -133,8 +140,9 @@ The same repository carries a [Tauri 2](https://tauri.app) shell for desktop and
 ## Development
 
 ```bash
-npm run check        # typecheck (TypeScript strict)
-npm run build        # production build
+pnpm check           # typecheck (TypeScript strict)
+pnpm test            # unit tests (vitest)
+pnpm build           # production build
 ```
 
 Rust-side tests: start the contract mock first, then run cargo test — cases that depend on the mock exit silently when it is not running:

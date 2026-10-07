@@ -1,10 +1,57 @@
 /**
- * AGH API client
+ * AGH API client — owner of the frontend proxy contract.
  * All requests go through this app's proxy (/api/agh/* → target AGH /control/*);
  * X-AGH-Target selects the target server, Authorization carries Basic credentials.
+ *
+ * Proxy contract (implemented by two adapters, pinned by
+ * contract/agh-proxy.contract.json — server/proxy.mjs for web/PWA,
+ * src-tauri/src/proxy.rs `agh_fetch` for the Tauri shell):
+ * - Request: `<method> /api/agh<path>` with X-AGH-Target + Authorization
+ *   (Basic); non-GET bodies are JSON strings.
+ * - Result: upstream status + raw body text; responses pass through untouched.
+ * - Adapter-generated failures are `{"error","kind"}` JSON with status 400/502;
+ *   `kind` is mapped to localized copy here (AghProxyErrorKind), upstream
+ *   errors are surfaced as-is.
  */
-import type { SvrConfig } from './auth'
+import { i18n } from './i18n'
+import { getTauriInvoke } from './native/shell'
+import type { SvrConfig } from './session/auth'
 export type { SvrConfig }
+
+/** Request the contract adapters accept */
+export interface AghProxyRequest {
+  method: string
+  target: string
+  authHeader: string
+  pathWithQuery: string
+  bodyJson?: string
+}
+
+/** Result both adapters return (serde field names stay snake_case on the Rust side) */
+export interface AghProxyResult {
+  status: number
+  contentType: string
+  bodyText: string
+}
+
+/** Machine-readable failure kinds emitted by the adapters as `{"error","kind"}`;
+ *  mapped to localized messages here so no copy lives in either adapter */
+export type AghProxyErrorKind =
+  | 'missing_target'
+  | 'invalid_target'
+  | 'timeout'
+  | 'cross_host_redirect'
+  | 'invalid_redirect'
+  | 'network'
+
+const PROXY_ERROR_KEYS = {
+  missing_target: 'proxy.missingTarget',
+  invalid_target: 'proxy.invalidTarget',
+  timeout: 'proxy.timeout',
+  cross_host_redirect: 'proxy.crossHostRedirect',
+  invalid_redirect: 'proxy.invalidRedirect',
+  network: 'proxy.network',
+} as const satisfies Record<AghProxyErrorKind, string>
 
 /** Shared SWR fetcher: useSWR<T>([name, cfg, path], swrFetcher) */
 export const swrFetcher = <T,>(args: readonly [string, SvrConfig, string]): Promise<T> =>
@@ -12,29 +59,20 @@ export const swrFetcher = <T,>(args: readonly [string, SvrConfig, string]): Prom
 
 export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** Present when the failure was adapter-generated (vs upstream passthrough) */
+  kind?: AghProxyErrorKind
+  /** Adapter-supplied technical detail; messages shown to users are localized */
+  detail?: string
+  constructor(status: number, message: string, opts?: { kind?: AghProxyErrorKind; detail?: string }) {
     super(message)
     this.status = status
+    this.kind = opts?.kind
+    this.detail = opts?.detail
   }
 }
 
 function basicAuth(user: string, pass: string): string {
   return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)))
-}
-
-/** Tauri shell detection: inside the iOS/desktop shell go through the Rust
- *  proxy (agh_fetch), bypassing WebView CORS */
-type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
-function getTauriInvoke(): TauriInvoke | null {
-  const w = window as unknown as { __TAURI_INTERNALS__?: { invoke?: TauriInvoke } }
-  return w.__TAURI_INTERNALS__?.invoke ?? null
-}
-
-/** agh_fetch result shape (Rust-side AghFetchResult; serde field names stay snake_case) */
-interface AghFetchResult {
-  status: number
-  content_type: string
-  body_text: string
 }
 
 export async function api<T = unknown>(
@@ -47,23 +85,29 @@ export async function api<T = unknown>(
   let text: string
   const invoke = getTauriInvoke()
   if (invoke) {
-    // Tauri shell: Rust proxy, behavior mirrors server/index.mjs proxyAGH
+    // Tauri shell: Rust proxy — the same contract as the Express adapter
     // (path normalization /api/agh → /control, redirects, timeouts and error
-    // semantics are all done Rust-side)
+    // kinds are all implemented Rust-side per contract/agh-proxy.contract.json)
+    const req: AghProxyRequest = {
+      method,
+      target: cfg.url,
+      authHeader: basicAuth(cfg.username, cfg.password),
+      pathWithQuery: '/api/agh' + path,
+      bodyJson: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
+    }
     try {
-      const r = (await invoke('agh_fetch', {
-        method,
-        target: cfg.url,
-        authHeader: basicAuth(cfg.username, cfg.password),
-        pathWithQuery: '/api/agh' + path,
-        bodyJson: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
-      })) as AghFetchResult
+      const r = (await invoke('agh_fetch', { ...req })) as {
+        status: number
+        content_type: string
+        body_text: string
+      }
       status = r.status
       text = r.body_text ?? ''
     } catch (e) {
       // IPC failure (missing command / serialization error etc.): same
       // semantics as a network error
-      throw new ApiError(502, String((e as Error)?.message ?? e))
+      const detail = String((e as Error)?.message ?? e)
+      throw new ApiError(502, i18n.t(PROXY_ERROR_KEYS.network), { kind: 'network', detail })
     }
   } else {
     const url = '/api/agh' + path
@@ -88,6 +132,15 @@ export async function api<T = unknown>(
     /* Non-JSON response */
   }
   if (status < 200 || status >= 300) {
+    // Adapter-generated failures carry a machine-readable kind; the copy for
+    // it lives here. Upstream errors pass through untouched.
+    const kind = (data?.kind as AghProxyErrorKind) in PROXY_ERROR_KEYS ? (data.kind as AghProxyErrorKind) : undefined
+    if (kind) {
+      throw new ApiError(status, i18n.t(PROXY_ERROR_KEYS[kind]), {
+        kind,
+        detail: typeof data?.error === 'string' ? data.error : undefined,
+      })
+    }
     const msg = data?.error || data?.message || text?.slice(0, 200) || `HTTP ${status}`
     throw new ApiError(status, msg)
   }

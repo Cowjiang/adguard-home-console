@@ -13,9 +13,10 @@ import querylog from './querylog'
 import filters from './filters'
 import stats from './stats'
 import advanced from './advanced'
+import proxy from './proxy'
 
 /** Type-isomorphic to the zh dictionary: missing keys fail tsc; en may have
  *  extra keys (structural typing doesn't reject extras) */
-const en: typeof zhDict = { common, login, dashboard, settings, units, protection, nav, agh, charts, clients, querylog, filters, stats, advanced }
+const en: typeof zhDict = { common, login, dashboard, settings, units, protection, nav, agh, charts, clients, querylog, filters, stats, advanced, proxy }
 
 export default en

@@ -4,20 +4,13 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { swrFetcher, type Stats } from '../lib/api'
 import { RankTable } from '../components/charts'
-import { usePageInClass, Loading, EmptyState, SearchBar, Card, PageHeader } from '../components/ui'
+import { usePageInClass, Card, PageHeader } from '../components/ui/primitives'
+import { Loading, EmptyState, SearchBar } from '../components/ui/atoms'
 import { fmtNum } from '../lib/format'
-
-/** v0.107.79 top_* fields are single-key object arrays; also accepts the legacy dictionary
- *  shape */
-function toMap(v: unknown): Record<string, number> {
-  if (Array.isArray(v)) {
-    return Object.assign({}, ...v.filter((o) => o && typeof o === 'object'))
-  }
-  return (v as Record<string, number>) ?? {}
-}
+import { topEntries } from '../lib/stats'
 
 const KINDS = {
   queried: { titleKey: 'stats.queriedTitle', field: 'top_queried_domains', color: 'var(--accent)', unitKey: 'stats.unitDomains' },
@@ -38,8 +31,7 @@ export default function TopListPage() {
   })
 
   const items = useMemo(() => {
-    const all = Object.entries(toMap(stats?.[conf.field]))
-      .sort((a, b) => b[1] - a[1])
+    const all = topEntries(stats?.[conf.field])
     const s = search.trim().toLowerCase()
     return s ? all.filter(([k]) => k.toLowerCase().includes(s)) : all
   }, [stats, conf.field, search])

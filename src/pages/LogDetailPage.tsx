@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { api, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
-import { useAuth } from '../lib/auth'
-import { usePageInClass, PageHeader, EmptyState, toast } from '../components/ui'
-import { LogDetail } from '../components/LogDetail'
+import { useAuth } from '../lib/session/auth'
+import { usePageInClass, PageHeader } from '../components/ui/primitives'
+import { EmptyState } from '../components/ui/atoms'
+import { runMutation } from '../lib/mutation'
+import { LogDetail } from '../components/log/LogDetail'
 
 export default function LogDetailPage() {
   const pageIn = usePageInClass()
@@ -35,14 +37,14 @@ export default function LogDetailPage() {
   async function saveRule(rule: string, block: boolean) {
     if (!cfg || !filtering) return
     const rules = [...(filtering.user_rules ?? []), rule]
-    try {
-      await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
-      mutateFiltering()
-      toast(block ? t('querylog.blockedToast', { domain: current.question.name }) : t('querylog.whitelistedToast'))
-      nav(-1)
-    } catch (e: any) {
-      toast(t('querylog.ruleSaveFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } }),
+      invalidate: mutateFiltering,
+      okKey: block ? 'querylog.blockedToast' : 'querylog.whitelistedToast',
+      okVars: block ? () => ({ domain: current.question.name }) : undefined,
+      failKey: 'querylog.ruleSaveFailed',
+    })
+    if (ok) nav(-1)
   }
 
   return (

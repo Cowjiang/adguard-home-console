@@ -51,16 +51,16 @@ AdGuard Home 的 API 不返回 CORS 头，浏览器无法直连——所有第�
 三种部署通道任选其一，详细配置见英文 [README](../../README.md)：
 
 ```bash
-# Docker（amd64 / arm64）
+# Docker（amd64 / arm64；仓库私有时需先 docker login ghcr.io）
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 
-# npx（Node ≥ 18）
+# npx（Node ≥ 24；稳定版走 latest tag，dev 的每晚构建走 nightly tag）
 npx agh-console
 
-# 源码运行
+# 源码运行（Node ≥ 24 + pnpm）
 git clone https://github.com/Cowjiang/adguard-home-console.git
-cd adguard-home-console && npm install
-npm run dev:all              # 开发：前端 5173，代理到 8787
+cd adguard-home-console && pnpm install
+pnpm dev:all                 # 开发：前端 5173，代理到 8787
 ```
 
 启动后打开 <http://localhost:8787>，填入 AdGuard Home 地址与账号密码即可。局域网设备访问 `http://<电脑 IP>:8787` 并「添加到主屏幕」可获得全屏体验。

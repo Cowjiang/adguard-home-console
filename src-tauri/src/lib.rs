@@ -6,12 +6,35 @@ mod proxy;
 /// as `AGH_*`).
 /// Never logged, never surfaced in error messages; always None in release builds.
 #[derive(serde::Serialize)]
+pub struct DebugInstance {
+    url: String,
+    username: String,
+    password: String,
+}
+
+#[derive(serde::Serialize)]
 pub struct DebugLogin {
     url: String,
     username: String,
     password: String,
     autoconnect: bool,
     route: Option<String>,
+    /// Optional second instance (AGH_URL2/AGH_USERNAME2/AGH_PASSWORD2) so the
+    /// shell can auto-login two instances for multi-instance acceptance runs
+    second: Option<DebugInstance>,
+}
+
+#[cfg(debug_assertions)]
+fn debug_second_instance() -> Option<DebugInstance> {
+    let url = std::env::var("AGH_URL2").ok().filter(|s| !s.is_empty())?;
+    let username = std::env::var("AGH_USERNAME2").ok().filter(|s| !s.is_empty())?;
+    let password = std::env::var("AGH_PASSWORD2").unwrap_or_default();
+    Some(DebugInstance { url, username, password })
+}
+
+#[cfg(not(debug_assertions))]
+fn debug_second_instance() -> Option<DebugInstance> {
+    None
 }
 
 #[cfg(debug_assertions)]
@@ -30,6 +53,7 @@ fn debug_login() -> Option<DebugLogin> {
             password,
             autoconnect,
             route,
+            second: debug_second_instance(),
         });
     }
     None
