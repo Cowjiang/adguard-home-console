@@ -61,6 +61,7 @@
 - npm 的 `latest` 只在第一个 stable 发布后才存在：在此之前 `npx agh-console`（不带 tag）会 ETARGET，需先发一个 stable，或手动 `npm dist-tag add agh-console@<版本> latest` 引导。
 - `NPM_TOKEN` 必须是**能创建新包**的令牌（classic automation token，或授权范围覆盖全部包的 granular token）：npm 对无权限的发布一律返回 404，无法与「名字已被占用」区分，首次发布 `agh-console` 时尤其要先排除这一条。
 - 镜像 tag 由 `release-plan.mjs` 输出为**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 当成 Docker Hub 名字，会去推 `library/<tag>` 并拿到 401——首次真实 nightly 就是这么失败的。
+- `release.yml` 里的 action 一律钉在 **node24 主线**（node20 的动作会被 runner 强制降级运行并逐 job 打弃用告警）；升大版本前逐个核对本流程用到的 input 在新版里是否仍然存在，本仓没有 Dependabot 兜底。
 - npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。`NPM_TOKEN` 未配置时该 job 只告警跳过，不影响其余渠道；私有仓库拿不到 provenance，故不加 `--provenance`。
 - GHCR 包继承仓库可见性：仓库私有时 README 里的匿名 `docker run` 需要先把包设为 public（或在目标机 `docker login ghcr.io`）。
 

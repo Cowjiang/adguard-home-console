@@ -57,7 +57,8 @@
 - [x] **首次真实 nightly 干跑**（run 37663748363，`publish=false`）：prepare/ build/ docker 全绿，release 与 npm 按预期 skipped；双平台镜像构建成功且没有推送。
 - [x] **首次真实 nightly 发布**（run 37665280344，`publish=true`）：GH Release `v0.1.0-nightly.20261007.aad0ad7` 创建成功、prerelease、`target_commitish` 落在 `dev` 的 `aad0ad7`，资产 `agh-console.tar.gz` 就位；CI 产出的 npm tgz 下载后能 `npm install`、`.bin/agh-console` 起服务（`/api/health`、`/`、SPA 回退全 200）。
 - [x] **该次运行暴露并修掉的两个问题**：(1) 镜像 tag 是裸 tag，buildx 把它当 Docker Hub 名字去推 `library/0.1.0-nightly…`，401 —— 改为由 `release-plan.mjs` 输出全限定引用并加断言；(2) 首次 nightly 之后重新验证会被「dev 未移动」跳过，补 `workflow_dispatch` 的 `force` 开关（布尔输入用 `!inputs.force` 判定，`!= 'true'` 会被类型强转成数值比较而失效）。
-- [ ] 账号侧人工动作：`NPM_TOKEN` 必须能**创建新包**（现有令牌的发布返回 404，无法与「名字被占用」区分）；GHCR 包设为 public，否则 README 里的匿名 `docker run` 会 401。
+- [x] **工作流动作升到 node24 主线**：每个 job 都报过 `Node.js 20 is deprecated … being forced to run on Node.js 24`。升级 `checkout` v7、`setup-node` v7、`upload-artifact` v7、`download-artifact` v8、`pnpm/action-setup` v6、`softprops/action-gh-release` v3、`docker/setup-qemu|setup-buildx|login` v4、`docker/build-push-action` v7 后，同一套流程（run 37666644463）里该告警 **0 条**，十个 action 的新版本都被实际拉取执行，prepare/build/release/docker 全绿（镜像三个 tag 推送到新 commit 的 digest）。升级前逐个核对了本流程用到的 input 在新版中仍然存在。
+- [ ] 账号侧人工动作：`NPM_TOKEN` 必须能**创建新包**；GHCR 包设为 public，否则 README 里的匿名 `docker run` 会 401。注意 npm 渠道当前的真实状态：run 37665280344 与 37665833705 里 token 有值、被 registry 以 404 拒绝（与「名字被占用」无法区分）；run 37666644463 里 token 解析为空，该 job 只是**告警跳过**——那次的绿不代表 npm 发布成功，registry 上至今没有 `agh-console`。
 - [ ] 把本变更合进 `main` 后，定时任务才会开始触发；随后核对一次真实 nightly 的三个渠道版本一致（需要推送权限与 GitHub 侧环境）。
 
 ## Note
