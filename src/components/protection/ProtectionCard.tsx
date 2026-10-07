@@ -4,7 +4,9 @@ import { ShieldCheck, ShieldOff, Clock3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/session/auth'
 import { api } from '../../lib/api'
-import { Button, Switch, toast, usePick } from '../ui'
+import { Button, Switch } from '../ui/primitives'
+import { toast } from '../ui/toast'
+import { usePick } from '../ui/menu'
 import { fmtDuration, fmtTime } from '../../lib/format'
 
 export function ProtectionCard() {

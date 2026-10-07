@@ -12,7 +12,9 @@ import { api, swrFetcher, type AghClient, type Stats } from '../../lib/api'
 import { useAuth } from '../../lib/session/auth'
 import { fmtCompact, fmtNum } from '../../lib/format'
 import { kvCount } from '../../lib/stats'
-import { Badge, Button, CopyIconButton, Group, GroupTitle, Row, Rows, Switch, toast } from '../ui'
+import { Badge, CopyIconButton } from '../ui/atoms'
+import { Button, Group, GroupTitle, Row, Rows, Switch } from '../ui/primitives'
+import { toast } from '../ui/toast'
 
 export interface ClientDetailData {
   ip?: string

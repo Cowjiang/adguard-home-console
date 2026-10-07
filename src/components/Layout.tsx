@@ -12,7 +12,10 @@ import { useNativeBackButton } from '../lib/native/nativeBackButton'
 import { TransitionArea, useArrivalPopAnim } from '../lib/routeTransition'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { APP_NAME } from '../lib/constants'
-import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES, NavScrim, Spinner, EmptyState, Button, StatusDot, useSheet } from './ui'
+import { TOP_LEVEL_ROUTES, TAB_ROOT_ROUTES } from '../lib/nav/routes'
+import { NavScrim, Button } from './ui/primitives'
+import { Spinner, EmptyState, StatusDot } from './ui/atoms'
+import { useSheet } from './ui/sheet'
 
 type NavItem = { to: string; labelKey: 'nav.overview' | 'nav.protection' | 'nav.log' | 'nav.settings' | 'nav.clients'; icon: typeof Home; match?: string[] }
 

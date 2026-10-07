@@ -5,7 +5,9 @@ import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { api, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
 import { useAuth } from '../lib/session/auth'
-import { usePageInClass, PageHeader, EmptyState, toast } from '../components/ui'
+import { usePageInClass, PageHeader } from '../components/ui/primitives'
+import { EmptyState } from '../components/ui/atoms'
+import { toast } from '../components/ui/toast'
 import { LogDetail } from '../components/log/LogDetail'
 
 export default function LogDetailPage() {

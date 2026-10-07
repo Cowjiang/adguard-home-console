@@ -17,11 +17,11 @@ import { ClientDetail, type ClientDetailData } from '../components/clients/Clien
 import { kvCount } from '../lib/stats'
 import { fmtNum } from '../lib/format'
 import { isAppleMobile } from '../lib/native/shell'
-import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
-  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge,
-  SourceBadge, Pagination, usePick, PickSelect,
-} from '../components/ui'
+import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction } from '../components/ui/primitives'
+import { useSheet, useConfirm } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { Loading, EmptyState, SearchBar, Badge, SourceBadge, Pagination } from '../components/ui/atoms'
+import { usePick, PickSelect } from '../components/ui/menu'
 
 
 export const emptyClient = (): Partial<AghClient> => ({

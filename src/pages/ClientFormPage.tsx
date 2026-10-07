@@ -6,7 +6,7 @@ import { useSWRConfig } from 'swr'
 import type { AghClient } from '../lib/api'
 import { useAuth } from '../lib/session/auth'
 import { navBack } from '../lib/nav/backNav'
-import { PageHeader, Screen } from '../components/ui'
+import { PageHeader, Screen } from '../components/ui/primitives'
 import { ClientForm, emptyClient } from './Clients'
 
 export default function ClientFormPage() {

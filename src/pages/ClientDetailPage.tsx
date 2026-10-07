@@ -8,7 +8,10 @@ import { api, swrFetcher, type ClientsData } from '../lib/api'
 import { useAuth } from '../lib/session/auth'
 import { navBack } from '../lib/nav/backNav'
 import { ClientDetail, type ClientDetailData } from '../components/clients/ClientDetail'
-import { PageHeader, EmptyState, useConfirm, toast } from '../components/ui'
+import { PageHeader } from '../components/ui/primitives'
+import { EmptyState } from '../components/ui/atoms'
+import { useConfirm } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
 
 export default function ClientDetailPage() {
   const { t } = useTranslation()

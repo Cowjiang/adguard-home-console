@@ -10,7 +10,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type RewriteEntry } from '../lib/api'
-import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
+import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Button } from '../components/ui/primitives'
+import { Badge } from '../components/ui/atoms'
+import { useSheet } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
 

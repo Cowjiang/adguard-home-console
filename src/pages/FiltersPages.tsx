@@ -7,10 +7,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
-import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
-  Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect, TabContent,
-} from '../components/ui'
+import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction, TabContent } from '../components/ui/primitives'
+import { useSheet, useConfirm } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { Loading, EmptyState, SearchBar, Badge, Chip } from '../components/ui/atoms'
+import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
 import { IconBubble } from './Protection'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'

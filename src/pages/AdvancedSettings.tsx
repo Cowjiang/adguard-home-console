@@ -8,10 +8,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type DnsInfo, type TlsStatus, type DhcpStatus } from '../lib/api'
-import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, useConfirm, useSheet, toast, Badge, EmptyState, usePick, Segmented,
-} from '../components/ui'
+import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, Segmented } from '../components/ui/primitives'
+import { useConfirm, useSheet } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { Badge, EmptyState, Loading } from '../components/ui/atoms'
+import { usePick } from '../components/ui/menu'
 import { fmtBytes, fmtDate } from '../lib/format'
 
 

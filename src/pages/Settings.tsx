@@ -12,10 +12,11 @@ import { useAuth } from '../lib/session/auth'
 import { activeEndpoint, labelFromUrl } from '../lib/session/instances'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
 import { setAppLang, getLangSetting, type LangSetting } from '../lib/i18n'
-import {
-  PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
-  Loading, useConfirm, toast, Badge, usePick, PickSelect, ErrorBox,
-} from '../components/ui'
+import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button } from '../components/ui/primitives'
+import { useConfirm } from '../components/ui/sheet'
+import { toast } from '../components/ui/toast'
+import { Badge, Loading, ErrorBox } from '../components/ui/atoms'
+import { usePick, PickSelect } from '../components/ui/menu'
 import { IconBubble } from './Protection'
 import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, fmtDate } from '../lib/format'
