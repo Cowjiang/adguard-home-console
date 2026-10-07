@@ -1,7 +1,7 @@
 # 构建与发布
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 
 两条交付线共用一份 Web 构建产物；发布走 GitHub Release，服务器只拉取产物，不在服务器上构建。
 
@@ -16,7 +16,8 @@
 | 前端构建 | `pnpm build`（Vite → `dist/`） |
 | 类型检查 | `pnpm check` |
 | 单元测试 | `pnpm test`（vitest） |
-| Rust 测试 | 先 `node scripts/mock-agh.mjs`，再 `cd src-tauri && cargo test` |
+| Rust 测试 | `cd src-tauri && cargo test`（契约 runner 自起临时 origin 服务器；`scripts/mock-agh.mjs` 只在本地手工联调时用） |
+| 插件 fork delta | `scripts/plugin-fork-diff.sh`（对照上游 crate 输出我方改动，基线与清单见插件内 `FORK.md`） |
 | 提案校验 | `node scripts/verify-proposals.mjs`（加 `--links` 核对路径） |
 | iOS 工程与构建 | `./scripts/ios-signing.sh generate tauri`、`pnpm ios:build`（生成后校验工程，缺工程时构建前自动重建） |
 
