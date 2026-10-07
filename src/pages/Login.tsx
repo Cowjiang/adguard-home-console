@@ -1,9 +1,10 @@
 /** Log in / connect to a server */
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getTauriInvoke } from '../lib/native/shell'
 import { ShieldCheck, Server, User, KeyRound, ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { Button, ErrorBox } from '../components/ui'
 import { Ambient } from '../components/Layout'
 import { APP_NAME } from '../lib/constants'
@@ -29,9 +30,7 @@ export default function Login() {
   // (auto-connect is handled by the App-level DebugAutoLogin, avoiding a navigate after
   // this component unmounts); the release shell always returns null
   useEffect(() => {
-    const invoke = (
-      window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }
-    ).__TAURI_INTERNALS__?.invoke
+    const invoke = getTauriInvoke()
     if (!invoke) return
     invoke('get_debug_login')
       .then((d) => {

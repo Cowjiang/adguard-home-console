@@ -15,9 +15,10 @@
  * Falls back silently to the CSS button when native is unavailable or creation fails.
  */
 import { useEffect, useRef, useState } from 'react'
-import { isTauriIOS, useGestureActive, useTransitionHalfBusy, TRANSITION_HALF_MS } from './routeTransition'
-import { useIsDesktop } from './useIsDesktop'
-import { consumeGestureCommit } from './routeTransition'
+import { isTauriIOS } from './shell'
+import { useGestureActive, useTransitionHalfBusy, TRANSITION_HALF_MS } from '../routeTransition'
+import { useIsDesktop } from '../useIsDesktop'
+import { consumeGestureCommit } from '../routeTransition'
 import { FADE_IN_S, FADE_OUT_S, accentHex } from './nativeGlass'
 
 const BTN_ID = 'nav-action'

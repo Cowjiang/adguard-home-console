@@ -8,10 +8,10 @@ import {
   ListFilter, CheckCircle, FileCode2, AppWindow, ArrowLeftRight, ScanSearch,
   ShieldAlert, Baby, SearchCheck, Timer, RefreshCw,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type RewriteEntry } from '../lib/api'
 import { usePageInClass, Card, Group, GroupTitle, Rows, Row, Switch, Badge, useSheet, Button, toast, usePick, PickSelect } from '../components/ui'
-import { isAppleMobile } from '../lib/nativePickers'
+import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
 
 

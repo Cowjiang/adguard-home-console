@@ -8,8 +8,8 @@ import {
   Info, Eraser, ShieldQuestion,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../lib/auth'
-import { activeEndpoint, labelFromUrl } from '../lib/instances'
+import { useAuth } from '../lib/session/auth'
+import { activeEndpoint, labelFromUrl } from '../lib/session/instances'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig, type VersionInfo } from '../lib/api'
 import { setAppLang, getLangSetting, type LangSetting } from '../lib/i18n'
 import {
@@ -17,7 +17,7 @@ import {
   Loading, useConfirm, toast, Badge, usePick, PickSelect, ErrorBox,
 } from '../components/ui'
 import { IconBubble } from './Protection'
-import { isAppleMobile } from '../lib/nativePickers'
+import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, fmtDate } from '../lib/format'
 import { APP_NAME, APP_VERSION } from '../lib/constants'
 import { useIsDesktop } from '../lib/useIsDesktop'

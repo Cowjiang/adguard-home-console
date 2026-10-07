@@ -6,10 +6,10 @@ import useSWR from 'swr'
 import {
   Radar, Play, ChevronDown, Globe,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, qs, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
 import { usePageInClass, SearchBar, Chip, Badge, Card, EmptyState, Spinner, useSheet, toast, TabContent } from '../components/ui'
-import { LogDetail, reasonMeta } from '../components/LogDetail'
+import { LogDetail, reasonMeta } from '../components/log/LogDetail'
 import { LOG_FILTERS, qtypeColor } from '../lib/constants'
 import { fmtTime, fmtMs } from '../lib/format'
 import { useIsDesktop } from '../lib/useIsDesktop'

@@ -3,11 +3,11 @@
  * probing, theme switching. Consumers keep seeing the single active instance
  * through cfg/status/offline — the multi-instance detail lives here.
  */
-import { applyNativeAppearance } from './nativeAppearance'
-import { i18n } from './i18n'
+import { applyNativeAppearance } from '../native/nativeAppearance'
+import { i18n } from '../i18n'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { mutate } from 'swr'
-import { api, type Status } from './api'
+import { api, type Status } from '../api'
 import {
   activeConfig,
   activeEndpoint,

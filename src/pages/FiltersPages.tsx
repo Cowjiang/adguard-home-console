@@ -5,13 +5,13 @@ import useSWR from 'swr'
 import {
   Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
   Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge, usePick, Chip, PickSelect, TabContent,
 } from '../components/ui'
-import { isAppleMobile } from '../lib/nativePickers'
+import { isAppleMobile } from '../lib/native/shell'
 import { IconBubble } from './Protection'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'

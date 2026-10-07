@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { api, swrFetcher, type QueryLogItem, type FilteringStatus } from '../lib/api'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { usePageInClass, PageHeader, EmptyState, toast } from '../components/ui'
-import { LogDetail } from '../components/LogDetail'
+import { LogDetail } from '../components/log/LogDetail'
 
 export default function LogDetailPage() {
   const pageIn = usePageInClass()

@@ -12,7 +12,7 @@
  * src-tauri/plugins/tauri-plugin-system-components
  * (SystemComponentsPlugin.setAppearance).
  */
-import { isTauriIOS } from './routeTransition'
+import { isTauriIOS } from './shell'
 
 export function applyNativeAppearance(dark: boolean) {
   if (!isTauriIOS()) return

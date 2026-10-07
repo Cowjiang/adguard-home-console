@@ -9,11 +9,11 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { TAB_ROOT_ROUTES, TOP_LEVEL_ROUTES } from '../lib/routes'
+import { TAB_ROOT_ROUTES, TOP_LEVEL_ROUTES } from '../lib/nav/routes'
 import { useRouteTransition, useEnterSkip } from '../lib/routeTransition'
-import { useNativeBackShown } from '../lib/nativeBackButton'
-import { useNativeHeaderAction, type NativeHeaderSpec } from '../lib/nativeHeaderAction'
-import { navBack } from '../lib/backNav'
+import { useNativeBackShown } from '../lib/native/nativeBackButton'
+import { useNativeHeaderAction, type NativeHeaderSpec } from '../lib/native/nativeHeaderAction'
+import { navBack } from '../lib/nav/backNav'
 import { copyText } from '../lib/clipboard'
 
 /* ---------- Page containers and titles ---------- */

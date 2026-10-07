@@ -2,11 +2,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Ban, CheckCircle2, Copy } from 'lucide-react'
-import { Badge, Button, toast } from './ui'
-import { copyText } from '../lib/clipboard'
-import { REASON_META, qtypeColor, type ReasonLabelKey } from '../lib/constants'
-import { fmtTimeFull, fmtMs } from '../lib/format'
-import type { QueryLogItem, FilteringStatus } from '../lib/api'
+import { Badge, Button, toast } from '../ui'
+import { copyText } from '../../lib/clipboard'
+import { REASON_META, qtypeColor, type ReasonLabelKey } from '../../lib/constants'
+import { fmtTimeFull, fmtMs } from '../../lib/format'
+import type { QueryLogItem, FilteringStatus } from '../../lib/api'
 
 type TFn = (key: ReasonLabelKey) => string
 

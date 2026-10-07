@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { scrollToTop } from './scrollToTop'
+import { scrollToTop } from '../nav/scrollToTop'
+import { isTauriShell } from './shell'
 
 type TabId = 'home' | 'protection' | 'logs' | 'settings'
 
@@ -27,10 +28,6 @@ function tabItems(t: TFn) {
 function routeToId(pathname: string): TabId | null {
   if (pathname === '/') return 'home'
   return TABS.find((t) => t.to !== '/' && pathname.startsWith(t.to))?.id ?? null
-}
-
-export function isTauriShell(): boolean {
-  return !!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
 }
 
 /** Configure the native TabBar while Layout (protected routes) is mounted;

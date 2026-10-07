@@ -18,9 +18,9 @@
  */
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { TAB_ROOT_ROUTES } from './routes'
-import { navBack } from './backNav'
-import { consumeGestureCommit, useTransitionHalfBusy, TRANSITION_HALF_MS } from './routeTransition'
+import { TAB_ROOT_ROUTES } from '../nav/routes'
+import { navBack } from '../nav/backNav'
+import { consumeGestureCommit, useTransitionHalfBusy, TRANSITION_HALF_MS } from '../routeTransition'
 import { FADE_IN_S, FADE_OUT_S } from './nativeGlass'
 
 const BTN_ID = 'nav-back'

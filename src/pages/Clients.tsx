@@ -10,13 +10,13 @@ import {
   Plus, Laptop, Smartphone, Globe, ShieldAlert, Baby,
   UserRound, ArrowDownUp, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type ClientsData, type AghClient, type AutoClient, type Stats } from '../lib/api'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { ClientDetail, type ClientDetailData } from '../components/ClientDetail'
+import { ClientDetail, type ClientDetailData } from '../components/clients/ClientDetail'
 import { kvCount } from '../lib/stats'
 import { fmtNum } from '../lib/format'
-import { isAppleMobile } from '../lib/nativePickers'
+import { isAppleMobile } from '../lib/native/shell'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button, HeaderAction,
   Loading, EmptyState, useSheet, useConfirm, toast, SearchBar, Badge,

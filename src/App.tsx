@@ -2,7 +2,8 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { SWRConfig, type SWRConfiguration } from 'swr'
-import { AuthProvider, useAuth } from './lib/auth'
+import { AuthProvider, useAuth } from './lib/session/auth'
+import { getTauriInvoke } from './lib/native/shell'
 import { SheetProvider, Spinner } from './components/ui'
 import { ToastHost } from './components/ui'
 import Layout from './components/Layout'
@@ -40,9 +41,7 @@ function DebugAutoLogin() {
   const nav = useNavigate()
   useEffect(() => {
     if (cfg) return
-    const invoke = (
-      window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }
-    ).__TAURI_INTERNALS__?.invoke
+    const invoke = getTauriInvoke()
     if (!invoke) return
     invoke('get_debug_login')
       .then((d) => {

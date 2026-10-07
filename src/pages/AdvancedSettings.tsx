@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import {
   Play, ShieldCheck, Plus, Trash2, Wifi, Pencil, AlertTriangle,
 } from 'lucide-react'
-import { useAuth } from '../lib/auth'
+import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type DnsInfo, type TlsStatus, type DhcpStatus } from '../lib/api'
 import {
   PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button,
