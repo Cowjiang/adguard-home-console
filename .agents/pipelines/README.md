@@ -41,6 +41,9 @@
 | 2026-10-06 | architecture | [上移 AGH 代理契约为前端持有的接口，Express/Rust 作为可替换实现](proposals/architecture/2026-10-06-proxy-contract-ownership.md) | implemented |
 | 2026-10-06 | simplification | [收敛 src/ 页面层的重复编排、探测状态机与超载文件](proposals/simplification/2026-10-06-src-layer-consolidation.md) | implemented |
 | 2026-10-07 | simplification | [收干净 Rust 壳与插件 fork 的失修项：失效配置、构建生成物与不可复现的 delta](proposals/simplification/2026-10-07-rust-shell-fork-consolidation.md) | proposed |
+| 2026-10-07 | bug-fix | [对齐 tauri crate 与 npm 的版本，退掉第三方 tao 补丁](proposals/bug-fix/2026-10-07-tauri-version-align.md) | implemented |
+| 2026-10-07 | bug-fix | [修回 iOS 工程的 pre-build 脚本调用方式，让 Xcode 阶段不再 panic](proposals/bug-fix/2026-10-07-ios-xcode-script-phase.md) | implemented |
+| 2026-10-07 | bug-fix | [修回 iOS release 构建的 Swift 静态链接](proposals/bug-fix/2026-10-07-ios-release-swift-link.md) | implemented |
 
 ## 与 docs/ 的分工
 
