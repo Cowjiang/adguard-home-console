@@ -1,7 +1,7 @@
 # Tauri 2 壳
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 
 `src-tauri/` 把同一个 React 前端装进系统 WebView，并用 Rust 复刻 Express 代理的传输语义，使 Web 与壳内共用页面，同时不依赖浏览器的同源代理。
 
@@ -12,7 +12,8 @@
 - 包 `adguard-home-console`，库名 `adguard_home_console_lib`（`staticlib`/`cdylib`/`rlib`，Tauri 移动端约定），二进制只调用 `run()`。
 - 模块面很小：`src-tauri/src/proxy.rs` 承担全部网络逻辑，`src-tauri/src/lib.rs` 负责注册命令、debug 登录注入与 iOS 专属处理。
 - 依赖 tauri 2、reqwest（rustls，不走系统 TLS）、tokio（proxy 单测自起 TCP）、thiserror；iOS 侧补 `objc2`。
-- `Cargo.toml` 有两处补丁：`tao` 指向 fork 分支，`tauri-plugin-system-components` 指向本仓 `plugins/` 下的实现。
+- `Cargo.toml` 只有一处补丁：`tauri-plugin-system-components` 指向本仓 `plugins/` 下的实现。`tao` 的补丁已于 2026-10-07 退掉——iOS 27 需要的 #1245 修复（scene 配置被提前释放，只在 release 构建暴露）已随 tao 0.37 进入上游，而 tauri 2.12 的 `tauri-runtime-wry` 依赖该版本。
+- **crate 与 npm 必须同 minor**：Tauri CLI 在 `build`/`dev` 上比对 `tauri` crate（取自 `Cargo.lock`）与 `@tauri-apps/api`（取自已安装依赖）的 major/minor，不一致直接中止。当前两侧都是 2.12；升一侧时必须同时升另一侧，`@tauri-apps/cli` 也随之同 minor。
 
 ## 命令面
 
