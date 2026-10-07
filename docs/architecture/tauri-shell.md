@@ -12,7 +12,8 @@
 - 包 `adguard-home-console`，库名 `adguard_home_console_lib`（`staticlib`/`cdylib`/`rlib`，Tauri 移动端约定），二进制只调用 `run()`。
 - 模块面很小：`src-tauri/src/proxy.rs` 承担全部网络逻辑，`src-tauri/src/lib.rs` 负责注册命令、debug 登录注入与 iOS 专属处理。
 - 依赖 tauri 2、reqwest（rustls，不走系统 TLS）、tokio（proxy 单测自起 TCP）、thiserror；iOS 侧补 `objc2`。
-- `Cargo.toml` 有两处补丁：`tao` 指向 fork 分支，`tauri-plugin-system-components` 指向本仓 `plugins/` 下的实现。
+- `Cargo.toml` 只有一处补丁：`tauri-plugin-system-components` 指向本仓 `plugins/` 下的实现。`tao` 的补丁已于 2026-10-07 退掉——iOS 27 需要的 #1245 修复（scene 配置被提前释放，只在 release 构建暴露）已随 tao 0.37 进入上游，而 tauri 2.12 的 `tauri-runtime-wry` 依赖该版本。
+- **crate 与 npm 必须同 minor**：Tauri CLI 在 `build`/`dev` 上比对 `tauri` crate（取自 `Cargo.lock`）与 `@tauri-apps/api`（取自已安装依赖）的 major/minor，不一致直接中止。当前两侧都是 2.12；升一侧时必须同时升另一侧，`@tauri-apps/cli` 也随之同 minor。
 
 ## 命令面
 
@@ -55,4 +56,5 @@
 - `beforeDevCommand`/`beforeBuildCommand` 复用 pnpm 脚本，壳与 Web 构建同一份 `dist/`。
 - iOS 在 setup 中禁用 WKWebView 的前进/后退手势，页面转场由前端自己负责（见 `docs/web-interaction.md`）。
 - `src-tauri/gen/` 只生成 apple 一套工程且不入库；生成与构建统一走 `./scripts/ios-signing.sh`，签名值来自被忽略的 `.env.signing`。
-- `scripts/ios-deploy.sh` 安装 `src-tauri/gen/apple/build/arm64/AGH Console.ipa` 到已连接的真机。
+- `src-tauri/Cargo.toml` 的 `[profile.release] debug = true` 是 **iOS release 链接的必需项**：swift-rs 依 cargo 的 `DEBUG` 选 Swift 编译配置，而 Swift 的 Release 配置（`-O -whole-module-optimization`）会把非 `public` 的 `@_cdecl` 入口降为 private external，静态归档解析不到，设备链接报 `_register_plugin` / `_init_plugin_system_components` 等未定义；Debug 配置保持 external。Xcode 的 release strip 会剥掉最终二进制的调试信息（ipa 约 3.4 MB，与开关无关）。上游把这些入口改成 `public`（或 swift-rs 不再优化这段胶水）后即可移除；移除前设备 release 构建必然失败。
+- `scripts/ios-deploy.sh` 安装 `src-tauri/gen/apple/build/arm64/AGH Console.ipa` 到已连接的真机；bundle id 从 ipa 里读（签名来源是 `.env.signing`，`tauri.conf.json` 的 `identifier` 不承担该职责）。Personal Team 首次安装后需在设备上「设置 → 通用 → VPN 与设备管理」信任开发者证书，否则启动被系统拒绝。
