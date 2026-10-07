@@ -89,7 +89,7 @@ export function useNativeTabBar(): boolean {
         document.documentElement.dataset.nativeTabbar = '1'
         setActive(true)
       } catch (e) {
-        console.warn('[nativeTabbar] 原生 TabBar 不可用,使用 CSS 标签栏:', e)
+        console.warn('[nativeTabbar] native tab bar unavailable, falling back to the CSS tab bar:', e)
       }
     })()
 
