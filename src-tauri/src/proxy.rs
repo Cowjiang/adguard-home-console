@@ -18,6 +18,7 @@
 //! - Never prints Authorization/passwords (this module has no request-header logs)
 //! Allowed variance vs the Express adapter: no request-body size limit (local
 //! IPC), and reqwest error details are English technical text.
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -25,17 +26,17 @@ use url::Url;
 
 const MAX_REDIRECTS: usize = 3;
 const REDIRECT_CODES: [u16; 4] = [301, 302, 307, 308];
-pub const TIMEOUT_DEFAULT: Duration = Duration::from_secs(25);
-pub const TIMEOUT_FILTERING_REFRESH: Duration = Duration::from_secs(120);
+const TIMEOUT_DEFAULT: Duration = Duration::from_secs(25);
+const TIMEOUT_FILTERING_REFRESH: Duration = Duration::from_secs(120);
 
 /// Machine-readable error kinds emitted in the body (`{"error","kind"}`); the
 /// frontend maps them to localized copy (i18n `proxy.*` keys)
-pub const KIND_MISSING_TARGET: &str = "missing_target";
-pub const KIND_INVALID_TARGET: &str = "invalid_target";
-pub const KIND_TIMEOUT: &str = "timeout";
-pub const KIND_CROSS_HOST_REDIRECT: &str = "cross_host_redirect";
-pub const KIND_INVALID_REDIRECT: &str = "invalid_redirect";
-pub const KIND_NETWORK: &str = "network";
+const KIND_MISSING_TARGET: &str = "missing_target";
+const KIND_INVALID_TARGET: &str = "invalid_target";
+const KIND_TIMEOUT: &str = "timeout";
+const KIND_CROSS_HOST_REDIRECT: &str = "cross_host_redirect";
+const KIND_INVALID_REDIRECT: &str = "invalid_redirect";
+const KIND_NETWORK: &str = "network";
 
 /// Return value of the invoke. Errors use the same struct (status=400/502 +
 /// body_text=`{"error":detail,"kind":...}`); the frontend maps non-2xx to
@@ -54,6 +55,17 @@ impl AghFetchResult {
             content_type: "application/json".into(),
             body_text: serde_json::json!({ "error": detail, "kind": kind }).to_string(),
         }
+    }
+}
+
+/// Maps a reqwest failure onto the adapter's 502 envelope; timeouts keep their
+/// own kind so the frontend can say "timed out" instead of "network".
+fn net_error(e: &reqwest::Error) -> AghFetchResult {
+    if e.is_timeout() {
+        AghFetchResult::error(502, KIND_TIMEOUT, "upstream request timed out")
+    } else {
+        // reqwest error messages only contain URL/IO details, no request headers
+        AghFetchResult::error(502, KIND_NETWORK, &e.to_string())
     }
 }
 
@@ -117,17 +129,27 @@ fn timeout_for(path_with_query: &str, default_timeout: Duration, refresh_timeout
     }
 }
 
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(timeout)
-        .build()
-        .map_err(|e| format!("HTTP client init failed: {e}"))
+/// One process-wide client. reqwest pools connections per host, so building a
+/// client per request (the previous shape) redid TCP+TLS on every call — the
+/// shell fires several AGH requests per page plus the 15s probes. The backstop
+/// timeout is applied per request instead, which also gives each redirect hop
+/// its own budget.
+fn shared_client() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|e| format!("HTTP client init failed: {e}"))
+        })
+        .as_ref()
+        .map_err(|e| e.clone())
 }
 
 /// Core implementation with injectable backstop timeouts (contract runner uses
 /// short ones); production entry points use the constants
-pub async fn agh_fetch_impl_with_timeouts(
+async fn agh_fetch_impl_with_timeouts(
     method: &str,
     target: &str,
     auth_header: &str,
@@ -144,7 +166,7 @@ pub async fn agh_fetch_impl_with_timeouts(
         Err(_) => return AghFetchResult::error(400, KIND_INVALID_TARGET, "unsupported HTTP method"),
     };
     let timeout = timeout_for(path_with_query, default_timeout, refresh_timeout);
-    let client = match client(timeout) {
+    let client = match shared_client() {
         Ok(c) => c,
         Err(msg) => return AghFetchResult::error(502, KIND_NETWORK, &msg),
     };
@@ -176,38 +198,28 @@ pub async fn agh_fetch_impl_with_timeouts(
 
         let resp = match req.send().await {
             Ok(r) => r,
-            Err(e) => {
-                // reqwest error messages only contain URL/IO details, no request
-                // headers, so they are safe to return
-                return if e.is_timeout() {
-                    AghFetchResult::error(502, KIND_TIMEOUT, "upstream request timed out")
-                } else {
-                    AghFetchResult::error(502, KIND_NETWORK, &e.to_string())
-                };
-            }
+            Err(e) => return net_error(&e),
         };
 
         let status = resp.status().as_u16();
-        let has_location = resp
+        // A hop only counts when upstream named a target: a redirect status
+        // without one passes through untouched, as does one past the hop budget
+        let location = resp
             .headers()
             .get(reqwest::header::LOCATION)
             .and_then(|v| v.to_str().ok())
-            .map(|s| !s.is_empty())
-            .unwrap_or(false);
-        if REDIRECT_CODES.contains(&status) && has_location && redirects < MAX_REDIRECTS {
-            let loc = resp
-                .headers()
-                .get(reqwest::header::LOCATION)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or_default()
-                .to_string();
-            match redirect_target(&upstream, &loc, origin_host.as_deref()) {
-                Ok(origin) => {
-                    current_target = origin;
-                    redirects += 1;
-                    continue;
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+        if REDIRECT_CODES.contains(&status) && redirects < MAX_REDIRECTS {
+            if let Some(loc) = location {
+                match redirect_target(&upstream, &loc, origin_host.as_deref()) {
+                    Ok(origin) => {
+                        current_target = origin;
+                        redirects += 1;
+                        continue;
+                    }
+                    Err((kind, msg)) => return AghFetchResult::error(502, kind, &msg),
                 }
-                Err((kind, msg)) => return AghFetchResult::error(502, kind, &msg),
             }
         }
 
@@ -219,13 +231,7 @@ pub async fn agh_fetch_impl_with_timeouts(
             .to_string();
         let body_text = match resp.text().await {
             Ok(t) => t,
-            Err(e) => {
-                return if e.is_timeout() {
-                    AghFetchResult::error(502, KIND_TIMEOUT, "upstream request timed out")
-                } else {
-                    AghFetchResult::error(502, KIND_NETWORK, &e.to_string())
-                };
-            }
+            Err(e) => return net_error(&e),
         };
         return AghFetchResult {
             status,
@@ -236,7 +242,7 @@ pub async fn agh_fetch_impl_with_timeouts(
 }
 
 /// Core implementation (production timeouts)
-pub async fn agh_fetch_impl(
+async fn agh_fetch_impl(
     method: &str,
     target: &str,
     auth_header: &str,
@@ -711,5 +717,86 @@ mod contract {
             }
         }
         assert!(failures.is_empty(), "contract failures:\n{}", failures.join("\n"));
+    }
+}
+
+// ---------- Connection pooling ----------
+// Not part of the contract fixture: reuse is adapter-internal, and the fixture's
+// scripted origins reply with `connection: close` (each scenario asserts one
+// request), so they cannot observe pooling. This origin keeps its connection
+// open and counts accepts instead.
+
+#[cfg(test)]
+mod pool {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Serves any number of GETs on one connection (no request bodies).
+    async fn spawn_keepalive_origin(accepts: Arc<AtomicUsize>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut sock, _)) = listener.accept().await else { break };
+                accepts.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut buf: Vec<u8> = Vec::new();
+                    let mut tmp = [0u8; 1024];
+                    loop {
+                        // One request head per iteration, then reply and wait for
+                        // the next one on the same socket.
+                        let head_end = loop {
+                            if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                                break pos;
+                            }
+                            let n = sock.read(&mut tmp).await.unwrap_or(0);
+                            if n == 0 { return; }
+                            buf.extend_from_slice(&tmp[..n]);
+                        };
+                        buf.drain(..head_end + 4);
+                        let body = r#"{"ok":true}"#;
+                        let resp = format!(
+                            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+                            body.len(),
+                            body
+                        );
+                        if sock.write_all(resp.as_bytes()).await.is_err() { return; }
+                        let _ = sock.flush().await;
+                    }
+                });
+            }
+        });
+        base
+    }
+
+    /// Two sequential requests to the same origin must share one TCP connection:
+    /// an accept count of two means the client (not the pool) was rebuilt per call.
+    #[tokio::test]
+    async fn sequential_requests_reuse_the_connection() {
+        let accepts = Arc::new(AtomicUsize::new(0));
+        let base = spawn_keepalive_origin(accepts.clone()).await;
+        for _ in 0..2 {
+            let r = agh_fetch_impl_with_timeouts(
+                "GET",
+                &base,
+                "",
+                "/status",
+                None,
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            )
+            .await;
+            assert_eq!(r.status, 200, "body: {}", r.body_text);
+        }
+        // A second accept would land immediately; give it a moment before asserting
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(
+            accepts.load(Ordering::SeqCst),
+            1,
+            "the adapter opened a new connection per request"
+        );
     }
 }
