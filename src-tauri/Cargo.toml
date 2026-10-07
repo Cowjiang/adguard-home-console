@@ -45,3 +45,16 @@ opt-level = 0
 # controls float above the WebView, so the effect can only be done on the
 # native side.
 tauri-plugin-system-components = { path = "plugins/tauri-plugin-system-components" }
+
+# Release builds must keep the Swift glue on swift-rs's *Debug* configuration.
+# swift-rs picks the Swift configuration from cargo's DEBUG env, and a Swift
+# release build (-O -whole-module-optimization) emits the plugin entry points
+# (`@_cdecl` declarations that are not `public`) as private externals, which the
+# static archive cannot resolve — the device link then dies with undefined
+# `_register_plugin` / `_init_plugin_system_components` / `_log_stdout`. The
+# Debug configuration keeps them external. Enabling debug info here is what
+# flips DEBUG; Xcode strips the app binary in its release strip phase, so the
+# shipped app is unaffected. Drop this once upstream declares those functions
+# `public` (or swift-rs stops optimizing the Swift glue with WMO).
+[profile.release]
+debug = true
