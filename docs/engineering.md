@@ -7,13 +7,14 @@
 
 - React Hooks 必须在条件返回之前调用。`src/lib/api.ts` 的 `swrFetcher` 接受只读三元组；新增 SWR 调用沿用它。
 - 所有 AGH `duration` / `interval` 字段以毫秒为单位，见 [API 契约](agh-api.md)。`stats.top_*` 使用单键对象数组，消费前需归一。
-- Express 4 的 AGH 代理注册为 `app.use('/api/agh', handler)`。`app.all('/*path')` 不匹配所需路径。
-- `/filtering/refresh` 可能下载大量规则，因此 Express 与 Rust 代理都有单独的长超时分支。
+- Express 4 的 AGH 代理注册为 `app.use('/api/agh', handler)`（handler 来自 `server/proxy.mjs` 的工厂）。`app.all('/*path')` 不匹配所需路径。
+- `/filtering/refresh` 可能下载大量规则，因此 Express 与 Rust 代理都有单独的长超时分支（按剥除 query 后的路径段判定，两端共用同一条规则与单测）。
+- 代理契约（Express/Rust 双 Adapter）以 `src/lib/api.ts` 为唯一书面定义，行为由 `contract/agh-proxy.contract.json` 钉住；修改代理语义必须先改夹具，再让两端变绿。适配器不携带用户文案，错误只报 `kind`。
 - 密码和 `Authorization` 不写入日志。Web/Tauri 的连接配置目前在本地 `localStorage`；签名值在被忽略的本地文件。
 
 ## i18n 约定
 
-- 词典在 `src/lib/i18n/locales/`，按域拆文件（`common`、`nav`、`agh`、`charts`、`units`、`login`、`dashboard`、`clients`、`querylog`、`filters`、`protection`、`stats`、`settings`、`advanced`），`zh` 是基准语言，`en` 与其类型同构（`en: typeof zh`）：**en 缺 key 会在 `pnpm check` 报错**，新增中文文案后必须同步补英文。
+- 词典在 `src/lib/i18n/locales/`，按域拆文件（`common`、`nav`、`agh`、`charts`、`units`、`login`、`dashboard`、`clients`、`querylog`、`filters`、`protection`、`stats`、`settings`、`advanced`、`proxy`），`zh` 是基准语言，`en` 与其类型同构（`en: typeof zh`）：**en 缺 key 会在 `pnpm check` 报错**，新增中文文案后必须同步补英文。
 - 组件经 `useTranslation()` 的 `t()` 取文案；非 React 上下文（`format.ts`、`auth.tsx`）用 `src/lib/i18n` 导出的 `i18n.t()`。带变量的 key 用 `{{name}}` 插值并显式传参（如 `t('clients.deleteConfirmTitle', { name })`），不要字符串拼接。
 - 语言解析链在 `src/lib/i18n` 的 `resolveLang()`：存储值 `zh|en|auto`（`agh.console.lang.v1`），`auto` 与缺省按 `navigator.languages` 顺序匹配 → **英文兜底**（浏览器跟随浏览器语言；iOS WKWebView 的 `navigator.languages` 跟随系统语言）；`index.html` 首帧引导脚本持有一份同逻辑内联副本与同值文档标题，改动语言列表、存储键或标题时**两处必须同步**。
 - 数字/日期经 `src/lib/format.ts` 走 `Intl` 并跟随当前语言；单位词（天/小时/分钟/秒等）在 `units` 域，时长/相对时间复数用 i18next 的 `_one/_other` 后缀，zh 两份同值（zh 基数规则恒为 other）。
@@ -44,8 +45,9 @@
 
 - 初次安装：`pnpm install`（包管理器是 pnpm，版本钉在 `package.json#packageManager`，`corepack enable` 即可；不再有 `package-lock.json`）。Web 开发使用 `pnpm dev:all`，同时启动 Vite 与 API 代理；生产模式先 `pnpm build`，再 `pnpm start`。
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
-- Web 代码：`pnpm check`、`pnpm test`、`pnpm build`。测试用 vitest，覆盖纯逻辑（契约归一、存储迁移等）；测试文件与被测源文件同目录（`*.test.ts`），随 `pnpm check` 一起做类型检查；组件渲染与端到端仍靠手测与 mock。
+- Web 代码：`pnpm check`、`pnpm test`、`pnpm build`。测试用 vitest（include 限定 `src/`），覆盖纯逻辑（契约归一、存储迁移等）；测试文件与被测源文件同目录（`*.test.ts`），随 `pnpm check` 一起做类型检查；组件渲染与端到端仍靠手测与 mock。
+- 代理契约：`npm run test:server`（node:test，驱动 `contract/agh-proxy.contract.json` 对 Express 适配器）；同一份夹具在 `cargo test` 中驱动 Rust 适配器。
 - pnpm 12 默认启用供应链策略：**发布未满 `minimumReleaseAge` 的版本会被拒绝安装**（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`）。这不是 lockfile 坏了，也不要关策略：`pnpm clean --lockfile && pnpm install` 重新解析会挑隔离期外的版本，或等窗口过去。`--frozen-lockfile`（CI 与 Docker）安装时会复检该策略。
-- Rust 测试：先运行 `node scripts/mock-agh.mjs`，再运行 `cd src-tauri && cargo test`。有三个测试在 mock 不可用时会跳过实际请求。
+- Rust 测试：`cd src-tauri && cargo test`（契约 runner 自起临时 origin，不再依赖 mock-agh；mock 仅用于本地联调与多实例演练）。
 - 多实例与代理策略验证：再起一个 `node scripts/mock-agh.mjs`，用 `PORT`/`HOST` 换监听地址（默认仍是 127.0.0.1:3990；真机访问需要显式设 `HOST`），并用 `MOCK_SCALE`、`MOCK_REVERSE`、`MOCK_AVG_TIME`、`MOCK_VERSION`、`MOCK_TIME_UNITS`、`MOCK_STATS_INTERVAL` 让第二实例的数据可区分。`MOCK_REDIRECT_TO` 配合 `GET /__redirect-test` 用于验证代理的跨主机重定向拒绝（该路径仅测试用，不属于 AGH 契约）。
 - iOS 工程生成与构建使用 `scripts/ios-signing.sh`：生成后校验 pbxproj 的关键设置（图标、签名、bundle id、部署目标、XcodeGen 预设哨兵），构建前缺工程时自动重建；机器专属的构建故障与修复记录在 `.agents/reviews/`，不作为通用构建步骤。

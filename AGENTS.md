@@ -20,7 +20,8 @@ Take the global constraints from this file; open only the next layer relevant to
 | Path | Contents |
 | --- | --- |
 | `src/` | React frontend: `pages/`, `components/`, `lib/`, `types/` |
-| `server/` | Express proxy and static hosting, single-file `index.mjs` |
+| `server/` | Express proxy and static hosting: `index.mjs` assembles, `proxy.mjs` is the web adapter of the frontend proxy contract, `proxy.test.mjs` runs it against the shared fixture |
+| `contract/` | Behavioral contracts shared by more than one tier; `agh-proxy.contract.json` pins both AGH proxy adapters (runners: `npm run test:server` and `cargo test`) |
 | `src-tauri/` | Tauri 2 shell, Rust proxy, and platform resources; `plugins/` holds this repo's Tauri plugin sources, while `gen/` and `target/` are generated output |
 | `scripts/` | `mock-agh.mjs` contract mock, `verify-proposals.mjs` proposal checks, iOS signing/deploy scripts, `release-notes.sh`, `server-pull.sh` |
 | `docs/` | Durable facts about the current codebase; enter by topic from `docs/README.md` |
@@ -49,7 +50,8 @@ Take the global constraints from this file; open only the next layer relevant to
 Run the checks that match the scope of your change:
 
 - Web frontend: `pnpm check` (`tsconfig.json` has `strict` on), `pnpm test`, and `pnpm build`.
-- Rust: start `node scripts/mock-agh.mjs` first, then `cd src-tauri && cargo test`; when the mock is not running, cases that depend on it exit silently and still report ok.
+- Server/proxy changes: `npm run test:server` drives the shared contract fixture (`contract/agh-proxy.contract.json`) against the Express adapter, and `cargo test` runs the same fixture against the Rust adapter. A semantic proxy change must update the fixture first, then make both sides pass.
+- Rust: `cd src-tauri && cargo test` — the contract runner self-hosts temporary origin servers and no longer needs `scripts/mock-agh.mjs` (the mock remains for local manual runs).
 - iOS: generate and build the project via `scripts/ios-signing.sh` (it validates project settings after generation and automatically rebuilds a missing project before building); do not bypass the script by calling `xcodegen` or `tauri ios init` directly.
 - Docs and proposals: `node scripts/verify-proposals.mjs`; add `--links` when referenced paths change.
 - Pure `docs/` or `.agents/` changes do not need frontend or Rust tests.

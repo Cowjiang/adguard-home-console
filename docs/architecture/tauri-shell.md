@@ -23,14 +23,15 @@
 | `agh_fetch(method, target, auth_header, path_with_query, body_json)` | 发起一次 AGH 请求，返回 `{status, content_type, body_text}` |
 | `get_debug_login()` | 仅 debug 构建返回环境变量里的连接信息，release 恒为 `None` |
 
-`agh_fetch` 与 Express 代理保持同一套语义：
+`agh_fetch` 与 Express 代理实现同一份前端契约（`src/lib/api.ts`，场景夹具 `contract/agh-proxy.contract.json`，由 `cargo test` 内的 runner 与 `npm run test:server` 分别验收）：
 
 - target 必须是 http(s)，只取 origin，target 自带路径丢弃；
 - 路径归一：`/api/agh` 前缀换成 `/control`，已带 `/control` 的原样，其余补 `/control/` 前缀；
 - 只发 `Authorization`（非空时）与 `Content-Type: application/json`（非 GET/HEAD），body 缺省 `{}`；
 - 上游 301/302/307/308 手动跟随最多 3 跳，只更换 origin 且**仅限同主机名**（scheme/port 可变）；跨主机的跳转返回 502，不把 `Authorization` 重放给别的主机；
-- 超时 25 秒，路径含 `/filtering/refresh` 时 120 秒；
-- 失败不返回 `Err`，而是产出 `{error}` JSON 与 400/502 状态码，由前端统一处理；响应体原样透传，不在 Rust 解析 JSON。
+- 超时 25 秒，按剥除 query 后的路径段判定；路径含 `/filtering/refresh` 时 120 秒；
+- 失败不返回 `Err`，而是产出 `{error, kind}` JSON 与 400/502 状态码（`kind` 枚举见 `proxy.rs`，文案在前端 i18n），由前端统一处理；响应体原样透传，不在 Rust 解析 JSON；
+- 与 Express Adapter 的允许差异：无请求体大小上限（本地 IPC），`content_type` 字段目前前端未消费。
 
 ## 权限
 
