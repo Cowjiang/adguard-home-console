@@ -49,15 +49,15 @@
 
 一条工作流、一次构建、三个消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，版本只在 `prepare` 算一次（`scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
 
-- 两个渠道：**nightly** 由定时任务（每天 UTC 19:17，避开整点以躲开 GitHub 的 cron 拥塞）从 `dev` 构建，版本 `<package.json 的 version>-nightly.<UTC YYYYMMDD>.<短 sha>`，Release 标 prerelease，npm dist-tag `nightly`，镜像 `<版本>`/`nightly`/`sha-<短 sha>`，**不带 `latest`**；**stable** 由 tag `vX.Y.Z` 触发，版本取自 tag，npm `latest`，镜像 `<版本>`/`X.Y`/`latest`/`sha-<短 sha>`。映射由 `pnpm test:release` 的断言钉住。
+- 两个渠道：**nightly** 由定时任务（每天 UTC 19:17，避开整点以躲开 GitHub 的 cron 拥塞）从 `dev` 构建，版本 `<package.json 的 version>-nightly.<UTC YYYYMMDD>.<短 sha>`，Release 标 prerelease 且**只占一条**（tag 固定为 `nightly`，每次强移到最新构建后原地更新），npm dist-tag `nightly`，镜像 `<版本>`/`nightly`/`sha-<短 sha>`，**不带 `latest`**；**stable** 由 tag `vX.Y.Z` 触发，版本取自 tag，npm `latest`，镜像 `<版本>`/`X.Y`/`latest`/`sha-<短 sha>`。映射由 `pnpm test:release` 的断言钉住。
 - 因此 `releases/latest`（`scripts/server-pull.sh` 读的）、npm 的 `latest` dist-tag 与镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。
 - 推送 `main` 不再发布任何东西：发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` tag 并推送。手推的 tag 若不是 `vX.Y.Z`（例如手推一个 nightly tag）会被 `prepare` 直接拒绝并说明原因。
-- nightly 只在 `dev` 相对上一个 nightly tag **有新提交**时才发；空转的日子整条跳过，不产出空版本，也不做双架构构建。
+- nightly 只在 `dev` 与滚动 tag 当前指向的提交**不同**时才发；空转的日子整条跳过，不产出空版本，也不做双架构构建。nightly 的说明正文以「上一次 nightly 的提交」为基线（滚动 tag 移动前的那个 commit），列出这一晚落了什么。
 - 定时任务的定义文件必须存在于默认分支（`main`）才会触发，而 `schedule` 事件报告的 ref 是默认分支——所以 workflow 显式把 nightly 的构建 ref 解析成 `dev`，三个 job 都按解析结果 checkout，Release tag 的 `target_commitish` 也指到那个 commit。
 - nightly 是「只在绿码上发」的渠道：build job 在打包前跑 `pnpm check`、`pnpm test`、`npm run test:server`、`pnpm test:release`；stable 不加这道门（沿用既有发布口径）。
 - `workflow_dispatch` 默认是**干跑**（`publish=false`）：只构建、校验 npm 包、构建镜像，不创建 Release、不推送；补发才把 `publish` 设为 true。另有 `force`：勾上时忽略「`dev` 未移动」的空转判定，用于手动重跑同一提交的 nightly；定时任务不受它影响。
 - Release 说明由 `scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag（nightly 与 stable tag 都算基线），再回退到最近 20 个提交。
-- Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线。nightly 渠道同名 Release 已存在时跳过创建（同提交重跑保持幂等），stable 渠道对同名 Release 做 upsert。
+- Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线；**唯一例外是 nightly 的滚动 tag**（`nightly`）——它每跑一次就被强移到新构建，Release 原地更新（同名资产覆盖），因此 Release 列表里恒为一条 nightly。stable 仍是「一个版本一条 tag、一条 Release」，从不覆盖。
 - npm 的 `latest` 只在第一个 stable 发布后才存在：在此之前 `npx agh-console`（不带 tag）会 ETARGET，需先发一个 stable，或手动 `npm dist-tag add agh-console@<版本> latest` 引导。
 - `NPM_TOKEN` 必须是**能创建新包**的令牌（classic automation token，或授权范围覆盖全部包的 granular token）：npm 对无权限的发布一律返回 404，无法与「名字已被占用」区分，首次发布 `agh-console` 时尤其要先排除这一条。
 - 镜像 tag 由 `release-plan.mjs` 输出为**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 当成 Docker Hub 名字，会去推 `library/<tag>` 并拿到 401——首次真实 nightly 就是这么失败的。

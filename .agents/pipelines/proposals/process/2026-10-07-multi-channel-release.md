@@ -22,13 +22,14 @@
 
    | 渠道 | 触发 | 版本 | Release | npm dist-tag | 镜像 tag |
    | --- | --- | --- | --- | --- | --- |
-   | nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建；也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | tag `v<版本>`，prerelease，已存在则跳过 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
+   | nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建；也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | **滚动 tag `nightly`**：强移到本次 commit 后原地 upsert，列表恒为一条 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
    | stable | 推送 tag `vX.Y.Z` | `X.Y.Z`（取自 tag） | 同名 tag，upsert，正式版 | `latest` | `X.Y.Z`、`X.Y`、`latest`、`sha-<短 sha>` |
    | dry-run | `workflow_dispatch` | 同 ref | 不创建 | 不发布 | 只构建、不推送 |
 
    - **nightly 从 `dev` 取，不从 `main` 取**：实测 `dev` 领先 `main` 58 个提交，而 `main` 只在发版时被推送——从 `main` 出的"每日构建"只是上一次发版的快照，没有信息量。
    - **nightly 是 prerelease**：`releases/latest`（`scripts/server-pull.sh` 读的）、npm `latest`、镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。顺带把首版遗留的"服务器是否只跟 stable"从待定项变成默认行为。
-   - **空转不发**：nightly 先比 `dev` HEAD 与上一个 nightly tag，相同就整条跳过，避免每天产出一个空版本和一次双架构构建。
+   - **空转不发**：nightly 先比 `dev` HEAD 与滚动 tag 当前指向的提交，相同就整条跳过，避免每天产出一个空版本和一次双架构构建。
+   - **一次只留一条 nightly**：tag 固定为 `nightly`，release job 先 force-move ref 再让 action 按 tag upsert，同名资产覆盖；每个构建的版本号仍然唯一（npm 与镜像 registry 需要），所以 nightly 的可追溯性落在 `sha-<短 sha>` 镜像 tag 与 Release 说明正文上。
    - **nightly 走测试门**：打包前跑 `pnpm check` / `pnpm test` / `npm run test:server` / `pnpm test:release`；nightly 是自用渠道，只发绿码。stable 不加这道门（沿用既有发布口径）。
    - **推送 `main` 不再发布任何东西**：发版动作明确为 `dev` → `main` 合并后打 `vX.Y.Z` tag 并推送。手推非 `vX.Y.Z` 的 tag（例如手推 nightly tag）会被 `prepare` 直接拒绝并说明原因。
    - **定时任务的落点约束**：`schedule` 只从默认分支取工作流定义并以其为事件 ref，所以 nightly 的 job 必须先合进 `main` 才会开始跑，且 workflow 里显式把构建 ref 解析成 `dev`、把 Release tag 的 `target_commitish` 指到该 commit（否则 tag 会落在 `main` 上，空转判定永远失效）。

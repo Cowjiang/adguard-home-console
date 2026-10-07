@@ -10,8 +10,9 @@
  * Channels (decision: .agents/pipelines/proposals/process/2026-10-07-multi-channel-release.md):
  *   nightly  built from a branch (scheduled from `dev`)  <package.json version>-nightly.<UTC YYYYMMDD>.<short sha>
  *   stable   push tag vX.Y.Z                              X.Y.Z
- * Nightlies are prereleases, so `releases/latest`, the npm `latest` dist-tag and
- * the `:latest` image stay on stable. A dispatched run is a dry run unless
+ * Nightlies are prereleases behind one rolling tag (`nightly`), so
+ * `releases/latest`, the npm `latest` dist-tag and the `:latest` image stay on
+ * stable and the release list keeps exactly one nightly entry. A dispatched run is a dry run unless
  * publish=true. Any tag that is not vX.Y.Z aborts: nightly tags are created by
  * this workflow with GITHUB_TOKEN, and a hand-pushed one must never be read as a
  * stable release.
@@ -31,6 +32,10 @@ const NIGHTLY_REF = 'dev';
 // push library/0.1.0-nightly… on the first real run), so every image tag is
 // emitted as a full ghcr.io reference.
 const IMAGE = 'ghcr.io/cowjiang/agh-console';
+// The nightly release rolls: one fixed tag, force-moved to the newest build on
+// every run, so the release list keeps a single nightly entry. Versions stay
+// unique per build (npm and the image registry need that).
+const NIGHTLY_TAG = 'nightly';
 
 function fail(message) {
   throw new Error(`release-plan: ${message}`);
@@ -63,6 +68,7 @@ export function plan(input) {
       channel: 'stable',
       version,
       releaseTag: refName,
+      releaseName: refName,
       packageName,
       npmTag: 'latest',
       dockerTags: imageTags([version, `${match[1]}.${match[2]}`, 'latest', `sha-${shortSha}`]),
@@ -82,7 +88,8 @@ export function plan(input) {
   return {
     channel: 'nightly',
     version,
-    releaseTag: `v${version}`,
+    releaseTag: NIGHTLY_TAG,
+    releaseName: `nightly ${version}`,
     packageName,
     npmTag: 'nightly',
     // No `latest` here on purpose: nightly must not shadow the stable channel
@@ -98,6 +105,7 @@ function outputs(result) {
     `channel=${result.channel}`,
     `version=${result.version}`,
     `release_tag=${result.releaseTag}`,
+    `release_name=${result.releaseName}`,
     `package_name=${result.packageName}`,
     `npm_tag=${result.npmTag}`,
     `docker_tags=${result.dockerTags.join(',')}`,
@@ -150,7 +158,8 @@ function selfTest() {
   assert.deepEqual(plan(base), {
     channel: 'nightly',
     version: '0.1.0-nightly.20261007.abc1234',
-    releaseTag: 'v0.1.0-nightly.20261007.abc1234',
+    releaseTag: 'nightly',
+    releaseName: 'nightly 0.1.0-nightly.20261007.abc1234',
     packageName: 'agh-console',
     npmTag: 'nightly',
     dockerTags: [
@@ -167,6 +176,7 @@ function selfTest() {
     channel: 'stable',
     version: '1.2.3',
     releaseTag: 'v1.2.3',
+    releaseName: 'v1.2.3',
     packageName: 'agh-console',
     npmTag: 'latest',
     dockerTags: [
