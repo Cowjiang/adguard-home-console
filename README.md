@@ -13,7 +13,7 @@ English | [简体中文简介](docs/assets/README.zh-CN.md)
 [![CI](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml/badge.svg)](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml)
 [![Release](https://img.shields.io/github/v/release/Cowjiang/adguard-home-console?include_prereleases)](https://github.com/Cowjiang/adguard-home-console/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20with%20Commons%20Clause-blue)](#license)
-[![Node](https://img.shields.io/badge/node-%E2%89%A524-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-24-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
 <img src="docs/images/dashboard-dark.png" alt="AdGuard Home Console dashboard (dark)" width="900" />
 
