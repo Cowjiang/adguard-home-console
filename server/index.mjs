@@ -3,6 +3,12 @@
  * 1. Serves the frontend build output (SPA)
  * 2. Reverse-proxies /api/agh/* to the user-configured AdGuard Home, bypassing
  *    browser CORS limits
+ *
+ * The proxy itself lives in proxy.mjs — one of the two adapters of the
+ * frontend-owned contract in src/lib/api.ts, pinned by
+ * contract/agh-proxy.contract.json. Allowed variance kept here: request bodies
+ * pass through express.json({limit:'4mb'}), so oversized/malformed bodies are
+ * rejected before the proxy (413/400; the Rust adapter has no such limit).
  */
 import express from 'express'
 import path from 'node:path'
@@ -10,6 +16,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import net from 'node:net'
 import { fileURLToPath } from 'node:url'
+import { createAghProxy } from './proxy.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Load .env from the project root (does not override existing env vars); skip if missing
@@ -55,64 +62,8 @@ app.get('/api/config', (_req, res) => {
   res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
 })
 
-// —— AGH reverse proxy ——
-const MAX_REDIRECTS = 3
-
-async function proxyAGH(req, res, target, authHeader, redirects = 0, originHost) {
-  try {
-    const targetUrl = new URL(target)
-    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
-      return res.status(400).json({ error: '目标地址必须是 http:// 或 https://' })
-    }
-    // First hop pins the host; every later hop must stay on it (see the redirect branch)
-    const pinnedHost = originHost ?? targetUrl.hostname
-    const upstream = new URL(req.originalUrl.replace(/^\/api\/agh/, '/control'), targetUrl.origin)
-
-    const headers = {}
-    if (authHeader) headers['Authorization'] = authHeader
-    const ct = req.headers['content-type']
-    if (ct) headers['Content-Type'] = ct
-
-    let body
-    if (!['GET', 'HEAD'].includes(req.method)) {
-      body = JSON.stringify(req.body ?? {})
-      headers['Content-Type'] = headers['Content-Type'] || 'application/json'
-    }
-
-    const r = await fetch(upstream, {
-      method: req.method,
-      headers,
-      body,
-      redirect: 'manual',
-      // Full filter refresh downloads rules from each URL, far slower than normal endpoints
-      signal: AbortSignal.timeout(req.path.includes('/filtering/refresh') ? 120_000 : 25_000),
-    })
-
-    // Follow upstream redirects (e.g. http->https 308). Only same-host hops: replaying
-    // Authorization to another host would hand the admin password to that host; the
-    // scheme/port may change, the hostname may not
-    if ([301, 302, 307, 308].includes(r.status) && r.headers.get('location') && redirects < MAX_REDIRECTS) {
-      const loc = new URL(r.headers.get('location'), upstream)
-      if (loc.hostname !== pinnedHost) {
-        return res.status(502).json({ error: '上游重定向到其他主机,已拒绝转发凭据' })
-      }
-      return proxyAGH(req, res, loc.origin, authHeader, redirects + 1, pinnedHost)
-    }
-
-    const text = await r.text()
-    res.status(r.status).type(r.headers.get('content-type') || 'application/json').send(text)
-  } catch (err) {
-    const msg = err?.name === 'TimeoutError' ? '连接超时,请检查地址与网络' : String(err?.cause?.message || err?.message || err)
-    res.status(502).json({ error: msg })
-  }
-}
-
-app.use('/api/agh', (req, res) => {
-  const target = req.get('X-AGH-Target')
-  if (!target) return res.status(400).json({ error: '缺少 X-AGH-Target 头' })
-  const auth = req.get('Authorization')
-  proxyAGH(req, res, target.trim(), auth)
-})
+// —— AGH reverse proxy (see proxy.mjs) ——
+app.use('/api/agh', createAghProxy())
 
 // —— Static assets + SPA fallback ——
 app.use(express.static(DIST, { maxAge: '1h', index: false }))
