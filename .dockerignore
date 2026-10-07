@@ -1,6 +1,7 @@
 # Keep the build context to what `npm ci` + `vite build` need
 .git
 .github
+*.tgz
 .agents
 .impeccable
 .local-backup

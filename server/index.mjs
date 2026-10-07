@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * AdGuard Home Console — local server
  * 1. Serves the frontend build output (SPA)

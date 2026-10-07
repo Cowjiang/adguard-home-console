@@ -1,8 +1,13 @@
 # Multi-stage: build the frontend with dev deps, ship only dist + server deps.
 # Base image per the release plan: node:24-alpine (same major as CI and the
 # documented local requirement), published multi-arch to
-# ghcr.io/cowjiang/agh-console (see .github/workflows/release.yml).
-FROM node:24-alpine AS build
+# ghcr.io/cowjiang/agh-console by .github/workflows/release.yml (dev channel →
+# :dev :sha-<sha>, stable tag → :latest :X.Y.Z :X.Y).
+#
+# The build stage runs on the builder platform: the Vite bundle is
+# platform-independent, so emulating it once per target architecture only burns
+# CI time. The runtime stage stays on the target platform.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS build
 WORKDIR /app
 # pnpm version comes from package.json#packageManager (the corepack bundled with
 # the base image can predate it); the "+sha512..." part is corepack metadata, not

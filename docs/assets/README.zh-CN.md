@@ -51,10 +51,10 @@ AdGuard Home 的 API 不返回 CORS 头，浏览器无法直连——所有第�
 三种部署通道任选其一，详细配置见英文 [README](../../README.md)：
 
 ```bash
-# Docker（amd64 / arm64）
+# Docker（amd64 / arm64；仓库私有时需先 docker login ghcr.io）
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 
-# npx（Node ≥ 24）
+# npx（Node ≥ 24；稳定版走 latest tag，dev 的每晚构建走 nightly tag）
 npx agh-console
 
 # 源码运行（Node ≥ 24 + pnpm）

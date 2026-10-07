@@ -44,6 +44,7 @@
 | 2026-10-07 | bug-fix | [对齐 tauri crate 与 npm 的版本，退掉第三方 tao 补丁](proposals/bug-fix/2026-10-07-tauri-version-align.md) | implemented |
 | 2026-10-07 | bug-fix | [修回 iOS 工程的 pre-build 脚本调用方式，让 Xcode 阶段不再 panic](proposals/bug-fix/2026-10-07-ios-xcode-script-phase.md) | implemented |
 | 2026-10-07 | bug-fix | [修回 iOS release 构建的 Swift 静态链接](proposals/bug-fix/2026-10-07-ios-release-swift-link.md) | implemented |
+| 2026-10-07 | process | [把发版拆成 GitHub Release / npm / GHCR 三个消费者](proposals/process/2026-10-07-multi-channel-release.md) | implemented |
 
 ## 与 docs/ 的分工
 

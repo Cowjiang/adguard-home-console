@@ -47,14 +47,26 @@
 
 ## 发布
 
-- 推送 `main` 触发 `.github/workflows/release.yml`：构建后把 `dist/`、`server/`、`package.json` 打包为 `agh-console.tar.gz`，发布为 tag `v0.1.0-dev.<YYYYMMDD>.<短 sha>` 的 Release。纯 `docs/**`、`.agents/**`、`**.md` 推送由 `paths-ignore` 跳过，也可用 `workflow_dispatch` 手动触发。
-- Release 说明由 `scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag，再回退到最近 20 个提交。
-- Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线。同一提交重复运行会跳过创建，保持幂等。
+一条工作流、一次构建、三个消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，版本只在 `prepare` 算一次（`scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
+
+- 两个渠道：**nightly** 由定时任务（每天 UTC 19:17，避开整点以躲开 GitHub 的 cron 拥塞）从 `dev` 构建，版本 `<package.json 的 version>-nightly.<UTC YYYYMMDD>.<短 sha>`，Release 标 prerelease，npm dist-tag `nightly`，镜像 `<版本>`/`nightly`/`sha-<短 sha>`，**不带 `latest`**；**stable** 由 tag `vX.Y.Z` 触发，版本取自 tag，npm `latest`，镜像 `<版本>`/`X.Y`/`latest`/`sha-<短 sha>`。映射由 `pnpm test:release` 的断言钉住。
+- 因此 `releases/latest`（`scripts/server-pull.sh` 读的）、npm 的 `latest` dist-tag 与镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。
+- 推送 `main` 不再发布任何东西：发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` tag 并推送。手推的 tag 若不是 `vX.Y.Z`（例如手推一个 nightly tag）会被 `prepare` 直接拒绝并说明原因。
+- nightly 只在 `dev` 相对上一个 nightly tag **有新提交**时才发；空转的日子整条跳过，不产出空版本，也不做双架构构建。
+- 定时任务的定义文件必须存在于默认分支（`main`）才会触发，而 `schedule` 事件报告的 ref 是默认分支——所以 workflow 显式把 nightly 的构建 ref 解析成 `dev`，三个 job 都按解析结果 checkout，Release tag 的 `target_commitish` 也指到那个 commit。
+- nightly 是「只在绿码上发」的渠道：build job 在打包前跑 `pnpm check`、`pnpm test`、`npm run test:server`、`pnpm test:release`；stable 不加这道门（沿用既有发布口径）。
+- `workflow_dispatch` 默认是**干跑**（`publish=false`）：只构建、校验 npm 包、构建镜像，不创建 Release、不推送；补发才把 `publish` 设为 true。
+- Release 说明由 `scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag（nightly 与 stable tag 都算基线），再回退到最近 20 个提交。
+- Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线。nightly 渠道同名 Release 已存在时跳过创建（同提交重跑保持幂等），stable 渠道对同名 Release 做 upsert。
+- npm 的 `latest` 只在第一个 stable 发布后才存在：在此之前 `npx agh-console`（不带 tag）会 ETARGET，需先发一个 stable，或手动 `npm dist-tag add agh-console@<版本> latest` 引导。
+- npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。`NPM_TOKEN` 未配置时该 job 只告警跳过，不影响其余渠道；私有仓库拿不到 provenance，故不加 `--provenance`。
+- GHCR 包继承仓库可见性：仓库私有时 README 里的匿名 `docker run` 需要先把包设为 public（或在目标机 `docker login ghcr.io`）。
 
 ## 验证入口
 
 - 初次安装：`pnpm install`（包管理器是 pnpm，版本钉在 `package.json#packageManager`，`corepack enable` 即可；不再有 `package-lock.json`）。Web 开发使用 `pnpm dev:all`，同时启动 Vite 与 API 代理；生产模式先 `pnpm build`，再 `pnpm start`。
 - 文档或提案路径、分类、状态变化：`node scripts/verify-proposals.mjs`。
+- 发版计划与 npm 包内容：`pnpm test:release`（渠道/版本/tag 映射的断言）、`pnpm check:pack`（先 `pnpm build`，打 tgz 并断言包内容）。
 - Web 代码：`pnpm check`、`pnpm test`、`pnpm build`。测试用 vitest（include 限定 `src/`），覆盖纯逻辑（契约归一、存储迁移等）；测试文件与被测源文件同目录（`*.test.ts`），随 `pnpm check` 一起做类型检查；组件渲染与端到端仍靠手测与 mock。
 - 代理契约：`npm run test:server`（node:test，驱动 `contract/agh-proxy.contract.json` 对 Express 适配器）；同一份夹具在 `cargo test` 中驱动 Rust 适配器。
 - pnpm 12 默认启用供应链策略：**发布未满 `minimumReleaseAge` 的版本会被拒绝安装**（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`）。这不是 lockfile 坏了，也不要关策略：`pnpm clean --lockfile && pnpm install` 重新解析会挑隔离期外的版本，或等窗口过去。`--frozen-lockfile`（CI 与 Docker）安装时会复检该策略。

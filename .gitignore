@@ -1,5 +1,7 @@
 node_modules
 dist
+# npm pack 产物（CI 在 workspace 根生成后立即上传）
+*.tgz
 _probe
 *.local
 .DS_Store

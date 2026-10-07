@@ -1,11 +1,27 @@
 {
-  "name": "adguard-home-console",
-  "private": true,
+  "name": "agh-console",
   "version": "0.1.0",
+  "description": "Web console for AdGuard Home: one Node process serves the UI and reverse-proxies the AdGuard Home API.",
   "type": "module",
   "packageManager": "pnpm@12.9.1+sha512.06b055fff5cd20dc12781de173ced3310ce0951bf2ec620211a16045d5444d5c93a663210764ef29a653a610459ba0368f0e74f84d80c54723cf95aae7bc0d6d",
   "engines": {
     "node": ">=24"
+  },
+  "bin": {
+    "agh-console": "server/index.mjs"
+  },
+  "files": [
+    "dist",
+    "server",
+    "!server/*.test.mjs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cowjiang/adguard-home-console.git"
+  },
+  "homepage": "https://github.com/Cowjiang/adguard-home-console#readme",
+  "bugs": {
+    "url": "https://github.com/Cowjiang/adguard-home-console/issues"
   },
   "scripts": {
     "dev": "vite",
@@ -15,6 +31,8 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:server": "node --test 'server/*.test.mjs'",
+    "test:release": "node scripts/release-plan.mjs --self-test",
+    "check:pack": "node scripts/check-npm-pack.mjs",
     "start": "node server/index.mjs",
     "preview": "vite preview",
     "tauri": "tauri",

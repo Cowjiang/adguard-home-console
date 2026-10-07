@@ -23,10 +23,10 @@ Take the global constraints from this file; open only the next layer relevant to
 | `server/` | Express proxy and static hosting: `index.mjs` assembles, `proxy.mjs` is the web adapter of the frontend proxy contract, `proxy.test.mjs` runs it against the shared fixture |
 | `contract/` | Behavioral contracts shared by more than one tier; `agh-proxy.contract.json` pins both AGH proxy adapters (runners: `npm run test:server` and `cargo test`) |
 | `src-tauri/` | Tauri 2 shell, Rust proxy, and platform resources; `plugins/` holds this repo's Tauri plugin sources, while `gen/` and `target/` are generated output |
-| `scripts/` | `mock-agh.mjs` contract mock, `verify-proposals.mjs` proposal checks, iOS signing/deploy scripts, `release-notes.sh`, `server-pull.sh` |
+| `scripts/` | `mock-agh.mjs` contract mock, `verify-proposals.mjs` proposal checks, iOS signing/deploy scripts, `release-plan.mjs` / `check-npm-pack.mjs` release checks, `release-notes.sh`, `server-pull.sh` |
 | `docs/` | Durable facts about the current codebase; enter by topic from `docs/README.md` |
 | `.agents/` | Proposals, skills, and process records; enter by purpose from `.agents/README.md` |
-| `.github/workflows/` | `release.yml`: builds artifacts and publishes a Release on pushes to `main` |
+| `.github/workflows/` | `release.yml`: one build feeding three channels — Release tarball, npm package, GHCR image (nightly from `dev` on a timer, stable on `vX.Y.Z` tags) |
 
 `dist/`, `node_modules/`, `src-tauri/gen/`, and `src-tauri/target/` are build or generated output; `_probe/` is local-only material. None of them are committed.
 
@@ -58,6 +58,7 @@ Run the checks that match the scope of your change:
 
 ## Branches and releases
 
-- Direct-track small changes can be committed straight to `dev` and pushed; Noted-track changes merge into `dev` after proposal and PR review. Pushes to `dev` do not trigger a release.
-- Only when releasing, merge `dev` into `main` and push it; do not push `main` for day-to-day work.
+- Direct-track small changes can be committed straight to `dev` and pushed; Noted-track changes merge into `dev` after proposal and PR review. Pushing `dev` publishes nothing, but the scheduled nightly builds from it.
+- Only when releasing, merge `dev` into `main` and push it, then push a `vX.Y.Z` tag: the tag is what publishes stable, a push to `main` alone publishes nothing.
+- The nightly timer only fires once `release.yml` sits on `main` — scheduled workflows run from the default branch only.
 - Concrete run, check, and platform-generation commands are reached from the relevant `docs/README.md` fact pages; proposal validation is reached from the `.agents/README.md` pipeline docs.

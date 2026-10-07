@@ -44,7 +44,9 @@ AdGuard Home has no CORS headers, so a browser cannot talk to its API directly �
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 ```
 
-Multi-arch (amd64 / arm64), published on semver releases. Image tags: `latest`, `X.Y.Z`, and `X.Y`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+Multi-arch (amd64 / arm64). A stable `vX.Y.Z` tag publishes `latest`, `X.Y.Z` and `X.Y`; the nightly built from `dev` publishes `nightly` and `sha-<commit>`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
+
+The GHCR package inherits the repository's visibility: while the repository is private, `docker login ghcr.io` (token with `read:packages`) is required; switching the package to public in its settings removes that step.
 
 Or with Docker Compose:
 
@@ -62,11 +64,14 @@ services:
 
 ### npx
 
-Requires Node.js ≥ 24:
+Requires Node.js ≥ 24. The package ships the built UI together with the server, so it starts the same process as the other channels:
 
 ```bash
 npx agh-console
+PORT=9000 npx agh-console     # configuration goes in the environment
 ```
+
+Stable versions sit on the default `latest` dist-tag; the nightly from `dev` is on `nightly` (`npx agh-console@nightly`).
 
 ### Release tarball
 
@@ -96,7 +101,7 @@ Open **http://localhost:5173** (development) or **http://localhost:8787** (produ
 
 ## Configuration
 
-All environment variables are optional. The server also reads a `.env` file in the project root.
+All environment variables are optional. The server also reads a `.env` file in the project root when it runs from a source checkout or an unpacked tarball; under npx or Docker, pass the variables in the environment.
 
 | Variable | Default | Description |
 | --- | --- | --- |
