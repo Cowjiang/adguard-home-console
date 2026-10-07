@@ -3,7 +3,7 @@
 **Class:** process
 **Status:** implemented
 **Date:** 2026-10-07
-**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly）
+**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly。随后在合并到 `main` 后跑了真实 nightly，暴露并修掉镜像引用与手动重跑两个问题，见 Accept 末两项）
 **Source:** 用户要求「调整 release 以适配 npx 和 docker 发版」
 
 ## Goal
@@ -22,13 +22,14 @@
 
    | 渠道 | 触发 | 版本 | Release | npm dist-tag | 镜像 tag |
    | --- | --- | --- | --- | --- | --- |
-   | nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建；也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | tag `v<版本>`，prerelease，已存在则跳过 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
+   | nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建；也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | **滚动 tag `nightly`**：强移到本次 commit 后原地 upsert，列表恒为一条 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
    | stable | 推送 tag `vX.Y.Z` | `X.Y.Z`（取自 tag） | 同名 tag，upsert，正式版 | `latest` | `X.Y.Z`、`X.Y`、`latest`、`sha-<短 sha>` |
    | dry-run | `workflow_dispatch` | 同 ref | 不创建 | 不发布 | 只构建、不推送 |
 
    - **nightly 从 `dev` 取，不从 `main` 取**：实测 `dev` 领先 `main` 58 个提交，而 `main` 只在发版时被推送——从 `main` 出的"每日构建"只是上一次发版的快照，没有信息量。
    - **nightly 是 prerelease**：`releases/latest`（`scripts/server-pull.sh` 读的）、npm `latest`、镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。顺带把首版遗留的"服务器是否只跟 stable"从待定项变成默认行为。
-   - **空转不发**：nightly 先比 `dev` HEAD 与上一个 nightly tag，相同就整条跳过，避免每天产出一个空版本和一次双架构构建。
+   - **空转不发**：nightly 先比 `dev` HEAD 与滚动 tag 当前指向的提交，相同就整条跳过，避免每天产出一个空版本和一次双架构构建。
+   - **一次只留一条 nightly**：tag 固定为 `nightly`，release job 先 force-move ref 再让 action 按 tag upsert，同名资产覆盖；每个构建的版本号仍然唯一（npm 与镜像 registry 需要），所以 nightly 的可追溯性落在 `sha-<短 sha>` 镜像 tag 与 Release 说明正文上。
    - **nightly 走测试门**：打包前跑 `pnpm check` / `pnpm test` / `npm run test:server` / `pnpm test:release`；nightly 是自用渠道，只发绿码。stable 不加这道门（沿用既有发布口径）。
    - **推送 `main` 不再发布任何东西**：发版动作明确为 `dev` → `main` 合并后打 `vX.Y.Z` tag 并推送。手推非 `vX.Y.Z` 的 tag（例如手推 nightly tag）会被 `prepare` 直接拒绝并说明原因。
    - **定时任务的落点约束**：`schedule` 只从默认分支取工作流定义并以其为事件 ref，所以 nightly 的 job 必须先合进 `main` 才会开始跑，且 workflow 里显式把构建 ref 解析成 `dev`、把 Release tag 的 `target_commitish` 指到该 commit（否则 tag 会落在 `main` 上，空转判定永远失效）。
@@ -47,14 +48,18 @@
 - [x] `pnpm check:pack`：tgz **10 项 / 677 KiB**，只含 `dist/`、`server/`（除测试文件）、`package.json`、`README.md`、`LICENSE`；改前是 347 项 / 10.3 MB 且缺 `dist/index.html`。
 - [x] 把 tgz 解包到临时目录（借用宿主机 `node_modules`）后按 bin 的方式直接执行：`/api/health` 200、`/` 200（4048 字节 HTML）、SPA 回退 `/settings` 200，`dist` 在包内解析正确。
 - [x] `bin` 的 shebang 与可执行位齐备（`npm pack` 报 mode 755，校验脚本断言两者）。
-- [x] `pnpm test:release`：16 项断言覆盖 nightly / stable / dispatch / ref 告警 / 非法 tag / 非法 semver 与 sha。
+- [x] `pnpm test:release`：断言覆盖 nightly / stable / dispatch / ref 告警 / 非法 tag / 非法 semver 与 sha / 镜像引用必须全限定。
 - [x] 本地推演 prepare 步骤：`schedule` → ref 解析为 `dev`、channel=nightly、prerelease=true、镜像 tag 不含 `latest`；tag push → stable；dispatch 默认 `publish=false`。
 - [x] 空转判定两条路径实测：无 nightly tag 时 `skip=false`；把 nightly tag 指到 `dev` HEAD 时 `skip=true`（临时 tag 已删除，仓库无残留）。
 - [x] `actionlint`（v1.7.12）对 `release.yml` 零告警；YAML 可解析，触发器 = schedule / push tags / workflow_dispatch。
 - [x] `docker-publish.yml` 退役，触发链不再依赖 `GITHUB_TOKEN` 创建的 tag。
 - [x] `release-notes.sh` 的祖先 tag 匹配泛化到 `v[0-9]*.[0-9]*.[0-9]*`，nightly 与 stable tag 都作为基线（实测命中现存 dev tag）。
 - [x] `node scripts/verify-proposals.mjs --links` 通过；`docs/engineering.md`、`docs/architecture/build-and-release.md`、`README.md`、`docs/assets/README.zh-CN.md`、`AGENTS.md` 与实现一致。
-- [ ] 账号侧人工动作：npm 建 automation token 落到 `NPM_TOKEN`；GHCR 包设为 public，否则 README 里的匿名 `docker run` 会 401。
+- [x] **首次真实 nightly 干跑**（run 37663748363，`publish=false`）：prepare/ build/ docker 全绿，release 与 npm 按预期 skipped；双平台镜像构建成功且没有推送。
+- [x] **首次真实 nightly 发布**（run 37665280344，`publish=true`）：GH Release `v0.1.0-nightly.20261007.aad0ad7` 创建成功、prerelease、`target_commitish` 落在 `dev` 的 `aad0ad7`，资产 `agh-console.tar.gz` 就位；CI 产出的 npm tgz 下载后能 `npm install`、`.bin/agh-console` 起服务（`/api/health`、`/`、SPA 回退全 200）。
+- [x] **该次运行暴露并修掉的两个问题**：(1) 镜像 tag 是裸 tag，buildx 把它当 Docker Hub 名字去推 `library/0.1.0-nightly…`，401 —— 改为由 `release-plan.mjs` 输出全限定引用并加断言；(2) 首次 nightly 之后重新验证会被「dev 未移动」跳过，补 `workflow_dispatch` 的 `force` 开关（布尔输入用 `!inputs.force` 判定，`!= 'true'` 会被类型强转成数值比较而失效）。
+- [x] **工作流动作升到 node24 主线**：每个 job 都报过 `Node.js 20 is deprecated … being forced to run on Node.js 24`。升级 `checkout` v7、`setup-node` v7、`upload-artifact` v7、`download-artifact` v8、`pnpm/action-setup` v6、`softprops/action-gh-release` v3、`docker/setup-qemu|setup-buildx|login` v4、`docker/build-push-action` v7 后，同一套流程（run 37666644463）里该告警 **0 条**，十个 action 的新版本都被实际拉取执行，prepare/build/release/docker 全绿（镜像三个 tag 推送到新 commit 的 digest）。升级前逐个核对了本流程用到的 input 在新版中仍然存在。
+- [ ] 账号侧人工动作：`NPM_TOKEN` 必须能**创建新包**；GHCR 包设为 public，否则 README 里的匿名 `docker run` 会 401。注意 npm 渠道当前的真实状态：run 37665280344 与 37665833705 里 token 有值、被 registry 以 404 拒绝（与「名字被占用」无法区分）；run 37666644463 里 token 解析为空，该 job 只是**告警跳过**——那次的绿不代表 npm 发布成功，registry 上至今没有 `agh-console`。
 - [ ] 把本变更合进 `main` 后，定时任务才会开始触发；随后核对一次真实 nightly 的三个渠道版本一致（需要推送权限与 GitHub 侧环境）。
 
 ## Note

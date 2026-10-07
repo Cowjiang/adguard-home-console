@@ -5,15 +5,17 @@ name: Release
 # prepare job (scripts/release-plan.mjs; `node scripts/release-plan.mjs --self-test`
 # pins the mapping).
 #
-#   nightly  schedule from `dev` / dispatch   Release <base>-nightly.<UTC date>.<sha>, prerelease
+#   nightly  schedule from `dev` / dispatch   one rolling prerelease, tag `nightly` moved to each build
 #                                              npm dist-tag nightly, image :nightly :<version> :sha-<sha>
 #   stable   push tag vX.Y.Z                   Release vX.Y.Z
 #                                              npm dist-tag latest,  image :latest :X.Y.Z :X.Y :sha-<sha>
 #
-# Nightlies are prereleases, so `releases/latest` (what scripts/server-pull.sh
-# reads), the npm `latest` dist-tag and the `:latest` image stay on stable. A
-# nightly whose `dev` has not moved since the last one is skipped, so idle days
-# do not publish empty versions. Scheduled workflows only run from the default
+# The nightly rolls: its tag is force-moved to the newest build and the release
+# is updated in place, so the release list holds exactly one nightly. Being a
+# prerelease, it also leaves `releases/latest` (what scripts/server-pull.sh
+# reads), the npm `latest` dist-tag and the `:latest` image on stable. A nightly
+# whose `dev` has not moved since the last one is skipped, so idle days do not
+# publish empty versions. Scheduled workflows only run from the default
 # branch, so this file has to sit on `main` for the timer to fire at all.
 on:
   schedule:
@@ -26,6 +28,10 @@ on:
     inputs:
       publish:
         description: 'Publish to the GitHub Release, npm and GHCR (default: dry run)'
+        type: boolean
+        default: false
+      force:
+        description: 'Rebuild even when dev has not moved since the last nightly'
         type: boolean
         default: false
 
@@ -45,12 +51,14 @@ jobs:
       sha: ${{ steps.commit.outputs.sha }}
       version: ${{ steps.plan.outputs.version }}
       release_tag: ${{ steps.plan.outputs.release_tag }}
+      release_name: ${{ steps.plan.outputs.release_name }}
       package_name: ${{ steps.plan.outputs.package_name }}
       npm_tag: ${{ steps.plan.outputs.npm_tag }}
       docker_tags: ${{ steps.plan.outputs.docker_tags }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
       publish: ${{ steps.plan.outputs.publish }}
-      skip: ${{ steps.changed.outputs.skip || 'false' }}
+      skip: ${{ steps.nightly.outputs.skip || 'false' }}
+      previous_sha: ${{ steps.nightly.outputs.previous_sha }}
     steps:
       # The nightly tracks the integration branch, which is not the default
       # branch the schedule event reports; every other trigger builds its own ref.
@@ -66,7 +74,7 @@ jobs:
             echo "ref=$REF_NAME" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.target.outputs.ref }}
           fetch-depth: 0
@@ -85,18 +93,23 @@ jobs:
           INPUT_PUBLISH: ${{ inputs.publish }}
         run: node scripts/release-plan.mjs
 
-      # A nightly is derived from the commit, so an idle day must not mint a new
-      # version. Tags come from the full-history checkout above.
-      - name: Skip an unchanged nightly
-        id: changed
-        if: steps.plan.outputs.channel == 'nightly'
+      # The nightly tag rolls: it always points at the newest build, and the
+      # commit it currently holds doubles as the baseline for the next notes.
+      # An idle day must not mint a new version, so the same commit is skipped.
+      - name: Check the rolling nightly tag
+        id: nightly
+        # force is the manual escape hatch: a dispatch is deliberate, the timer is not
+        if: steps.plan.outputs.channel == 'nightly' && !inputs.force
         env:
+          TAG: ${{ steps.plan.outputs.release_tag }}
           SHA: ${{ steps.commit.outputs.sha }}
         run: |
-          last="$(git tag --list 'v*-nightly.*' --sort=-v:refname | head -1)"
-          if [ -n "$last" ] && [ "$(git rev-parse "$last^{commit}")" = "$SHA" ]; then
+          # --verify --quiet: a missing tag must yield an empty string, not the ref name
+          last="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
+          echo "previous_sha=$last" >> "$GITHUB_OUTPUT"
+          if [ -n "$last" ] && [ "$last" = "$SHA" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::$last already points at $SHA — skipping this nightly"
+            echo "::notice::$TAG already points at $SHA — skipping this nightly"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -106,13 +119,13 @@ jobs:
     if: needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -138,7 +151,7 @@ jobs:
       - name: Package the release tarball
         run: tar czf agh-console.tar.gz dist server package.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-assets
           if-no-files-found: error
@@ -153,47 +166,51 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-assets
 
       - name: Prepare release notes
         env:
-          BEFORE: ${{ github.event.before }}
+          # A nightly lists what landed since the previous nightly build
+          BEFORE: ${{ needs.prepare.outputs.channel == 'nightly' && needs.prepare.outputs.previous_sha || github.event.before }}
           AFTER: ${{ needs.prepare.outputs.sha }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
           BRANCH: ${{ needs.prepare.outputs.ref }}
         run: bash scripts/release-notes.sh
 
-      # A nightly tag is derived from the commit, so re-running the same commit
-      # must stay a no-op; a stable tag is explicit and its release is upserted.
-      - name: Check for an existing nightly release
-        id: check
+      # One rolling nightly: the tag moves to the newest build and the release is
+      # updated in place, so the release list never grows past a single entry.
+      # Stable keeps one tag and one release per version.
+      - name: Move the rolling nightly tag
         if: needs.prepare.outputs.channel == 'nightly'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          if gh api -X PATCH "repos/$REPO/git/refs/tags/$TAG" -f sha="$SHA" -F force=true >/dev/null 2>&1; then
+            echo "moved $TAG to $SHA"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "$TAG is not there yet — the release creates it"
           fi
 
+      # Upserts by tag: the nightly release is updated in place, and an asset
+      # with the same name is replaced instead of piling up.
       - name: Create release
-        if: needs.prepare.outputs.channel == 'stable' || steps.check.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
-          # github.sha is the default branch on a schedule event, so the nightly
-          # tag would otherwise point at main instead of the dev commit it built
+          # github.sha is the default branch on a schedule event, so without this
+          # the nightly tag would point at main instead of the dev commit it built
           target_commitish: ${{ needs.prepare.outputs.sha }}
-          name: ${{ needs.prepare.outputs.release_tag }}
+          name: ${{ needs.prepare.outputs.release_name }}
           body_path: release-notes.md
           files: agh-console.tar.gz
           prerelease: ${{ needs.prepare.outputs.prerelease }}
@@ -208,11 +225,11 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       NPM_TAG: ${{ needs.prepare.outputs.npm_tag }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-assets
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -243,22 +260,22 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         if: needs.prepare.outputs.publish == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64

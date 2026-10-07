@@ -33,14 +33,16 @@
 
 | 渠道 | 触发 | 版本 | Release | npm dist-tag | 镜像 tag |
 | --- | --- | --- | --- | --- | --- |
-| nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建，也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | tag `v<版本>`，prerelease，已存在则跳过 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
+| nightly | 定时任务（每天 UTC 19:17）从 `dev` 构建，也可 `workflow_dispatch` | `<package.json version>-nightly.<UTC YYYYMMDD>.<短 sha>` | **滚动**：tag 固定 `nightly`，强移到本次 commit 后原地更新，列表恒为一条 | `nightly` | `<版本>`、`nightly`、`sha-<短 sha>` |
 | stable | 推送 tag `vX.Y.Z` | `X.Y.Z`（取自 tag） | 同名 tag，upsert | `latest` | `X.Y.Z`、`X.Y`、`latest`、`sha-<短 sha>` |
 | dry-run | `workflow_dispatch`（`publish=false`，默认） | 同 ref | 不创建 | 不发布 | 只构建、不推送 |
 
-- nightly 是 prerelease，所以 `releases/latest`、npm `latest` 与镜像 `:latest` 都留在 stable；`dev` 相对上一个 nightly tag 没有新提交时整条跳过。
+- nightly 是 prerelease，所以 `releases/latest`、npm `latest` 与镜像 `:latest` 都留在 stable；`dev` 与滚动 tag 指向的提交相同时整条跳过。
+- nightly 的 tag 是**唯一会被移动的 tag**：release job 先 `PATCH /git/refs/tags/nightly`（force）再让 action upsert 同一条 Release，同名资产被覆盖而不是堆积；stable 的 tag 一个版本一个，永不移动。
 - 定时任务的定义文件必须在默认分支（`main`）上才会触发，且 `schedule` 报的 ref 是默认分支——workflow 里因此显式把构建 ref 解析成 `dev`，并把 Release tag 的 `target_commitish` 指到那个 commit。
 - 发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` 并推送；推送 `main` 本身不发布任何东西。手推非 `vX.Y.Z` 的 tag 会被 `prepare` 直接拒绝，避免 nightly tag 被当成稳定版顶掉 `:latest`。
-- nightly 走测试门（`pnpm check` / `pnpm test` / `test:server` / `test:release`）之后才打包。
+- nightly 走测试门（`pnpm check` / `pnpm test` / `test:server` / `test:release`）之后才打包；手动 `workflow_dispatch` 另有 `force`，勾上时忽略「`dev` 未移动」的空转判定以重跑同一提交。
+- 镜像 tag 是**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 读成 Docker Hub 名字，首次真实 nightly 因此在 `library/0.1.0-nightly…` 上 401。
 - npm 渠道发布的就是 build 校验过的那个 tgz（`agh-console`，`files` 只含 `dist`、`server`），`NPM_TOKEN` 未配置时告警跳过。私有仓库不生成 provenance，故不加 `--provenance`；npm 的 `latest` 要等第一个 stable 才存在。
 - 镜像由 `Dockerfile` 自行构建，保证 `docker build .` 可独立复现；构建阶段跑在 builder 平台上，arm64 不再走 QEMU 编译前端。GHCR 包继承仓库可见性，设为 public 才能匿名拉取。
 - `concurrency` 按 ref 串行，不取消进行中的运行；Release 与 tag 都不删除，既是回滚点，也是「相对上一版」变更列表的基线。
@@ -68,5 +70,5 @@
 
 ## 回滚
 
-- 代码层面回滚到任一历史 tag；Release 与 tag 长期保留，不会被清理。
+- 代码层面回滚到任一历史 tag；Release 与 tag 长期保留，不会被清理（例外是 nightly 的滚动 tag，它一直在动，本就不作回滚点——夜间的回滚锚点是镜像的 `sha-<短 sha>` tag）。
 - 服务器层面用 `/opt/agh-console.bak`、`.bak.prev` 覆盖回退，或手动下载目标 tag 的产物解包。
