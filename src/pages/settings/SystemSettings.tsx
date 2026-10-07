@@ -9,6 +9,7 @@ import { toast } from '../../components/ui/toast'
 import { Badge, IconBubble } from '../../components/ui/atoms'
 import { Network, DownloadCloud, RotateCcw, Eraser, Trash } from 'lucide-react'
 import { fmtDate } from '../../lib/format'
+import { runMutation } from '../../lib/mutation'
 
 /* ================= System management ================= */
 
@@ -38,26 +39,22 @@ export function SystemPage() {
 
   async function autoUpdate() {
     if (!cfg) return
-    setUpdating(true)
-    try {
-      await api(cfg, '/update', { method: 'POST', body: {} })
-      toast(t('settings.autoUpdateStarted'))
-    } catch (e: any) {
-      toast(t('common.updateFailed', { msg: e.message }), 'err')
-    } finally {
-      setUpdating(false)
-    }
+    await runMutation({
+      action: () => api(cfg, '/update', { method: 'POST', body: {} }),
+      okKey: 'settings.autoUpdateStarted',
+      failKey: 'common.updateFailed',
+      setBusy: setUpdating,
+    })
   }
 
   // doneKey/failKey point to the settings-domain success/failure toasts
   async function maintenance(path: string, doneKey: 'settings.cacheDone' | 'settings.statsDone' | 'settings.logDone', failKey: 'settings.cacheFail' | 'settings.statsFail' | 'settings.logFail') {
     if (!cfg) return
-    try {
-      await api(cfg, path, { method: 'POST', body: {} })
-      toast(t(doneKey))
-    } catch (e: any) {
-      toast(t(failKey, { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, path, { method: 'POST', body: {} }),
+      okKey: doneKey,
+      failKey,
+    })
   }
 
   const hasNew = versionInfo?.new_version && versionInfo.new_version !== status?.version

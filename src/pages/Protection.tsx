@@ -15,10 +15,10 @@ import { IconBubble } from '../components/ui/atoms'
 import { SafeSearchSheet, SAFE_ENGINES } from '../components/protection/SafeSearchSheet'
 import { Badge } from '../components/ui/atoms'
 import { useSheet } from '../components/ui/sheet'
-import { toast } from '../components/ui/toast'
 import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
+import { runMutation } from '../lib/mutation'
 
 
 
@@ -37,13 +37,11 @@ export default function Protection() {
 
   async function saveInterval(hours: number) {
     if (!cfg || !filtering) return
-    try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } })
-      mFiltering()
-      toast(t('filters.intervalSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } }),
+      invalidate: mFiltering,
+      okKey: 'filters.intervalSaved',
+    })
   }
   const { data: rewrites } = useSWR<{ total: number } | RewriteEntry[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
   const { data: bsCurrent } = useSWR<{ ids: string[] }>(cfg ? ['bsg', cfg, '/blocked_services/get'] : null, swrFetcher)
@@ -68,50 +66,49 @@ export default function Protection() {
 
   async function toggleFiltering(enabled: boolean) {
     if (!cfg || !filtering) return
-    try {
-      await api(cfg, '/filtering/config', { method: 'POST', body: { enabled, interval: filtering.interval } })
-      mFiltering()
-      toast(enabled ? t('protection.filteringOn') : t('protection.filteringOff'))
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled, interval: filtering.interval } }),
+      invalidate: mFiltering,
+      okKey: enabled ? 'protection.filteringOn' : 'protection.filteringOff',
+      failKey: 'common.opFailed',
+    })
   }
 
   async function refreshAllFilters() {
     if (!cfg) return
-    setRefreshing(true)
-    try {
-      // /filtering/refresh refreshes one side at a time, so call it once per list
-      const [a, b] = await Promise.all([
-        api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: false } }),
-        api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: true } }),
-      ])
-      mFiltering()
-      toast(t('protection.refreshedToast', { n: (a?.updated ?? 0) + (b?.updated ?? 0) }))
-    } catch (e: any) {
-      toast(t('common.updateFailed', { msg: e.message }), 'err')
-    } finally {
-      setRefreshing(false)
-    }
+    // /filtering/refresh refreshes one side at a time, so call it once per list
+    await runMutation({
+      action: async () => {
+        const [a, b] = await Promise.all([
+          api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: false } }),
+          api<{ updated: number }>(cfg, '/filtering/refresh', { method: 'POST', body: { whitelist: true } }),
+        ])
+        return { n: (a?.updated ?? 0) + (b?.updated ?? 0) }
+      },
+      invalidate: mFiltering,
+      okKey: 'protection.refreshedToast',
+      okVars: ({ n }) => ({ n }),
+      failKey: 'common.updateFailed',
+      setBusy: setRefreshing,
+    })
   }
 
   async function toggleEndpoint(path: string, on: boolean, mutate: () => void) {
     if (!cfg) return
-    try {
-      await api(cfg, `/${path}/${on ? 'enable' : 'disable'}`, { method: 'POST', body: {} })
-      mutate()
-      toast(on ? t('protection.turnedOn') : t('protection.turnedOff'))
-    } catch (e: any) {
-      toast(t('common.opFailed', { msg: e.message }), 'err')
-    }
-  }  async function saveSafeSearch(enabled: boolean, engines: Record<string, boolean>) {
+    await runMutation({
+      action: () => api(cfg, `/${path}/${on ? 'enable' : 'disable'}`, { method: 'POST', body: {} }),
+      invalidate: mutate,
+      okKey: on ? 'protection.turnedOn' : 'protection.turnedOff',
+      failKey: 'common.opFailed',
+    })
+  }
+
+  async function saveSafeSearch(enabled: boolean, engines: Record<string, boolean>) {
     if (!cfg) return
-    try {
-      await api(cfg, '/safesearch/settings', { method: 'PUT', body: { enabled, ...engines } })
-      toast(t('protection.safeSearchSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/safesearch/settings', { method: 'PUT', body: { enabled, ...engines } }),
+      okKey: 'protection.safeSearchSaved',
+    })
   }
 
   function openSafeSearchSheet() {

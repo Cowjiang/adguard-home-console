@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/session/auth'
 import { api, type AghClient } from '../../lib/api'
 import { Switch, Button } from '../ui/primitives'
 import { toast } from '../ui/toast'
+import { runMutation } from '../../lib/mutation'
 
 export const emptyClient = (): Partial<AghClient> => ({
   name: '',
@@ -45,8 +46,6 @@ export function ClientForm({
     if (!c.name?.trim()) return toast(t('clients.nameRequired'), 'err')
     const ids = idsText.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean)
     if (!ids.length) return toast(t('clients.idsRequired'), 'err')
-    if (!ids.length) return toast(t('clients.idsRequired'), 'err')
-    setSaving(true)
     const payload: AghClient = {
       name: c.name.trim(),
       ids,
@@ -62,19 +61,15 @@ export function ClientForm({
       upstreams_cache_enabled: false,
       upstreams_cache_size: 64 * 1024,
     }
-    try {
-      if (isNew) {
-        await api(cfg, '/clients/add', { method: 'POST', body: payload })
-      } else {
-        await api(cfg, '/clients/update', { method: 'POST', body: { name: initial.name, data: payload } })
-      }
-      onSaved()
-      toast(isNew ? t('clients.added') : t('common.saved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
+    await runMutation({
+      action: () => isNew
+        ? api(cfg, '/clients/add', { method: 'POST', body: payload })
+        : api(cfg, '/clients/update', { method: 'POST', body: { name: initial.name, data: payload } }),
+      // The caller's onSaved closes the sheet/subpage and revalidates the list
+      invalidate: onSaved,
+      okKey: isNew ? 'clients.added' : 'common.saved',
+      setBusy: setSaving,
+    })
   }
 
   return (

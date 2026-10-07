@@ -11,7 +11,7 @@ import { ClientDetail, type ClientDetailData } from '../components/clients/Clien
 import { PageHeader } from '../components/ui/primitives'
 import { EmptyState } from '../components/ui/atoms'
 import { useConfirm } from '../components/ui/sheet'
-import { toast } from '../components/ui/toast'
+import { runMutation } from '../lib/mutation'
 
 export default function ClientDetailPage() {
   const { t } = useTranslation()
@@ -40,14 +40,13 @@ export default function ClientDetailPage() {
 
   async function remove() {
     if (!cfg || !c) return
-    try {
-      await api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } })
-      mutate()
-      toast(t('clients.deleted'))
-      navBack(nav, pathname)
-    } catch (e: any) {
-      toast(t('common.deleteFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/clients/delete', { method: 'POST', body: { name: c.name } }),
+      invalidate: mutate,
+      okKey: 'clients.deleted',
+      failKey: 'common.deleteFailed',
+    })
+    if (ok) navBack(nav, pathname)
   }
 
   return (

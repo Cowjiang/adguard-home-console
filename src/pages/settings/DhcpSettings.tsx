@@ -11,6 +11,7 @@ import { toast } from '../../components/ui/toast'
 import { EmptyState, Loading } from '../../components/ui/atoms'
 import { usePick } from '../../components/ui/menu'
 import { fmtDate } from '../../lib/format'
+import { runMutation } from '../../lib/mutation'
 /* ================= DHCP ================= */
 
 export function DhcpSettings() {
@@ -65,9 +66,8 @@ export function DhcpSettings() {
       }
       if (next.v6.range_start && !(next.v6.lease_duration > 0)) return toast(t('advanced.incompleteV6'), 'err')
     }
-    setSaving(true)
-    try {
-      await api(cfg, '/dhcp/set_config', {
+    const ok = await runMutation({
+      action: () => api(cfg, '/dhcp/set_config', {
         method: 'POST',
         body: {
           enabled: next.enabled,
@@ -75,15 +75,13 @@ export function DhcpSettings() {
           v4: next.v4,
           v6: next.v6,
         },
-      })
-      setDraftLocal(null)
-      mutate()
-      toast(t('advanced.savedDhcp'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
+      }),
+      invalidate: mutate,
+      okKey: 'advanced.savedDhcp',
+      setBusy: setSaving,
+    })
+    // Back to following the server copy once the save landed
+    if (ok) setDraftLocal(null)
   }
 
   // v0.107.79 契约:结果在 v4/v6 的 other_server.found(yes/no/error)与
@@ -121,13 +119,12 @@ export function DhcpSettings() {
 
   async function removeLease(mac: string) {
     if (!cfg) return
-    try {
-      await api(cfg, '/dhcp/remove_static_lease', { method: 'POST', body: { mac } })
-      mutate()
-      toast(t('advanced.leaseDeleted'))
-    } catch (e: any) {
-      toast(t('common.deleteFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/dhcp/remove_static_lease', { method: 'POST', body: { mac } }),
+      invalidate: mutate,
+      okKey: 'advanced.leaseDeleted',
+      failKey: 'common.deleteFailed',
+    })
   }
 
   function openAddLease(init?: { mac?: string; ip?: string; hostname?: string }) {
@@ -143,14 +140,13 @@ export function DhcpSettings() {
           <input className="field" placeholder={t('advanced.hostnamePlaceholder')} defaultValue={hostname} onChange={(e) => (hostname = e.target.value)} />
           <Button size="lg" className="mt-1" onClick={async () => {
             if (!mac.trim() || !ip.trim()) return toast(t('advanced.macIpRequired'), 'err')
-            try {
-              await api(cfg!, '/dhcp/add_static_lease', { method: 'POST', body: { mac: mac.trim(), ip: ip.trim(), hostname: hostname.trim() } })
-              mutate()
-              sheet.close()
-              toast(t('advanced.leaseAdded'))
-            } catch (e: any) {
-              toast(t('common.addFailed', { msg: e.message }), 'err')
-            }
+            const ok = await runMutation({
+              action: () => api(cfg!, '/dhcp/add_static_lease', { method: 'POST', body: { mac: mac.trim(), ip: ip.trim(), hostname: hostname.trim() } }),
+              invalidate: mutate,
+              okKey: 'advanced.leaseAdded',
+              failKey: 'common.addFailed',
+            })
+            if (ok) sheet.close()
           }}>
             {t('common.add')}
           </Button>
@@ -172,14 +168,12 @@ export function DhcpSettings() {
           <input className="field" placeholder={t('advanced.hostnamePlaceholder')} defaultValue={l.hostname} onChange={(e) => (hostname = e.target.value)} />
           <Button size="lg" className="mt-1" onClick={async () => {
             if (!ip.trim()) return toast(t('advanced.macIpRequired'), 'err')
-            try {
-              await api(cfg!, '/dhcp/update_static_lease', { method: 'POST', body: { mac: l.mac, ip: ip.trim(), hostname: hostname.trim() } })
-              mutate()
-              sheet.close()
-              toast(t('advanced.leaseUpdated'))
-            } catch (e: any) {
-              toast(t('common.saveFailed', { msg: e.message }), 'err')
-            }
+            const ok = await runMutation({
+              action: () => api(cfg!, '/dhcp/update_static_lease', { method: 'POST', body: { mac: l.mac, ip: ip.trim(), hostname: hostname.trim() } }),
+              invalidate: mutate,
+              okKey: 'advanced.leaseUpdated',
+            })
+            if (ok) sheet.close()
           }}>
             {t('common.save')}
           </Button>
@@ -190,25 +184,22 @@ export function DhcpSettings() {
 
   async function resetLeases() {
     if (!cfg) return
-    try {
-      await api(cfg, '/dhcp/reset_leases', { method: 'POST', body: {} })
-      mutate()
-      toast(t('advanced.resetLeasesDone'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    await runMutation({
+      action: () => api(cfg, '/dhcp/reset_leases', { method: 'POST', body: {} }),
+      invalidate: mutate,
+      okKey: 'advanced.resetLeasesDone',
+    })
   }
 
   async function resetDhcp() {
     if (!cfg) return
-    try {
-      await api(cfg, '/dhcp/reset', { method: 'POST', body: {} })
-      setDraftLocal(null)
-      mutate()
-      toast(t('advanced.resetDhcpDone'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/dhcp/reset', { method: 'POST', body: {} }),
+      invalidate: mutate,
+      okKey: 'advanced.resetDhcpDone',
+    })
+    // Back to following the server copy once the reset landed
+    if (ok) setDraftLocal(null)
   }
 
   return (

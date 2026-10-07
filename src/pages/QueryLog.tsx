@@ -17,6 +17,7 @@ import { LogRow, keyOf } from '../components/log/LogRow'
 import { LogTable } from '../components/log/LogTable'
 import { LOG_FILTERS } from '../lib/constants'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { runMutation } from '../lib/mutation'
 
 export default function QueryLog() {
   const pageIn = usePageInClass()
@@ -166,14 +167,14 @@ export default function QueryLog() {
   async function saveRule(rule: string, block: boolean) {
     if (!cfg || !filtering) return
     const rules = [...(filtering.user_rules ?? []), rule]
-    try {
-      await api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } })
-      mutateFiltering()
-      toast(block ? t('querylog.blockedToast', { domain: itemDomain(rule) }) : t('querylog.whitelistedToast'))
-      sheet.close()
-    } catch (e: any) {
-      toast(t('querylog.ruleSaveFailed', { msg: e.message }), 'err')
-    }
+    const ok = await runMutation({
+      action: () => api(cfg, '/filtering/set_rules', { method: 'POST', body: { rules } }),
+      invalidate: mutateFiltering,
+      okKey: block ? 'querylog.blockedToast' : 'querylog.whitelistedToast',
+      okVars: block ? () => ({ domain: itemDomain(rule) }) : undefined,
+      failKey: 'querylog.ruleSaveFailed',
+    })
+    if (ok) sheet.close()
   }
 
   function itemDomain(rule: string) {
