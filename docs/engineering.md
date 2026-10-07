@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 
 ## 实现约束
 
@@ -34,6 +34,16 @@
 - 顶栏原生控件与自定义按钮互斥：原生接管时 CSS 按钮只留 `visibility:hidden` 占位，转场快照克隆里也不补显（否则侧滑揭示的旧页会露出自定义胶囊）。
 - 转场快照克隆会带同一批 `data-*` 属性且在 `#root` 内、文档顺序先于 portal 到 `body` 的实时节点，因此手势/转场查询实时元素必须限定 `document.body.querySelector(':scope > [data-floating-nav]')`，并在克隆上摘掉该属性。
 - Tauri v2 插件新增命令除 `invoke_handler` 外必须登记插件 `build.rs` 的 `COMMANDS` 与 `permissions/default.toml`，否则 `invoke` 被静默拒绝（调用方的 `catch` 会吞掉）。
+
+## 变更编排与乐观更新
+
+- 常规 mutation（请求 → 成功后 scoped revalidate → toast）一律走 `src/lib/mutation.ts` 的 `runMutation`：成功 toast 的插值经 `okVars(action 结果)` 取；失败只 toast 不抛，渲染 `ApiError.message`（适配器 kind 已在 `api.ts` 本地化），`failKey` 默认 `common.saveFailed`，返回布尔值供调用方决定后续（关 Sheet、跳转）。`invalidate` 不 await，与它所替换的逐页副本一致。
+- **不**走 `runMutation` 的三类：乐观更新（见下）；带结果状态的纯查询（`check_host`、`find_active_dhcp`、`test_upstreams`、日志分页拉取、版本检查——结果要落到页面状态或另有条件文案）；两阶段的 TLS validate/configure（校验驳回有独立文案，且不得下发配置）。
+- 设置页的「草稿 + 保存」统一用 `src/lib/useDraftForm.ts`：服务端副本是 dirty 基线；保存成功后必须**先 await refetch 再回填草稿**——先置 `null` 会被 effect 立即用旧数据重填，其后的数据更新不再同步，dirty 永远清不掉。需要服务端规范化的字段（被忽略域名、访问控制名单）以返回值回填，否则 trim/去重后的差异会把 dirty 挂在页面上。
+- 乐观更新是三种各有适用场景的习语，**不抽公共 helper**（统一成 options-bag 会产出比实现更复杂的浅接口），各自的并发防护要求：
+  - **pending 镜像 + 倒计时**（`src/components/protection/ProtectionCard.tsx`）：先本地镜像开关再发请求，失败丢弃镜像回到服务端状态；开关带持续时间，镜像必须能被服务端返回的 `protection_disabled_until` 覆盖。
+  - **本地副本 + 回滚**（`src/components/clients/ClientDetail.tsx`）：桌面弹层不随列表重渲染，组件持有配置副本逐字段即时保存，失败回滚到上一份副本；`useEffect([c])` 把刷新结果重灌进副本，正在编辑的字段以本地为准。
+  - **pending Set + 串行队列 + 防过期写**（`src/pages/FiltersPages.tsx` 的 ServicesPage）：点击立即生效（乐观 `Set`），写入串行（`saveQueue`）避免后发先至，用 `latestIdsRef` 判定本次写入是否仍是最后一次再释放 pending，失败则 revalidate 回滚。
 
 ## 发布
 

@@ -1,11 +1,11 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-07
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
-代码入口：`src/main.tsx`、`src/App.tsx`、`src/lib/api.ts`、`src/lib/instances.ts`、`src/lib/auth.tsx`、`src/components/ui.tsx`、`src/index.css`。
+代码入口：`src/main.tsx`、`src/App.tsx`、`src/lib/api.ts`、`src/lib/session/instances.ts`、`src/lib/session/auth.tsx`、`src/components/ui/`、`src/index.css`。
 
 ## 启动与 Provider
 
@@ -17,15 +17,15 @@
 
 - `/login` 公开（首启引导，无实例时才可见）；其余路由挂在 `<Protected><Layout/></Protected>` 下，未配置任何实例时重定向登录页。
 - 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及十个子页（实例列表 `/settings/server` 与编辑页 `/settings/server/edit`）；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
-- 顶级路由白名单在 `src/lib/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
+- 顶级路由白名单在 `src/lib/nav/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
 - 移动端的详情与表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。
 
 ## 多实例会话与配置
 
-- `src/lib/instances.ts` 持有实例模型与存储：`Instance = {id, label, endpoints[]}`（MVP 每实例 1 个 endpoint，数组为 Away Connection 预留），运行时 `cfg` 仍是活动实例活动 endpoint 的扁平 `{url, username, password}`，页面层零改动。
+- `src/lib/session/instances.ts` 持有实例模型与存储：`Instance = {id, label, endpoints[]}`（MVP 每实例 1 个 endpoint，数组为 Away Connection 预留），运行时 `cfg` 仍是活动实例活动 endpoint 的扁平 `{url, username, password}`，页面层零改动。
 - localStorage 键：`agh.console.cfg.v2`（`{instances, activeId}`）、`agh.console.cfg.v1`（迁移后保留，供旧版降级读取）、`agh.console.theme.v1`（主题）、`agh.services.v1.<instanceId>`（拦截服务目录缓存，按实例键控）。
 - `AuthProvider` 持有 store 与 per-instance 会话 `{status, offline, lastProbeOk}`；对外的 `cfg`/`status`/`offline` 由活动实例派生。`connect(cfg, opts)` 先 `GET /status` 验证再落盘：带 `id` 原位编辑（不改变活动指针），否则按 `url+username` 匹配更新或新增实例（默认激活；`activate:false` 用于壳内调试自动登录第二实例）。`removeInstance` 删除后回退到列表首台，删空回到登录页（同时清掉 v1 防止迁移复活）。
-- `/status` 探测逐实例并发、各自 5s deadline、15s 周期；非活动实例失败时退避（15/30/60s 封顶，成功复位），活动实例不退避（离线遮罩的自愈恢复依赖 15s 节奏）。
+- `/status` 探测逐实例并发、各自 5s deadline、15s 周期；非活动实例失败时退避（15/30/60s 封顶，成功复位），活动实例不退避（离线遮罩的自愈恢复依赖 15s 节奏）。状态机在 `src/lib/session/probe.ts`（时钟注入、vitest 覆盖退避/去重/恢复），`AuthProvider` 只做 React 状态接线。
 - 恢复在线与下拉刷新只重取「活动实例的全部 SWR 键 + 全部实例 /status」，不再全局 `mutate(() => true)`。
 - 未配置实例时受保护路由跳登录页，页面把 SWR key 传 `null` 表示不请求。
 
@@ -49,13 +49,14 @@
 | `src/pages/Protection.tsx` | 过滤功能总览：开关、刷新、重写与服务拦截入口 | `/filtering/status`、`POST /filtering/config`、`POST /filtering/refresh` |
 | `src/pages/FiltersPages.tsx` | 过滤器与白名单 CRUD、自定义规则、服务拦截、DNS 重写、规则检测 | `/filtering/*`、`/blocked_services/*`、`/rewrite/*` |
 | `src/pages/Clients.tsx`、`src/pages/ClientDetailPage.tsx`、`src/pages/ClientFormPage.tsx` | 客户端列表、详情与增删改 | `/clients`、`/stats`、`/clients/{add,update,delete}` |
-| `src/pages/Settings.tsx`、`src/pages/AdvancedSettings.tsx` | 设置分组及其子页：查询日志与统计、系统、外观、实例管理（列表 + 编辑）、DNS、访问、加密、DHCP | `/querylog/config`、`/stats/config`、`/dns_info`、`/access/*`、`/tls/*`、`/dhcp/*` |
+| `src/pages/Settings.tsx`、`src/pages/settings/` | 设置分组及其子页：查询日志与统计、系统、外观、实例管理（列表 + 编辑）、DNS、访问、加密、DHCP | `/querylog/config`、`/stats/config`、`/dns_info`、`/access/*`、`/tls/*`、`/dhcp/*` |
 
-## 组件与样式
+## 组件、lib 与样式
 
-- `src/components/` 只有六个文件：`ui.tsx`（基础控件与浮层）、`Layout.tsx`（全局布局与导航）、`charts.tsx`（纯 SVG 图表）、`ProtectionCard.tsx`、`LogDetail.tsx`、`ClientDetail.tsx`。
+- `src/components/` 按域分组：`ui/`（基础控件与浮层，拆为 `sheet`/`menu`/`toast`/`primitives`/`atoms` 五个文件，无 re-export barrel，逐文件导入）、`layout/`（Layout 与 TopBar/TabBar/Sidebar/InstanceSwitchList/OfflineNotice）、`dashboard/`、`log/`、`clients/`、`protection/`，另有 `charts.tsx`（纯 SVG 图表）。跨页复用的组件必须落在 `components/`；页面私有且体量小的留在页面内联。
+- `src/lib/` 分组：`native/`（壳能力 + `shell.ts` 统一平台判定）、`session/`（instances/auth/probe）、`nav/`（routes/navMeta/backNav/scrollToTop）；其余平铺——`api.ts` 是代理契约的唯一书面定义、import 面最大，留根作为入口。新增文件按「≥3 个文件共享同一关注点才建组」判断，平铺是默认。
 - 弹层一律屏幕居中：底部上滑会被原生 TabBar 遮挡；开启用双 `requestAnimationFrame` 触发过渡，关闭延时 260ms，期间锁 `body` 滚动。
-- 苹果移动端的单选项渲染真实 `<select>` 覆盖层（`src/lib/nativePickers.ts`），其余设备用锚定菜单。
+- 苹果移动端的单选项渲染真实 `<select>` 覆盖层（`PickSelect`，见 `src/components/ui/menu.tsx` 与各页的 `isAppleMobile()` 分支），其余设备用锚定菜单。
 - 样式是 Tailwind 4 单行入口加 `@theme inline` 变量映射；深浅主题各自定义一组 CSS 变量；材质、动效与路由转场都是 `src/index.css` 里的具名类。
 
 ## 平台分支

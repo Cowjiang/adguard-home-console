@@ -37,10 +37,10 @@ import {
   useSyncExternalStore, type ReactNode,
 } from 'react'
 import { useLocation, useNavigate, useNavigationType, useOutlet } from 'react-router-dom'
-import { consumeBackTap, markBackTap, peekBackTap } from './backNav'
-import { consumeNavAnim } from './navMeta'
-import { isAppleMobile } from './nativePickers'
-import { TAB_ROOT_ROUTES } from './routes'
+import { consumeBackTap, markBackTap, peekBackTap } from './nav/backNav'
+import { consumeNavAnim } from './nav/navMeta'
+import { isTauriIOS } from './native/shell'
+import { TAB_ROOT_ROUTES } from './nav/routes'
 import { useIsDesktop } from './useIsDesktop'
 
 export type TransitionDir = 'push' | 'pop'
@@ -279,18 +279,6 @@ const FLICK_V = 0.5
  *  position, only the top layer slides away. */
 const PARALLAX = 0
 
-/** The home-grown swipe takes over only inside the iOS shell: browsers and
- *  desktop have their own native history gestures we must not steal */
-let tauriIOS: boolean | null = null
-export function isTauriIOS(): boolean {
-  if (tauriIOS === null) {
-    tauriIOS =
-      typeof window !== 'undefined' &&
-      '__TAURI_INTERNALS__' in window &&
-      isAppleMobile()
-  }
-  return tauriIOS
-}
 
 function trimUnderlays(current: number) {
   for (const k of [...underlays.keys()]) if (k > current) underlays.delete(k)

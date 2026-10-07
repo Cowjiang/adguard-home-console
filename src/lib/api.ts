@@ -14,7 +14,8 @@
  *   errors are surfaced as-is.
  */
 import { i18n } from './i18n'
-import type { SvrConfig } from './auth'
+import { getTauriInvoke } from './native/shell'
+import type { SvrConfig } from './session/auth'
 export type { SvrConfig }
 
 /** Request the contract adapters accept */
@@ -72,14 +73,6 @@ export class ApiError extends Error {
 
 function basicAuth(user: string, pass: string): string {
   return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)))
-}
-
-/** Tauri shell detection: inside the iOS/desktop shell go through the Rust
- *  proxy (agh_fetch), bypassing WebView CORS */
-type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
-function getTauriInvoke(): TauriInvoke | null {
-  const w = window as unknown as { __TAURI_INTERNALS__?: { invoke?: TauriInvoke } }
-  return w.__TAURI_INTERNALS__?.invoke ?? null
 }
 
 export async function api<T = unknown>(

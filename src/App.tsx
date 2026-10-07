@@ -2,10 +2,12 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { SWRConfig, type SWRConfiguration } from 'swr'
-import { AuthProvider, useAuth } from './lib/auth'
-import { SheetProvider, Spinner } from './components/ui'
-import { ToastHost } from './components/ui'
-import Layout from './components/Layout'
+import { AuthProvider, useAuth } from './lib/session/auth'
+import { getTauriInvoke } from './lib/native/shell'
+import { SheetProvider } from './components/ui/sheet'
+import { Spinner } from './components/ui/atoms'
+import { ToastHost } from './components/ui/toast'
+import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import TopListPage from './pages/TopListPage'
@@ -15,9 +17,18 @@ import ClientDetailPage from './pages/ClientDetailPage'
 import ClientFormPage from './pages/ClientFormPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
-import Settings, { GeneralSettings, SystemPage, AppearanceSettings, ServerSettings, InstanceEdit, AboutSettings } from './pages/Settings'
+import Settings from './pages/Settings'
+import { GeneralSettings } from './pages/settings/GeneralSettings'
+import { SystemPage } from './pages/settings/SystemSettings'
+import { AppearanceSettings } from './pages/settings/AppearanceSettings'
+import { ServerSettings } from './pages/settings/InstanceList'
+import { InstanceEdit } from './pages/settings/InstanceEdit'
+import { AboutSettings } from './pages/settings/AboutSettings'
 import { FiltersPage, RulesPage, ServicesPage, RewritesPage, CheckHostPage } from './pages/FiltersPages'
-import { DnsSettings, AccessSettings, EncryptionSettings, DhcpSettings } from './pages/AdvancedSettings'
+import { DnsSettings } from './pages/settings/DnsSettings'
+import { AccessSettings } from './pages/settings/AccessSettings'
+import { EncryptionSettings } from './pages/settings/EncryptionSettings'
+import { DhcpSettings } from './pages/settings/DhcpSettings'
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { cfg } = useAuth()
@@ -40,9 +51,7 @@ function DebugAutoLogin() {
   const nav = useNavigate()
   useEffect(() => {
     if (cfg) return
-    const invoke = (
-      window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string) => Promise<unknown> } }
-    ).__TAURI_INTERNALS__?.invoke
+    const invoke = getTauriInvoke()
     if (!invoke) return
     invoke('get_debug_login')
       .then((d) => {

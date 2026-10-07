@@ -1,13 +1,14 @@
 /**
- * Global session and theme: multi-instance store, per-instance /status
- * probing, theme switching. Consumers keep seeing the single active instance
- * through cfg/status/offline — the multi-instance detail lives here.
+ * Global session and theme: multi-instance store, per-instance /status probe
+ * wiring (the cadence state machine itself is ./probe), theme switching.
+ * Consumers keep seeing the single active instance through cfg/status/offline —
+ * the multi-instance detail lives here.
  */
-import { applyNativeAppearance } from './nativeAppearance'
-import { i18n } from './i18n'
+import { applyNativeAppearance } from '../native/nativeAppearance'
+import { i18n } from '../i18n'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { mutate } from 'swr'
-import { api, type Status } from './api'
+import { api, type Status } from '../api'
 import {
   activeConfig,
   activeEndpoint,
@@ -20,14 +21,11 @@ import {
   type InstanceStoreData,
   type SvrConfig,
 } from './instances'
+import { createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS } from './probe'
 
 export type { SvrConfig }
 
 const THEME_KEY = 'agh.console.theme.v1'
-/** /status probe deadline: offline, the proxy layer takes 25s to report
- *  timeout, so the probe must conclude within 5s */
-const PROBE_TIMEOUT_MS = 5000
-const PROBE_INTERVAL_MS = 15000
 
 export type ThemeSetting = 'auto' | 'dark' | 'light'
 
@@ -92,20 +90,6 @@ function mutateInstanceData(ep: SvrConfig): Promise<unknown> {
   })
 }
 
-/** Non-active failing instances back off their periodic probe (success
- *  resets); the active instance never backs off — the 15s self-heal cadence
- *  is what recovers the offline mask */
-function backoffMs(failures: number): number {
-  return PROBE_INTERVAL_MS * Math.min(1 << Math.min(failures - 1, 2), 4)
-}
-
-interface ProbeState {
-  inFlight: boolean
-  failures: number
-  /** Epoch ms before which the periodic cadence skips this instance */
-  nextAt: number
-}
-
 function loadTheme(): ThemeSetting {
   try {
     return (localStorage.getItem(THEME_KEY) as ThemeSetting) || 'auto'
@@ -136,11 +120,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // their identities (and the interval/events effects below) stay stable
   const storeRef = useRef(store)
   const sessionsRef = useRef(sessions)
-  const probesRef = useRef(new Map<string, ProbeState>())
   useEffect(() => {
     storeRef.current = store
     sessionsRef.current = sessions
   }, [store, sessions])
+
+  // Probe engine: cadence/backoff state lives in lib/session/probe (unit-tested
+  // there); the refs above hand it the latest store/session verdicts
+  const fetchStatus = useMemo(() => createStatusFetcher(), [])
+  const engine = useMemo(
+    () =>
+      createProbeEngine({
+        fetchStatus,
+        wasProbeOk: (id) => sessionsRef.current[id]?.lastProbeOk ?? false,
+        isActive: (id) => storeRef.current?.activeId === id,
+      }),
+    [fetchStatus]
+  )
 
   useEffect(() => applyTheme(theme), [theme])
   useEffect(() => {
@@ -149,26 +145,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => mq?.removeEventListener('change', () => applyTheme(theme))
   }, [theme])
 
-  // Fast-fail /status probe: offline, the proxy layer takes 25s to time out
-  // and the probe doesn't wait — pull-to-refresh, the offline mask and the 15s
-  // self-heal all need a prompt verdict. A timeout resolves null as failure;
-  // the background request is left to finish on its own
-  const fetchStatus = useCallback(async (c: SvrConfig): Promise<Status | null> => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    try {
-      return await Promise.race([
-        api<Status>(c, '/status'),
-        new Promise<null>((resolve) => {
-          timer = setTimeout(() => resolve(null), PROBE_TIMEOUT_MS)
-        }),
-      ])
-    } catch {
-      return null
-    } finally {
-      clearTimeout(timer)
-    }
-  }, [])
-
   const patchSession = useCallback((id: string, patch: Partial<InstanceSession>) => {
     setSessions((prev) => {
       const cur = prev[id] ?? { status: null, offline: false, lastProbeOk: false }
@@ -176,58 +152,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  // Probe one instance: result lands in its session; recovery of the active
-  // instance revalidates only that instance's frozen SWR keys (previously a
-  // global mutate — narrowed with multi-instance)
+  // Probe one instance: the verdict lands in its session; recovery of the
+  // active instance revalidates only that instance's frozen SWR keys
+  // (previously a global mutate — narrowed with multi-instance)
   const probeOne = useCallback(
-    async (inst: Instance, ep: SvrConfig, isActive: boolean) => {
-      let st = probesRef.current.get(inst.id)
-      if (!st) {
-        st = { inFlight: false, failures: 0, nextAt: 0 }
-        probesRef.current.set(inst.id, st)
-      }
-      if (st.inFlight) return
-      st.inFlight = true
-      try {
-        const s = await fetchStatus(ep)
-        // The instance may have been removed while probing: drop the result
-        if (!storeRef.current?.instances.some((x) => x.id === inst.id)) return
-        const ok = s !== null
-        const prevOk = sessionsRef.current[inst.id]?.lastProbeOk ?? false
-        const recovered = ok && !prevOk
-        st.failures = ok ? 0 : st.failures + 1
-        st.nextAt = ok || isActive ? 0 : Date.now() + backoffMs(st.failures)
-        patchSession(inst.id, {
-          // Keep the last known status while failing: the pill switches to
-          // offline but keeps showing the stale protection state
-          status: s ?? sessionsRef.current[inst.id]?.status ?? null,
-          offline: !ok,
-          lastProbeOk: ok,
-        })
-        if (recovered && storeRef.current?.activeId === inst.id) void mutateInstanceData(ep)
-      } finally {
-        const cur = probesRef.current.get(inst.id)
-        if (cur) cur.inFlight = false
-      }
+    async (inst: Instance, ep: SvrConfig) => {
+      const outcome = await engine.probe(inst, ep)
+      // In flight already, or the instance was removed while probing
+      if (!outcome) return
+      patchSession(inst.id, {
+        // Keep the last known status while failing: the pill switches to
+        // offline but keeps showing the stale protection state
+        status: outcome.status ?? sessionsRef.current[inst.id]?.status ?? null,
+        offline: !outcome.ok,
+        lastProbeOk: outcome.ok,
+      })
+      if (outcome.recovered) void mutateInstanceData(ep)
     },
-    [fetchStatus, patchSession]
+    [engine, patchSession]
   )
 
   const probeAll = useCallback(
     (force = false) => {
       const st = storeRef.current
       if (!st) return
-      const now = Date.now()
-      for (const inst of st.instances) {
-        const ep = activeEndpoint(inst)
-        if (!ep) continue
-        const isActive = inst.id === st.activeId
-        const p = probesRef.current.get(inst.id)
-        if (!force && !isActive && p && (p.inFlight || now < p.nextAt)) continue
-        void probeOne(inst, ep, isActive)
-      }
+      engine.probeAll(st.instances, force)
     },
-    [probeOne]
+    [engine]
   )
 
   // Stable probe cadence: initial probe, 15s tick, and visibility/online
@@ -261,7 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     for (const inst of st.instances) {
       if (!sessionsRef.current[inst.id]) {
         const ep = activeEndpoint(inst)
-        if (ep) void probeOne(inst, ep, inst.id === st.activeId)
+        if (ep) void probeOne(inst, ep)
       }
     }
   }, [store, probeOne])
@@ -346,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         saveStore(nextStore)
         setStore(nextStore)
-        probesRef.current.set(targetId, { inFlight: false, failures: 0, nextAt: 0 })
+        engine.reset(targetId)
         patchSession(targetId, { status: s, offline: false, lastProbeOk: true })
         return true
       } catch (e: any) {
@@ -360,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setConnecting(false)
       }
     },
-    [patchSession]
+    [engine, patchSession]
   )
 
   const removeInstance = useCallback(
@@ -381,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearStore()
         setStore(null)
         setSessions({})
-        probesRef.current.clear()
+        engine.clear()
         return
       }
       setSessions((s) => {
@@ -389,18 +340,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         delete n[id]
         return n
       })
-      probesRef.current.delete(id)
+      engine.drop(id)
     },
-    []
+    [engine]
   )
 
   const logout = useCallback(() => {
     clearStore()
     setStore(null)
     setSessions({})
-    probesRef.current.clear()
+    engine.clear()
     setError(null)
-  }, [])
+  }, [engine])
 
   const refreshStatus = useCallback((): Promise<Status | null> => {
     if (!activeInst || !activeEp) return Promise.resolve(null)
