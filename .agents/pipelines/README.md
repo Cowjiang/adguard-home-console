@@ -39,6 +39,7 @@
 | 2026-09-26 | feature | [补齐加密设置页与 AGH 原生功能的差距](proposals/feature/2026-09-26-encryption-page-parity.md) | implemented |
 | 2026-09-26 | feature | [将统计分析页合并进概览页（仅桌面）](proposals/feature/2026-09-26-merge-stats-into-overview.md) | implemented |
 | 2026-10-06 | architecture | [上移 AGH 代理契约为前端持有的接口，Express/Rust 作为可替换实现](proposals/architecture/2026-10-06-proxy-contract-ownership.md) | implemented |
+| 2026-10-06 | simplification | [收敛 src/ 页面层的重复编排、探测状态机与超载文件](proposals/simplification/2026-10-06-src-layer-consolidation.md) | proposed |
 
 ## 与 docs/ 的分工
 
