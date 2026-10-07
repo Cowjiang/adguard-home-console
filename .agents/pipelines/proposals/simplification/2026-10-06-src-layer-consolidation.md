@@ -1,9 +1,9 @@
 # 收敛 src/ 页面层的重复编排、探测状态机与超载文件
 
 **Class:** simplification
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-06
-**Updated:** 2026-10-06（并入组件归位与分类：放置规则、域目录树、跨页 import 清零；并入 lib/ 按关注簇分组）
+**Updated:** 2026-10-07（实施完成并验收：runMutation、probe engine、useDraftForm、乐观习语文档；落地签名与基线的实测差异见 Note 的实施记录）
 **Source:** 2026-10-06 整体架构审核（web 端部分）建议 1/2/3/4；用户方向（同日会话，含组件与 lib 散落观察）
 
 ## Goal
@@ -12,7 +12,7 @@
 
 ## Decision
 
-1. **`runMutation()` helper（`src/lib/mutation.ts`）**：统一 mutation 编排——`action()` 执行、成功后 `invalidate()`（scoped mutate）+ 成功 toast、失败按现状取 `e.message`（kind 体系下已本地化）渲染 `common.saveFailed`。签名收敛为 `{ action, invalidate?, okKey?, okVars? }`；迁移是逐处等价替换，各页现有 toast 文案保持不变。**不纳入**乐观更新习语（决策 6）与纯请求无 toast 的场景。
+1. **`runMutation()` helper（`src/lib/mutation.ts`）**：统一 mutation 编排——`action()` 执行、成功后 `invalidate()`（scoped mutate）+ 成功 toast、失败按现状取 `e.message`（kind 体系下已本地化）渲染失败 toast。落地签名 `{ action, invalidate?, okKey?, okVars?(result), failKey?, setBusy? }`：`failKey` 默认 `common.saveFailed`（各页 delete/add/op/update 文案原样传入）、`okVars` 从 action 结果取值（唯一带变量的成功 toast 是 `protection.refreshedToast` 的 n）、`setBusy` 承接 `setSaving`/`setRefreshing`。迁移是逐处等价替换，各页现有 toast 文案保持不变，返回布尔值供调用方决定关 Sheet/跳转。**不纳入**乐观更新习语（决策 6）与纯请求无 toast 的场景。
 2. **probe engine 抽出（`src/lib/session/probe.ts`）**：从 `auth.tsx` 抽出探测状态机为独立模块，依赖注入 `fetchStatus` 与时钟；`AuthProvider` 只做 React 接线（状态订阅 ↔ useState）。接口保持最小：创建引擎（注入依赖）、`probe(instance, ep, isActive)`、`probeAll(..., force)`；内部保留 per-instance `{inFlight, failures, nextAt}` 状态与退避曲线。行为不变：非活动失败退避 15/30/60s 封顶、成功复位、活动实例永不退避、恢复触发 scoped revalidate、移除实例丢弃在途结果。
 3. **机械拆分（零行为变化，路由不变）**：
    | 现文件 | 拆出 |
@@ -48,19 +48,19 @@
        pullToRefresh.ts、routeTransition.tsx、mutation.ts（新）、useDraftForm.ts（新）
      ```
      现有 `components/ClientDetail.tsx`、`LogDetail.tsx`、`ProtectionCard.tsx` 随域目录迁移；对应的薄路由包装页（`ClientDetailPage`/`LogDetailPage`）不动。
-5. **`useDraftForm` hook（`src/lib/`）**：draft 表单当前 4 份副本（DnsSettings、AccessSettings、Encryption、GeneralSettings），其中「SWR refetch 后重灌未脏草稿」不变式仅 GeneralSettings 实现。实现时先逐处核对行为差异，hook 只收敛真正共享的部分（draft 状态、dirty 判定、refetch 重灌、提交回填），分歧处保留原样；缺失不变式的副本随之补齐（这是本提案唯一的预期行为变化，方向是修正）。
+5. **`useDraftForm` hook（`src/lib/`）**：draft 表单当前 4 份副本（DnsSettings、AccessSettings、Encryption、GeneralSettings）。落地形态 `useDraftForm(data, project?) → { draft, dirty, patch(key, value), reset(next?) }`：服务器副本是 dirty 基线（`project` 提供「服务器载荷 → 草稿形状」的投影，默认结构克隆），保存成功先 refetch 再 `reset(服务端返回值)`。hook 只收敛真正共享的部分（draft 状态、dirty 判定、保存后回填、丢弃），分歧处保留原样：访问控制的「每行一项」投影、加密页的来源单选、一般设置的双草稿各自留在页面。缺失不变式的副本随之补齐（这是本提案唯一的预期行为变化，方向是修正）。
 6. **只文档化、不抽代码**：三种乐观更新习语（`ProtectionCard` 的 pending 镜像、`ClientDetail` 的 draft+回滚、`FiltersPages` ServicesPage 的 pending Set + saveQueue + latestIdsRef 防过期写）在 `docs/engineering.md` 记录适用场景与并发防护要求——统一为 options-bag 会产出浅模块，明确不做。
 7. **不做的**：分页/Sheet 表单脚手架抽取；`Row` 嵌套 `button` 修法（使用面广，另行评估）；路由与 i18n key 变更；R2/L4 之外的强行外移或建组（避免 components/ 与 lib/ 变成倾倒场）。
 
 ## Accept
 
-- [ ] `catch (e: any)` 的 try→api→mutate→toast 编排从 42 处（10 文件）收敛至 `runMutation`；各页成功/失败 toast 文案与回滚行为不变
-- [ ] `src/lib/session/probe.ts` 独立于 React 可实例化，vitest 覆盖：退避 15/30/60s 封顶、成功复位、活动实例不退避、inFlight 去重、恢复触发 scoped revalidate、移除实例丢弃在途结果；`AuthProvider` 对外契约（`useAuth` 返回值）不变
-- [ ] 三个文件按决策 3 的映射拆分，`App.tsx` 路由与用户可见行为不变，`components/ui.tsx` 不存在且无 barrel
-- [ ] pages→pages 组件 import 清零（现 3 处）；components/ 与 lib/ 按决策 4 的目录树归类（含 `native/shell.ts` 统一探测，既有 6 个 native 模块改从它取判定），页面文件只保留数据编排与组装，最大页面文件 ≤700 行
-- [ ] 4 处 draft 表单走 `useDraftForm`，「refetch 后重灌未脏草稿」行为四处一致
-- [ ] 乐观更新习语约定写入 `docs/engineering.md`
-- [ ] `pnpm check`、`pnpm test`、`pnpm build`、`npm run test:server` 全绿
+- [x] try→api→mutate→toast 编排收敛：实测基线 `catch (e: any)` 43 处/16 文件（提案记 42/10，拆分批次后文件数已变），**33 处**走 `runMutation`（`src/lib/mutation.ts`），保留 10 处且逐条写明理由（见 Note 实施记录）；各页成功/失败 toast 文案与回滚行为不变
+- [x] `src/lib/session/probe.ts` 独立于 React 可实例化（时钟与 fetchStatus 注入），vitest 11 例覆盖退避 15/30/60s 封顶、成功复位、活动实例不退避、inFlight 去重、恢复信号（活动实例 fail→ok）、移除实例丢弃在途结果、5s deadline；`AuthProvider` 按信号做 scoped revalidate，「移除实例丢弃在途结果」由引擎的 `drop()` 独立于 store 实现；`useAuth` 返回值不变
+- [x] 三个文件按决策 3 的映射拆分，`App.tsx` 路由与用户可见行为不变，`components/ui.tsx` 不存在且无 barrel
+- [x] pages→pages 组件 import 清零（实测 0）；components/ 与 lib/ 按决策 4 的目录树归类（含 `native/shell.ts` 统一探测）；最大页面文件 609 行（≤700），`routeTransition.tsx` 736 行为单文件引擎（R4 保留）
+- [x] 4 处 draft 表单走 `useDraftForm`，保存成功后按服务端返回值重灌草稿的行为四处一致（DnsSettings/AccessSettings 原缺该不变式，为本次唯一的预期行为修正）
+- [x] 乐观更新习语约定写入 `docs/engineering.md`（含「不抽 helper」的判定与各自的并发防护要求），并补记 `runMutation`/`useDraftForm` 的适用边界
+- [x] `pnpm check`、`pnpm test`、`pnpm build`、`npm run test:server` 全绿；另做浏览器烟测（mock-agh + dev:all + Playwright）逐条断言成功/失败文案与 draft 生命周期
 
 ## Note
 
@@ -69,3 +69,13 @@
 - R4 的判断依据：`routeTransition.tsx`（748 行）四个关注点中三个是引擎（转场/手势/滚动），`TransitionArea` 只是渲染出口；把它搬进 components/ 会把引擎塞进控件层。其"引擎内聚四个关注点"的评估与改进（时序协议类型化等）属移动端专项，不在本提案范围。
 - `native/shell.ts` 是审核 M1 建议的最小落地：只统一判定函数（`isTauriShell`/`isTauriIOS`/`isAppleMobile` 的唯一实现与缓存策略），不改各模块的降级行为；JS 用 UA 重推平台的全面治理（能力探针替代）属移动端专项。
 - 实施顺序建议：决策 3 + 4（机械拆分、组件与 lib 归位先行，一次 import 风暴）→ 1（runMutation 替换）→ 2（probe engine）→ 5（useDraftForm）；决策 6 的文档随任一批次顺带落地。
+
+### 实施记录（2026-10-07）
+
+- 基线复核：`catch (e: any)` 实测 43 处/16 文件（提案记 42/10，拆分批次后文件分布已变）；`common.saveFailed` 16 处。
+- 批次一（`refactor(ui)`/`refactor(layout)`/`refactor(pages)`/`refactor(src)` 四提交）：ui.tsx 拆为 `components/ui/{sheet,menu,toast,primitives,atoms}`（无 barrel）、Layout 拆入 `components/layout/`、页面私有组件落域目录、lib 分 `native/`（含 `shell.ts`）、`session/`、`nav/`；AdvancedSettings/Settings 拆为 `pages/settings/`。
+- 批次二（`runMutation`）：33 处迁移——FiltersPages 10、DhcpSettings 6、Protection 5、SystemSettings 2、DnsSettings 2，QueryLog/Clients/ClientDetailPage/LogDetailPage/ClientForm/EncryptionSettings/AccessSettings/GeneralSettings 各 1。保留 10 处，理由逐条：`auth.connect`（会话层，失败写 error 状态并返回布尔，且先验证 /status 再落盘）、`ProtectionCard` / `ClientDetail` / ServicesPage 三处乐观习语（决策 6）、`CheckHostPage.check` / `QueryLog.fetchPage` / `findActive` / `testUpstreams` 四处查询结果落页面状态、`SystemSettings.checkUpdate` 三态条件文案、`EncryptionSettings.save` 两阶段 validate/configure（校验驳回有独立文案且不得下发配置）。
+- 批次三（`probe`）：状态机落在 `src/lib/session/probe.ts`，接线形态 `createProbeEngine({ fetchStatus, wasProbeOk, isActive, now? })` —— 「恢复」用注入的会话 reader 在完成时刻判定（与旧代码同时刻读取），移除实例的丢弃由 `drop()` 删除引擎内状态实现（不新增 store 依赖），`createStatusFetcher` 携带 5s deadline。`probe.test.ts` 11 例；`auth.tsx` 只余接线（store/session refs、patchSession、engine 调用）。
+- 批次四（`useDraftForm`）修复两处缺失不变式：DnsSettings 保存后先 `setDraft(null)` 会被 effect 用旧数据重灌（dirty 永不复位），AccessSettings 保存后从不回填（trim/去重后 dirty 常挂）；GeneralSettings / EncryptionSettings 原有行为不变。加密页的来源单选在草稿首次落地时播种（独立 effect），保存与重置后显式复位。
+- 顺带修复 docs 漂移：`docs/architecture/frontend.md`、`docs/web-interaction.md` 仍引用 `src/lib/auth.tsx`、`src/components/ui.tsx`、`Layout.tsx`、`nativePickers.ts` 等拆分前路径，一并更新为现结构并补「组件、lib 与样式」的放置规则；`node scripts/verify-proposals.mjs --links` 下 docs 已无缺失路径（`.agents/reviews/` 是历史快照，按约定不改）。
+- 验收证据：`pnpm check`、`pnpm test`（40 例，含 probe 11 例）、`pnpm build`、`npm run test:server`（17 例）全绿；浏览器烟测（`scripts/mock-agh.mjs` + `pnpm dev:all` + Playwright，桌面 1280×900）逐条断言：`DNS settings saved` + dirty 清除、`Access control saved` + 列表按服务端规范化内容回填、`Settings saved` + 保存入口消失、`Rewrite added`、过滤器开关成功时静默、断网后 `Failed to save: Network error. Cannot reach the upstream.` 且 dirty 保留（回滚行为不变）。
