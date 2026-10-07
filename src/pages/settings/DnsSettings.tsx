@@ -1,5 +1,5 @@
 /** DNS settings: upstreams, bootstrap, protection mode, cache */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
@@ -10,6 +10,8 @@ import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button 
 import { toast } from '../../components/ui/toast'
 import { Loading } from '../../components/ui/atoms'
 import { fmtBytes } from '../../lib/format'
+import { runMutation } from '../../lib/mutation'
+import { useDraftForm } from '../../lib/useDraftForm'
 import { Field } from './Field'
 /* ================= DNS settings ================= */
 
@@ -18,57 +20,51 @@ export function DnsSettings() {
   const { t } = useTranslation()
   const nav = useNavigate()
   const { data, mutate, isLoading } = useSWR<DnsInfo>(cfg ? ['dns', cfg, '/dns_info'] : null, swrFetcher)
-  const [draft, setDraft] = useState<DnsInfo | null>(null)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<Record<string, string> | null | undefined>(undefined)
+  const form = useDraftForm(data)
 
-  useEffect(() => {
-    if (data && draft === null) setDraft(structuredClone(data))
-  }, [data, draft])
-
-  const d = draft
-  const set = <K extends keyof DnsInfo>(k: K, v: DnsInfo[K]) => setDraft((s) => (s ? { ...s, [k]: v } : s))
-  const dirty = !!d && !!data && JSON.stringify(d) !== JSON.stringify(data)
+  const d = form.draft
+  const set = form.patch
+  const dirty = form.dirty
 
   async function save() {
     if (!cfg || !d) return
-    setSaving(true)
+    await runMutation({
+      action: async () => {
+        await api(cfg, '/dns_config', { method: 'POST', body: d })
+        // Refetch before refilling: the server copy becomes the dirty baseline
+        form.reset(await mutate())
+      },
+      okKey: 'advanced.savedDns',
+      setBusy: setSaving,
+    })
+  }
+
+  // Upstream test: the result list stays on the page, so only the toast is shared
+  async function testUpstreams() {
+    if (!cfg || !d) return
     try {
-      await api(cfg, '/dns_config', { method: 'POST', body: d })
-      mutate()
-      setDraft(null)
-      toast(t('advanced.savedDns'))
+      const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
+        method: 'POST',
+        body: { upstream_dns: toLines(d.upstream_dns) },
+      })
+      const errs = Object.fromEntries(Object.entries(r ?? {}).filter(([, v]) => v && v.toLowerCase() !== 'ok'))
+      setTestResult(errs)
+      toast(Object.keys(errs).length === 0 ? t('advanced.testAllOk') : t('advanced.testSomeFailed'), Object.keys(errs).length === 0 ? 'ok' : 'err')
     } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
+      toast(t('common.testFailed', { msg: e.message }), 'err')
     }
   }
 
-async function testUpstreams() {
-if (!cfg || !d) return
-try {
-const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
-method: 'POST',
-body: { upstream_dns: toLines(d.upstream_dns) },
-})
-const errs = Object.fromEntries(Object.entries(r ?? {}).filter(([, v]) => v && v.toLowerCase() !== 'ok'))
-setTestResult(errs)
-toast(Object.keys(errs).length === 0 ? t('advanced.testAllOk') : t('advanced.testSomeFailed'), Object.keys(errs).length === 0 ? 'ok' : 'err')
-} catch (e: any) {
-toast(t('common.testFailed', { msg: e.message }), 'err')
-}
-}
-
-async function clearCache() {
-if (!cfg) return
-try {
-await api(cfg, '/cache_clear', { method: 'POST' })
-toast(t('advanced.cacheClearedDns'), 'ok')
-} catch (e: any) {
-toast(t('advanced.clearCacheFailed', { msg: e.message }), 'err')
-}
-}
+  async function clearCache() {
+    if (!cfg) return
+    await runMutation({
+      action: () => api(cfg, '/cache_clear', { method: 'POST' }),
+      okKey: 'advanced.cacheClearedDns',
+      failKey: 'advanced.clearCacheFailed',
+    })
+  }
 
   if (isLoading || !d) return <Screen><PageHeader back title={t('advanced.titleDns')} /><Loading /></Screen>
 
@@ -250,7 +246,7 @@ toast(t('advanced.clearCacheFailed', { msg: e.message }), 'err')
 
       {dirty && (
         <div className="mt-4 flex gap-2.5">
-          <Button variant="glass" className="flex-1" onClick={() => setDraft(structuredClone(data!))}>{t('advanced.discard')}</Button>
+          <Button variant="glass" className="flex-1" onClick={() => form.reset(data)}>{t('advanced.discard')}</Button>
           <Button className="flex-1" loading={saving} onClick={save}>{t('advanced.saveChanges')}</Button>
         </div>
       )}

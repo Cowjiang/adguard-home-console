@@ -1,49 +1,50 @@
 /** Access control: allowed/blocked clients and blocked hosts */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { useAuth } from '../../lib/session/auth'
 import { api, swrFetcher } from '../../lib/api'
 import { PageHeader, Screen, Card, GroupTitle, Button } from '../../components/ui/primitives'
-import { toast } from '../../components/ui/toast'
 import { Loading } from '../../components/ui/atoms'
+import { runMutation } from '../../lib/mutation'
+import { useDraftForm } from '../../lib/useDraftForm'
 import { Field } from './Field'
 /* ================= Access control ================= */
+
+/** Draft shape is one entry per line (the server keeps trimmed arrays) */
+type AccessDraft = { allowed: string; disallowed: string; hosts: string }
+
+const toDraft = (d: any): AccessDraft => ({
+  allowed: (d.allowed_clients ?? []).join('\n'),
+  disallowed: (d.disallowed_clients ?? []).join('\n'),
+  hosts: (d.blocked_hosts ?? []).join('\n'),
+})
 
 export function AccessSettings() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
   const { data, mutate, isLoading } = useSWR<any>(cfg ? ['acl', cfg, '/access/list'] : null, swrFetcher)
-  const [draft, setDraft] = useState<null | { allowed: string; disallowed: string; hosts: string }>(null)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (data && draft === null)
-      setDraft({
-        allowed: (data.allowed_clients ?? []).join('\n'),
-        disallowed: (data.disallowed_clients ?? []).join('\n'),
-        hosts: (data.blocked_hosts ?? []).join('\n'),
-      })
-  }, [data, draft])
-
-  const dirty = !!draft && !!data && (draft.allowed !== (data.allowed_clients ?? []).join('\n') || draft.disallowed !== (data.disallowed_clients ?? []).join('\n') || draft.hosts !== (data.blocked_hosts ?? []).join('\n'))
+  const form = useDraftForm<any, AccessDraft>(data, toDraft)
+  const draft = form.draft
+  const dirty = form.dirty
 
   async function save() {
     if (!cfg || !draft) return
-    setSaving(true)
-    try {
-      const toArr = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
-      await api(cfg, '/access/set', {
-        method: 'POST',
-        body: { allowed_clients: toArr(draft.allowed), disallowed_clients: toArr(draft.disallowed), blocked_hosts: toArr(draft.hosts) },
-      })
-      mutate()
-      toast(t('advanced.savedAccess'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
+    const toArr = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
+    await runMutation({
+      action: async () => {
+        await api(cfg, '/access/set', {
+          method: 'POST',
+          body: { allowed_clients: toArr(draft.allowed), disallowed_clients: toArr(draft.disallowed), blocked_hosts: toArr(draft.hosts) },
+        })
+        // Refetch before refilling: the server's normalized copy becomes the
+        // dirty baseline (trimmed/blank-filtered input no longer sticks)
+        form.reset(await mutate())
+      },
+      okKey: 'advanced.savedAccess',
+      setBusy: setSaving,
+    })
   }
 
   if (isLoading || !draft) return <Screen><PageHeader back title={t('advanced.titleAccess')} /><Loading /></Screen>
@@ -56,14 +57,14 @@ export function AccessSettings() {
         <div>
           <GroupTitle>{t('advanced.groupClients')}</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
-            <Field label={t('advanced.allowedLabel')} value={draft.allowed} onChange={(v) => setDraft({ ...draft, allowed: v })} placeholder="192.168.1.0/24" />
-            <Field label={t('advanced.blockedLabel')} value={draft.disallowed} onChange={(v) => setDraft({ ...draft, disallowed: v })} placeholder="10.0.0.1" />
+            <Field label={t('advanced.allowedLabel')} value={draft.allowed} onChange={(v) => form.patch('allowed', v)} placeholder="192.168.1.0/24" />
+            <Field label={t('advanced.blockedLabel')} value={draft.disallowed} onChange={(v) => form.patch('disallowed', v)} placeholder="10.0.0.1" />
           </Card>
         </div>
         <div>
           <GroupTitle>{t('advanced.groupDomains')}</GroupTitle>
           <Card className="p-4">
-            <Field label={t('advanced.blockedHostsLabel')} value={draft.hosts} onChange={(v) => setDraft({ ...draft, hosts: v })} placeholder={'version.bind\nid.server'} />
+            <Field label={t('advanced.blockedHostsLabel')} value={draft.hosts} onChange={(v) => form.patch('hosts', v)} placeholder={'version.bind\nid.server'} />
           </Card>
         </div>
       </div>
@@ -74,7 +75,7 @@ export function AccessSettings() {
 
       {dirty && (
         <div className="mt-4 flex gap-2.5">
-          <Button variant="glass" className="flex-1" onClick={() => setDraft(null)}>{t('advanced.discard')}</Button>
+          <Button variant="glass" className="flex-1" onClick={() => form.reset(data)}>{t('advanced.discard')}</Button>
           <Button className="flex-1" loading={saving} onClick={save}>{t('advanced.saveChanges')}</Button>
         </div>
       )}

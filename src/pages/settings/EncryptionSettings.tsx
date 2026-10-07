@@ -10,6 +10,8 @@ import { useConfirm } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
 import { Badge, Loading } from '../../components/ui/atoms'
 import { fmtDate } from '../../lib/format'
+import { runMutation } from '../../lib/mutation'
+import { useDraftForm } from '../../lib/useDraftForm'
 /* ================= Encryption settings ================= */
 
 // 原生 Encryption Form 的 defaultValues（端口为标准端口常量）
@@ -24,41 +26,41 @@ export function EncryptionSettings() {
   const { t } = useTranslation()
   const confirm = useConfirm()
   const { data, mutate, isLoading } = useSWR<TlsStatus>(cfg ? ['tls', cfg, '/tls/status'] : null, swrFetcher)
-  const [draft, setDraft] = useState<null | Partial<TlsStatus>>(null)
   const [saving, setSaving] = useState(false)
   // 原生 certificate_source / key_source radio：路径与内容互斥，保存时清空未选字段
   const [certSource, setCertSource] = useState<'path' | 'content'>('path')
   const [keySource, setKeySource] = useState<'path' | 'content'>('path')
+  const form = useDraftForm(data)
 
+  // Seed the source radios from the loaded copy once (stored content → content mode)
   useEffect(() => {
-    if (data && draft === null) {
-      setDraft({ ...data })
-      setCertSource(data.certificate_chain ? 'content' : 'path')
-      setKeySource((data.private_key || data.private_key_saved) ? 'content' : 'path')
-    }
-  }, [data, draft])
+    if (!data || form.draft !== null) return
+    setCertSource(data.certificate_chain ? 'content' : 'path')
+    setKeySource((data.private_key || data.private_key_saved) ? 'content' : 'path')
+  }, [data, form.draft])
 
-  const d = draft
-  const set = <K extends keyof TlsStatus>(k: K, v: TlsStatus[K]) => setDraft((s) => (s ? { ...s, [k]: v } : s))
-  const dirty = !!d && !!data && JSON.stringify(d) !== JSON.stringify(data)
+  const d = form.draft
+  const set = form.patch
+  const dirty = form.dirty
 
   async function save() {
     if (!cfg || !d) return
     // 原生 form_error_equal：HTTPS 与 DoT 端口不得相同
     if (d.port_https === d.port_dns_over_tls) return toast(t('advanced.portConflict'), 'err')
+    // 原生 getSubmitValues 语义：只保留所选来源的字段；勾选已存私钥时不回传内容
+    const body: Partial<TlsStatus> = { ...d }
+    if (certSource === 'content') body.certificate_path = ''
+    else body.certificate_chain = ''
+    if (keySource === 'content') {
+      body.private_key_path = ''
+      if (body.private_key_saved) body.private_key = ''
+    } else {
+      body.private_key = ''
+    }
     setSaving(true)
     try {
-      // 原生 getSubmitValues 语义：只保留所选来源的字段；勾选已存私钥时不回传内容
-      const body: Partial<TlsStatus> = { ...d }
-      if (certSource === 'content') body.certificate_path = ''
-      else body.certificate_chain = ''
-      if (keySource === 'content') {
-        body.private_key_path = ''
-        if (body.private_key_saved) body.private_key = ''
-      } else {
-        body.private_key = ''
-      }
-      // Validate first, then apply
+      // Two-phase save: the pair is validated server-side first, and a
+      // rejection carries its own copy (so this copy does not use runMutation)
       const validate = await api<any>(cfg, '/tls/validate', { method: 'POST', body })
       const hasError = validate?.warning_validation && !validate?.valid_pair
       if (hasError) {
@@ -66,10 +68,8 @@ export function EncryptionSettings() {
         return
       }
       await api(cfg, '/tls/configure', { method: 'POST', body })
-      // 等 refetch 拿到服务端新值再回填：先置 null 会立即用旧数据重填草稿，
-      // 之后数据更新不再同步，dirty 永远清不掉
-      const fresh = await mutate()
-      if (fresh) setDraft({ ...fresh })
+      // Refetch before refilling: the server copy becomes the dirty baseline
+      form.reset(await mutate())
       toast(t('advanced.savedEncryption'))
     } catch (e: any) {
       toast(t('common.saveFailed', { msg: e.message }), 'err')
@@ -81,17 +81,16 @@ export function EncryptionSettings() {
   // 原生 clearFields：确认后向服务端下发默认配置（不是仅清空表单）
   async function resetEncryption() {
     if (!cfg) return
-    try {
-      await api(cfg, '/tls/configure', { method: 'POST', body: TLS_DEFAULTS })
-      const fresh = await mutate()
-      if (fresh) {
-        setDraft({ ...fresh })
-        setCertSource('path')
-        setKeySource('path')
-      }
-      toast(t('advanced.resetEncryptionDone'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
+    const ok = await runMutation({
+      action: async () => {
+        await api(cfg, '/tls/configure', { method: 'POST', body: TLS_DEFAULTS })
+        form.reset(await mutate())
+      },
+      okKey: 'advanced.resetEncryptionDone',
+    })
+    if (ok) {
+      setCertSource('path')
+      setKeySource('path')
     }
   }
 
@@ -266,7 +265,7 @@ export function EncryptionSettings() {
 
       {dirty && (
         <div className="mt-4 flex gap-2.5">
-          <Button variant="glass" className="flex-1" onClick={() => setDraft({ ...data! })}>{t('advanced.discard')}</Button>
+          <Button variant="glass" className="flex-1" onClick={() => form.reset(data)}>{t('advanced.discard')}</Button>
           <Button className="flex-1" loading={saving} onClick={save}>{t('advanced.validateAndSave')}</Button>
         </div>
       )}

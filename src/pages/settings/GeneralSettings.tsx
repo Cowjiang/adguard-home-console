@@ -1,15 +1,16 @@
 /** General settings: query log / stats retention and ignored domains */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import { useAuth } from '../../lib/session/auth'
 import { api, swrFetcher, type QueryLogConfig, type StatsConfig } from '../../lib/api'
 import { PageHeader, Screen, Group, GroupTitle, Rows, Row, Switch, Button } from '../../components/ui/primitives'
-import { toast } from '../../components/ui/toast'
 import { Loading } from '../../components/ui/atoms'
 import { usePick, PickSelect } from '../../components/ui/menu'
 import { isAppleMobile } from '../../lib/native/shell'
 import { hoursLabel } from '../../lib/format'
+import { runMutation } from '../../lib/mutation'
+import { useDraftForm } from '../../lib/useDraftForm'
 
 /* ================= General settings ================= */
 
@@ -17,27 +18,17 @@ export function GeneralSettings() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
   const pick = usePick()
-  const { data: ql, mutate: mQl, isLoading: qlLoading } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
-  const { data: sc, mutate: mSc, isLoading: scLoading } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
-  // 与 DNS 设置页一致的「草稿 + 页头保存」：所有行编辑本地草稿，右上角出现
-  // 保存按钮时才整体下发；被忽略的域名在保存时按行拆分、trim、去空行并去重
-  const [qlDraft, setQlDraft] = useState<QueryLogConfig | null>(null)
-  const [scDraft, setScDraft] = useState<StatsConfig | null>(null)
+  const { data: qlData, mutate: mQl, isLoading: qlLoading } = useSWR<QueryLogConfig>(cfg ? ['qlc', cfg, '/querylog/config'] : null, swrFetcher)
+  const { data: scData, mutate: mSc, isLoading: scLoading } = useSWR<StatsConfig>(cfg ? ['stc', cfg, '/stats/config'] : null, swrFetcher)
+  // Same draft + header-save idiom as the DNS page (useDraftForm): rows edit a
+  // local draft and the save button appears once dirty; ignored domains are
+  // split per line, trimmed and deduped on save
   const [saving, setSaving] = useState(false)
+  const ql = useDraftForm(qlData)
+  const sc = useDraftForm(scData)
+  const dirty = ql.dirty || sc.dirty
 
-  useEffect(() => {
-    if (ql && qlDraft === null) setQlDraft(structuredClone(ql))
-  }, [ql, qlDraft])
-  useEffect(() => {
-    if (sc && scDraft === null) setScDraft(structuredClone(sc))
-  }, [sc, scDraft])
-
-  const setQl = (patch: Partial<QueryLogConfig>) => setQlDraft((s) => (s ? { ...s, ...patch } : s))
-  const setSc = (patch: Partial<StatsConfig>) => setScDraft((s) => (s ? { ...s, ...patch } : s))
   const normList = (s: string) => [...new Set(s.split('\n').map((x) => x.trim()).filter(Boolean))]
-  const qlDirty = !!qlDraft && !!ql && JSON.stringify(qlDraft) !== JSON.stringify(ql)
-  const scDirty = !!scDraft && !!sc && JSON.stringify(scDraft) !== JSON.stringify(sc)
-  const dirty = qlDirty || scDirty
 
   // Newer v0.107.79 API: interval is in ms (GET returns 604800000 = 7 days)
   const HOUR = 3_600_000
@@ -49,31 +40,29 @@ export function GeneralSettings() {
 
   async function save() {
     if (!cfg) return
-    setSaving(true)
-    try {
-      // 等 refetch 拿到服务端新值再回填草稿：先置 null 会立即用旧数据重填，
-      // 之后数据更新不再同步，dirty 永远清不掉
-      if (qlDirty && qlDraft) {
-        await api(cfg, '/querylog/config/update', { method: 'PUT', body: { ...qlDraft, ignored: normList(qlDraft.ignored.join('\n')) } })
-        const fresh = await mQl()
-        setQlDraft(fresh ? structuredClone(fresh) : null)
-      }
-      if (scDirty && scDraft) {
-        await api(cfg, '/stats/config/update', { method: 'PUT', body: { ...scDraft, ignored: normList(scDraft.ignored.join('\n')) } })
-        const fresh = await mSc()
-        setScDraft(fresh ? structuredClone(fresh) : null)
-      }
-      toast(t('settings.generalSaved'))
-    } catch (e: any) {
-      toast(t('common.saveFailed', { msg: e.message }), 'err')
-    } finally {
-      setSaving(false)
-    }
+    await runMutation({
+      action: async () => {
+        // Refetch before refilling each draft: the server copy becomes its
+        // dirty baseline, so a successful save clears the button
+        if (ql.dirty && ql.draft) {
+          await api(cfg, '/querylog/config/update', { method: 'PUT', body: { ...ql.draft, ignored: normList(ql.draft.ignored.join('\n')) } })
+          ql.reset(await mQl())
+        }
+        if (sc.dirty && sc.draft) {
+          await api(cfg, '/stats/config/update', { method: 'PUT', body: { ...sc.draft, ignored: normList(sc.draft.ignored.join('\n')) } })
+          sc.reset(await mSc())
+        }
+      },
+      okKey: 'settings.generalSaved',
+      setBusy: setSaving,
+    })
   }
 
-  if (qlLoading || scLoading || !qlDraft || !scDraft) {
+  if (qlLoading || scLoading || !ql.draft || !sc.draft) {
     return <Screen><PageHeader back title={t('settings.itemQueryStats')} /><Loading /></Screen>
   }
+  const qlDraft = ql.draft
+  const scDraft = sc.draft
 
   return (
     <Screen>
@@ -89,7 +78,7 @@ export function GeneralSettings() {
           <Row
             title={t('settings.enableQueryLog')}
             subtitle={t('settings.enableQueryLogSub')}
-            right={<Switch on={qlDraft.enabled} onChange={(v) => setQl({ enabled: v })} />}
+            right={<Switch on={qlDraft.enabled} onChange={(v) => ql.patch('enabled', v)} />}
           />
           <Row
             title={t('settings.logRetention')}
@@ -100,7 +89,7 @@ export function GeneralSettings() {
                   className="field num !py-1.5 !pr-8 text-right"
                   value={qlDraft.interval}
                   options={QL_RETENTIONS}
-                  onPick={(v) => setQl({ interval: v })}
+                  onPick={(v) => ql.patch('interval', v)}
                 />
               </div>
             ) : undefined}
@@ -111,25 +100,25 @@ export function GeneralSettings() {
                 align: 'right',
                 value: qlDraft.interval,
                 options: QL_RETENTIONS,
-                onPick: (v) => setQl({ interval: v }),
+                onPick: (v) => ql.patch('interval', v),
               })
             }}
           />
           <Row
             title={t('settings.anonymizeIp')}
             subtitle={t('settings.anonymizeIpSub')}
-            right={<Switch on={qlDraft.anonymize_client_ip} onChange={(v) => setQl({ anonymize_client_ip: v })} />}
+            right={<Switch on={qlDraft.anonymize_client_ip} onChange={(v) => ql.patch('anonymize_client_ip', v)} />}
           />
           <Row
             title={t('settings.ignoredDomains')}
             subtitle={t('settings.ignoredDomainsSubQl')}
-            right={<Switch on={qlDraft.ignored_enabled} onChange={(v) => setQl({ ignored_enabled: v })} />}
+            right={<Switch on={qlDraft.ignored_enabled} onChange={(v) => ql.patch('ignored_enabled', v)} />}
           />
           <div className="px-4 pb-4 pt-2">
             <textarea
               className="field"
               value={qlDraft.ignored.join('\n')}
-              onChange={(e) => setQl({ ignored: e.target.value.split('\n') })}
+              onChange={(e) => ql.patch('ignored', e.target.value.split('\n'))}
               placeholder={t('settings.ignoredDomainsPlaceholder')}
               spellCheck={false}
               autoCapitalize="off"
@@ -146,7 +135,7 @@ export function GeneralSettings() {
           <Row
             title={t('settings.enableStats')}
             subtitle={t('settings.enableStatsSub')}
-            right={<Switch on={scDraft.enabled} onChange={(v) => setSc({ enabled: v })} />}
+            right={<Switch on={scDraft.enabled} onChange={(v) => sc.patch('enabled', v)} />}
           />
           <Row
             title={t('settings.statsRetention')}
@@ -157,7 +146,7 @@ export function GeneralSettings() {
                   className="field num !py-1.5 !pr-8 text-right"
                   value={scDraft.interval}
                   options={STAT_RETENTIONS}
-                  onPick={(v) => setSc({ interval: v })}
+                  onPick={(v) => sc.patch('interval', v)}
                 />
               </div>
             ) : undefined}
@@ -168,20 +157,20 @@ export function GeneralSettings() {
                 align: 'right',
                 value: scDraft.interval,
                 options: STAT_RETENTIONS,
-                onPick: (v) => setSc({ interval: v }),
+                onPick: (v) => sc.patch('interval', v),
               })
             }}
           />
           <Row
             title={t('settings.ignoredDomains')}
             subtitle={t('settings.ignoredDomainsSubStats')}
-            right={<Switch on={scDraft.ignored_enabled} onChange={(v) => setSc({ ignored_enabled: v })} />}
+            right={<Switch on={scDraft.ignored_enabled} onChange={(v) => sc.patch('ignored_enabled', v)} />}
           />
           <div className="px-4 pb-4 pt-2">
             <textarea
               className="field"
               value={scDraft.ignored.join('\n')}
-              onChange={(e) => setSc({ ignored: e.target.value.split('\n') })}
+              onChange={(e) => sc.patch('ignored', e.target.value.split('\n'))}
               placeholder={t('settings.ignoredDomainsPlaceholder')}
               spellCheck={false}
               autoCapitalize="off"
