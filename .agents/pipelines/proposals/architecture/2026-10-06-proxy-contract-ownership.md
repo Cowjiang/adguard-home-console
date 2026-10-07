@@ -1,9 +1,9 @@
 # 上移 AGH 代理契约为前端持有的接口，Express/Rust 作为可替换实现
 
 **Class:** architecture
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-06
-**Updated:** 2026-10-06（由同日 testing 草稿改写：测试方案升级为契约所有权架构）
+**Updated:** 2026-10-06（实现落地于分支 refactor/proxy-contract：夹具 14 场景、双 runner、kind 信封、D1 修正；原 testing 草稿并入本提案）
 **Source:** 用户方向（2026-10-06 会话）；架构审核发现 W1「双 Adapter 契约只靠镜像注释维持」
 
 ## Goal
@@ -38,12 +38,12 @@
 
 ## Accept
 
-- [ ] `contract/agh-proxy.contract.json` 场景 ≥12 条覆盖上表第一行全部契约项；`npm run test:server` 与 `cargo test`（无需 mock-agh）各自加载**同一文件**全绿
-- [ ] 两个 Adapter 源码中不再出现镜像文案与镜像语义注释（头注释改为指向 `api.ts` 契约段与夹具路径）
-- [ ] `kind` 枚举落地：`ApiError.kind`、zh/en i18n key、`api.ts` 映射；离线/跨主机重定向/坏地址三类场景的错误 toast 输出与界面语言一致
-- [ ] D1 落地：两端 `timeoutFor` 按剥 query 路径判定，「marker 只在 query」反例单测存在
-- [ ] `server/proxy.mjs` 抽出后 `index.mjs` 行为不变（`pnpm build` + `pnpm start` 代理与静态托管冒烟）
-- [ ] 允许差异写入两侧头注释与 `docs/architecture/web-runtime.md`；`cargo test`、`pnpm check`、`pnpm test`、`pnpm build` 全绿
+- [x] `contract/agh-proxy.contract.json` 场景 ≥12 条覆盖上表第一行全部契约项；`npm run test:server` 与 `cargo test`（无需 mock-agh）各自加载**同一文件**全绿
+- [x] 两个 Adapter 源码中不再出现镜像文案与镜像语义注释（头注释改为指向 `api.ts` 契约段与夹具路径）
+- [x] `kind` 枚举落地：`ApiError.kind`、zh/en i18n key、`api.ts` 映射；离线/跨主机重定向/坏地址三类场景的错误 toast 输出与界面语言一致
+- [x] D1 落地：两端 `timeoutFor` 按剥 query 路径判定，「marker 只在 query」反例单测存在
+- [x] `server/proxy.mjs` 抽出后 `index.mjs` 行为不变（`pnpm build` + `pnpm start` 代理与静态托管冒烟）
+- [x] 允许差异写入两侧头注释与 `docs/architecture/web-runtime.md`；`cargo test`、`pnpm check`、`pnpm test`、`pnpm build` 全绿
 
 ## Note
 
