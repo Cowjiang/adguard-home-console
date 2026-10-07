@@ -1,15 +1,23 @@
-//! `agh_fetch` — Rust port of proxyAGH, mirroring `proxyAGH` in `server/index.mjs`:
-//! - Path normalization: `/api/agh/*` → `/control/*` (the frontend may also pass
-//!   short paths such as `/control/...` or `/status` directly)
-//! - Manually follows 301/302/307/308 up to 3 times; location uses the **origin**
-//!   only (swap the whole origin, keep the original request path — Express
-//!   semantics), and only while the hostname stays the same: replaying the
-//!   Authorization header to another host would hand it the admin password
-//! - Timeouts: 120s for `/filtering/refresh`, 25s otherwise; timeout/network
-//!   errors → 502 `{"error":"..."}`
-//! - Responses are returned as-is as text + content-type; JSON is not parsed or
-//!   rewritten in Rust
+//! `agh_fetch` — the Tauri-shell adapter of the frontend-owned proxy contract
+//! in `src/lib/api.ts`, pinned by `contract/agh-proxy.contract.json` (the
+//! Express adapter implements the same file via `server/proxy.test.mjs`):
+//! - Path normalization: `/api/agh/*` → `/control/*` (short paths such as
+//!   `/control/...` or `/status` are also accepted)
+//! - Manually follows 301/302/307/308 up to 3 times; each hop swaps the whole
+//!   origin and replays the original request path, and only while the hostname
+//!   stays the same: replaying the Authorization header to another host would
+//!   hand it the admin password. Other statuses (303 etc.) pass through.
+//! - Backstop timeouts keyed on the query-stripped path: 120s for
+//!   `/filtering/refresh`, 25s otherwise (same rule and unit tests as Express)
+//! - Adapter-generated failures return the same struct as upstream responses
+//!   (status=400/502 + `{"error":detail,"kind":...}` body). `kind` is
+//!   machine-readable; all user-facing copy lives in the frontend i18n, so no
+//!   error text is mirrored here. Upstream responses pass through untouched and
+//!   JSON is not parsed or rewritten in Rust. `content_type` is carried for
+//!   contract completeness; the frontend currently ignores it.
 //! - Never prints Authorization/passwords (this module has no request-header logs)
+//! Allowed variance vs the Express adapter: no request-body size limit (local
+//! IPC), and reqwest error details are English technical text.
 use std::time::Duration;
 
 use serde::Serialize;
@@ -17,12 +25,21 @@ use url::Url;
 
 const MAX_REDIRECTS: usize = 3;
 const REDIRECT_CODES: [u16; 4] = [301, 302, 307, 308];
-const TIMEOUT_DEFAULT: Duration = Duration::from_secs(25);
-const TIMEOUT_FILTERING_REFRESH: Duration = Duration::from_secs(120);
+pub const TIMEOUT_DEFAULT: Duration = Duration::from_secs(25);
+pub const TIMEOUT_FILTERING_REFRESH: Duration = Duration::from_secs(120);
+
+/// Machine-readable error kinds emitted in the body (`{"error","kind"}`); the
+/// frontend maps them to localized copy (i18n `proxy.*` keys)
+pub const KIND_MISSING_TARGET: &str = "missing_target";
+pub const KIND_INVALID_TARGET: &str = "invalid_target";
+pub const KIND_TIMEOUT: &str = "timeout";
+pub const KIND_CROSS_HOST_REDIRECT: &str = "cross_host_redirect";
+pub const KIND_INVALID_REDIRECT: &str = "invalid_redirect";
+pub const KIND_NETWORK: &str = "network";
 
 /// Return value of the invoke. Errors use the same struct (status=400/502 +
-/// body_text=`{"error":msg}`); the frontend maps non-2xx to ApiError, matching
-/// the fetch path semantics exactly.
+/// body_text=`{"error":detail,"kind":...}`); the frontend maps non-2xx to
+/// ApiError, matching the fetch path semantics exactly.
 #[derive(Debug, Serialize)]
 pub struct AghFetchResult {
     pub status: u16,
@@ -31,18 +48,13 @@ pub struct AghFetchResult {
 }
 
 impl AghFetchResult {
-    fn error(status: u16, msg: &str) -> Self {
+    fn error(status: u16, kind: &str, detail: &str) -> Self {
         AghFetchResult {
             status,
             content_type: "application/json".into(),
-            body_text: serde_json::json!({ "error": msg }).to_string(),
+            body_text: serde_json::json!({ "error": detail, "kind": kind }).to_string(),
         }
     }
-}
-
-#[cfg(test)]
-fn error_body(msg: &str) -> String {
-    serde_json::json!({ "error": msg }).to_string()
 }
 
 /// Path normalization: mirrors Express
@@ -65,38 +77,43 @@ fn normalize_path(path_with_query: &str) -> String {
 /// Builds the final upstream URL. Express uses `targetUrl.origin` plus the
 /// normalized path (any path inside target is dropped)
 fn upstream_url(target: &str, path_with_query: &str) -> Result<Url, String> {
-    let t = Url::parse(target.trim()).map_err(|_| "目标地址无效".to_string())?;
+    let t = Url::parse(target.trim()).map_err(|_| "invalid target URL".to_string())?;
     if t.scheme() != "http" && t.scheme() != "https" {
-        return Err("目标地址必须是 http:// 或 https://".into());
+        return Err("target must be an http(s) URL".into());
     }
     let origin = t.origin().ascii_serialization();
     Url::parse(&format!("{origin}{}", normalize_path(path_with_query)))
-        .map_err(|_| "目标地址无效".to_string())
+        .map_err(|_| "invalid target URL".to_string())
 }
 
 /// Redirect target for 308-style redirects: `new URL(location, upstream).origin`.
 /// Same hostname only (scheme and port may change): Authorization is replayed on
 /// every hop, so following another host would leak the admin password
-fn redirect_target(current: &Url, location: &str, origin_host: Option<&str>) -> Result<String, String> {
+fn redirect_target(current: &Url, location: &str, origin_host: Option<&str>) -> Result<String, (&'static str, String)> {
     let loc = Url::parse(location)
         .or_else(|_| current.join(location))
-        .map_err(|_| "重定向地址无效".to_string())?;
+        .map_err(|_| (KIND_INVALID_REDIRECT, "invalid redirect location".to_string()))?;
     if !matches!(loc.origin(), url::Origin::Tuple(_, _, _)) {
-        return Err("重定向地址无效".into());
+        return Err((KIND_INVALID_REDIRECT, "invalid redirect location".into()));
     }
     let host = loc.host_str().map(|h| h.to_ascii_lowercase());
     if host.is_none() || host.as_deref() != origin_host {
-        return Err("上游重定向到其他主机,已拒绝转发凭据".into());
+        return Err((
+            KIND_CROSS_HOST_REDIRECT,
+            "upstream redirected to another host; credentials not forwarded".into(),
+        ));
     }
     Ok(loc.origin().ascii_serialization())
 }
 
-/// Timeout tiers: Express keys on `req.path.includes('/filtering/refresh')`
-fn timeout_for(path_with_query: &str) -> Duration {
-    if path_with_query.contains("/filtering/refresh") {
-        TIMEOUT_FILTERING_REFRESH
+/// Backstop timeout for one upstream attempt, keyed on the query-stripped path
+/// (both adapters share this rule and its unit tests)
+fn timeout_for(path_with_query: &str, default_timeout: Duration, refresh_timeout: Duration) -> Duration {
+    let path = path_with_query.split('?').next().unwrap_or("");
+    if path.contains("/filtering/refresh") {
+        refresh_timeout
     } else {
-        TIMEOUT_DEFAULT
+        default_timeout
     }
 }
 
@@ -105,28 +122,31 @@ fn client(timeout: Duration) -> Result<reqwest::Client, String> {
         .redirect(reqwest::redirect::Policy::none())
         .timeout(timeout)
         .build()
-        .map_err(|e| format!("HTTP 客户端初始化失败: {e}"))
+        .map_err(|e| format!("HTTP client init failed: {e}"))
 }
 
-/// Core implementation (decoupled from the Tauri command for unit testing)
-pub async fn agh_fetch_impl(
+/// Core implementation with injectable backstop timeouts (contract runner uses
+/// short ones); production entry points use the constants
+pub async fn agh_fetch_impl_with_timeouts(
     method: &str,
     target: &str,
     auth_header: &str,
     path_with_query: &str,
     body_json: Option<&str>,
+    default_timeout: Duration,
+    refresh_timeout: Duration,
 ) -> AghFetchResult {
     if target.trim().is_empty() {
-        return AghFetchResult::error(400, "缺少 X-AGH-Target 头");
+        return AghFetchResult::error(400, KIND_MISSING_TARGET, "missing X-AGH-Target header");
     }
     let ok_method = match reqwest::Method::from_bytes(method.to_uppercase().as_bytes()) {
         Ok(m) => m,
-        Err(_) => return AghFetchResult::error(400, "不支持的 HTTP 方法"),
+        Err(_) => return AghFetchResult::error(400, KIND_INVALID_TARGET, "unsupported HTTP method"),
     };
-    let timeout = timeout_for(path_with_query);
+    let timeout = timeout_for(path_with_query, default_timeout, refresh_timeout);
     let client = match client(timeout) {
         Ok(c) => c,
-        Err(msg) => return AghFetchResult::error(502, &msg),
+        Err(msg) => return AghFetchResult::error(502, KIND_NETWORK, &msg),
     };
 
     // Manual redirect following: same hostname only, origin swap with the request
@@ -139,7 +159,7 @@ pub async fn agh_fetch_impl(
     loop {
         let upstream = match upstream_url(&current_target, path_with_query) {
             Ok(u) => u,
-            Err(msg) => return AghFetchResult::error(400, &msg),
+            Err(msg) => return AghFetchResult::error(400, KIND_INVALID_TARGET, &msg),
         };
         let mut req = client
             .request(ok_method.clone(), upstream.clone())
@@ -159,12 +179,11 @@ pub async fn agh_fetch_impl(
             Err(e) => {
                 // reqwest error messages only contain URL/IO details, no request
                 // headers, so they are safe to return
-                let msg = if e.is_timeout() {
-                    "连接超时,请检查地址与网络".to_string()
+                return if e.is_timeout() {
+                    AghFetchResult::error(502, KIND_TIMEOUT, "upstream request timed out")
                 } else {
-                    e.to_string()
+                    AghFetchResult::error(502, KIND_NETWORK, &e.to_string())
                 };
-                return AghFetchResult::error(502, &msg);
             }
         };
 
@@ -188,7 +207,7 @@ pub async fn agh_fetch_impl(
                     redirects += 1;
                     continue;
                 }
-                Err(msg) => return AghFetchResult::error(502, &msg),
+                Err((kind, msg)) => return AghFetchResult::error(502, kind, &msg),
             }
         }
 
@@ -201,12 +220,11 @@ pub async fn agh_fetch_impl(
         let body_text = match resp.text().await {
             Ok(t) => t,
             Err(e) => {
-                let msg = if e.is_timeout() {
-                    "连接超时,请检查地址与网络".to_string()
+                return if e.is_timeout() {
+                    AghFetchResult::error(502, KIND_TIMEOUT, "upstream request timed out")
                 } else {
-                    e.to_string()
+                    AghFetchResult::error(502, KIND_NETWORK, &e.to_string())
                 };
-                return AghFetchResult::error(502, &msg);
             }
         };
         return AghFetchResult {
@@ -215,6 +233,26 @@ pub async fn agh_fetch_impl(
             body_text,
         };
     }
+}
+
+/// Core implementation (production timeouts)
+pub async fn agh_fetch_impl(
+    method: &str,
+    target: &str,
+    auth_header: &str,
+    path_with_query: &str,
+    body_json: Option<&str>,
+) -> AghFetchResult {
+    agh_fetch_impl_with_timeouts(
+        method,
+        target,
+        auth_header,
+        path_with_query,
+        body_json,
+        TIMEOUT_DEFAULT,
+        TIMEOUT_FILTERING_REFRESH,
+    )
+    .await
 }
 
 /// Tauri command: always returns Ok with the result struct; error semantics
@@ -242,7 +280,6 @@ pub async fn agh_fetch(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::io::AsyncWriteExt;
 
     #[test]
     fn normalize_path_cases() {
@@ -288,150 +325,391 @@ mod tests {
 
     #[test]
     fn timeout_cases() {
-        assert_eq!(timeout_for("/filtering/refresh"), Duration::from_secs(120));
-        assert_eq!(timeout_for("/status"), Duration::from_secs(25));
-        assert_eq!(timeout_for("/filtering/status"), Duration::from_secs(25));
+        // Keyed on the query-stripped path; a marker appearing only in the
+        // query must not widen the tier
+        assert_eq!(timeout_for("/filtering/refresh", TIMEOUT_DEFAULT, TIMEOUT_FILTERING_REFRESH), TIMEOUT_FILTERING_REFRESH);
+        assert_eq!(timeout_for("/filtering/refresh?x=1", TIMEOUT_DEFAULT, TIMEOUT_FILTERING_REFRESH), TIMEOUT_FILTERING_REFRESH);
+        assert_eq!(timeout_for("/status", TIMEOUT_DEFAULT, TIMEOUT_FILTERING_REFRESH), TIMEOUT_DEFAULT);
+        assert_eq!(timeout_for("/stats?search=/filtering/refresh", TIMEOUT_DEFAULT, TIMEOUT_FILTERING_REFRESH), TIMEOUT_DEFAULT);
+    }
+}
+
+// ---------- Contract fixture runner ----------
+// Drives agh_fetch_impl_with_timeouts against scripted origin servers using the
+// SAME scenario file as the Express runner (server/proxy.test.mjs), so a
+// semantic change on either adapter fails here or there. The runner rules are
+// documented in the fixture's `comment` header.
+
+#[cfg(test)]
+mod contract {
+    use super::*;
+    use serde::Deserialize;
+    use serde_json::{json, Value};
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::Mutex;
+
+    const CONTRACT_JSON: &str = include_str!("../../contract/agh-proxy.contract.json");
+    /// Short backstop so the timeout scenario (origin delay 2000ms) runs fast
+    const BACKSTOP_MS: Duration = Duration::from_millis(300);
+
+    #[derive(Deserialize)]
+    struct Contract {
+        scenarios: Vec<Scenario>,
     }
 
-    // ---- Smoke tests against a real mock server at 127.0.0.1:3990 (auto-skip if down) ----
-
-    fn mock_up() -> bool {
-        std::net::TcpStream::connect("127.0.0.1:3990").is_ok()
+    #[derive(Deserialize)]
+    struct Scenario {
+        id: String,
+        request: ReqSpec,
+        #[serde(default)]
+        origins: HashMap<String, Vec<OriginReply>>,
+        expect: ExpectSpec,
     }
 
-    #[tokio::test]
-    async fn smoke_forward_status() {
-        if !mock_up() {
-            eprintln!("skip: mock 服务器未运行");
-            return;
+    #[derive(Deserialize)]
+    struct ReqSpec {
+        method: String,
+        path: String,
+        /// missing → default origin A; null → omit target; value → explicit target
+        #[serde(default)]
+        target: Option<Option<String>>,
+        #[serde(default)]
+        auth: Option<String>,
+        #[serde(default)]
+        body: Option<Value>,
+        /// No Rust-side input exists for extra client headers (the impl takes
+        /// none); the whitelist contract is exercised by the Express runner
+        #[serde(default, rename = "extraHeaders")]
+        #[allow(dead_code)]
+        extra_headers: HashMap<String, String>,
+    }
+
+    #[derive(Deserialize, Clone)]
+    struct OriginReply {
+        status: u16,
+        #[serde(default)]
+        headers: HashMap<String, String>,
+        #[serde(default)]
+        json: Option<Value>,
+        #[serde(default)]
+        body: Option<String>,
+        #[serde(default, rename = "delayMs")]
+        delay_ms: Option<u64>,
+    }
+
+    #[derive(Deserialize)]
+    struct ExpectSpec {
+        status: u16,
+        #[serde(default)]
+        json: Option<Value>,
+        #[serde(default)]
+        kind: Option<String>,
+        /// missing = the scenario does not pin origin observations
+        #[serde(default)]
+        seen: Option<Vec<SeenSpec>>,
+    }
+
+    #[derive(Deserialize)]
+    struct SeenSpec {
+        origin: String,
+        #[serde(default)]
+        method: Option<String>,
+        #[serde(default)]
+        path: Option<String>,
+        /// null = the header must be absent
+        #[serde(default)]
+        auth: Option<Option<String>>,
+        /// null = the body must be empty; value = parsed deep-equal
+        #[serde(default)]
+        body: Option<Option<Value>>,
+        #[serde(default, rename = "absentHeaders")]
+        absent_headers: Vec<String>,
+    }
+
+    #[derive(Clone, Debug)]
+    struct Hit {
+        origin: String,
+        method: String,
+        path: String,
+        auth: Option<String>,
+        body: String,
+        headers: HashMap<String, String>,
+    }
+
+    fn status_text(code: u16) -> &'static str {
+        match code {
+            200 => "OK",
+            302 => "Found",
+            303 => "See Other",
+            308 => "Permanent Redirect",
+            400 => "Bad Request",
+            401 => "Unauthorized",
+            404 => "Not Found",
+            500 => "Internal Server Error",
+            503 => "Service Unavailable",
+            _ => "",
         }
-        let r = agh_fetch_impl(
-            "GET",
-            "http://127.0.0.1:3990",
-            "Basic YWRtaW46ZGVtbw==", // admin:demo
-            "/status",
-            None,
-        )
-        .await;
-        assert_eq!(r.status, 200);
-        assert!(r.body_text.contains("0.107.79"), "{}", r.body_text);
     }
 
-    #[tokio::test]
-    async fn smoke_unauthorized_without_auth() {
-        if !mock_up() {
-            eprintln!("skip: mock 服务器未运行");
-            return;
-        }
-        let r = agh_fetch_impl("GET", "http://127.0.0.1:3990", "", "/status", None).await;
-        assert_eq!(r.status, 401);
-    }
-
-    #[tokio::test]
-    async fn smoke_missing_target_is_400() {
-        let r = agh_fetch_impl("GET", "", "Basic x", "/status", None).await;
-        assert_eq!(r.status, 400);
-        assert!(r.body_text.contains("X-AGH-Target"));
-    }
-
-    #[tokio::test]
-    async fn smoke_post_body_passthrough() {
-        if !mock_up() {
-            eprintln!("skip: mock 服务器未运行");
-            return;
-        }
-        let r = agh_fetch_impl(
-            "POST",
-            "http://127.0.0.1:3990",
-            "Basic YWRtaW46ZGVtbw==",
-            "/protection",
-            Some(r#"{"enabled":true,"duration":30000}"#),
-        )
-        .await;
-        assert_eq!(r.status, 200);
-        // Re-read /status to confirm protection is enabled
-        let s = agh_fetch_impl("GET", "http://127.0.0.1:3990", "Basic YWRtaW46ZGVtbw==", "/status", None).await;
-        assert!(s.body_text.contains("\"protection_enabled\":true"));
-    }
-
-    // ---- Redirects: spin up mini HTTP servers to verify the same-host rule and
-    // "swap the whole origin, keep the original request path" ----
-
-    async fn spawn_origin_server(port: u16, reply: &'static str) -> tokio::task::JoinHandle<()> {
+    /// Scripted origin server: replies consumed per hit in order, every request
+    /// recorded into the scenario-shared `hits` (chronological across origins)
+    async fn spawn_scripted_origin(
+        name: String,
+        replies: Vec<OriginReply>,
+        hits: Arc<Mutex<Vec<Hit>>>,
+        urls: Arc<Mutex<HashMap<String, String>>>,
+    ) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let replies = Arc::new(replies);
+        let served = Arc::new(AtomicUsize::new(0));
         tokio::spawn(async move {
-            let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await.unwrap();
             loop {
                 let Ok((mut sock, _)) = listener.accept().await else { break };
-                let mut buf = vec![0u8; 4096];
-                let _ = tokio::io::AsyncReadExt::read(&mut sock, &mut buf).await;
-                let _ = sock.write_all(reply.as_bytes()).await;
-                let _ = sock.shutdown().await;
+                let replies = replies.clone();
+                let hits = hits.clone();
+                let urls = urls.clone();
+                let name = name.clone();
+                let served = served.clone();
+                tokio::spawn(async move {
+                    let mut buf: Vec<u8> = Vec::new();
+                    let mut tmp = [0u8; 4096];
+                    let head_end = loop {
+                        let n = sock.read(&mut tmp).await.unwrap_or(0);
+                        if n == 0 { return; }
+                        buf.extend_from_slice(&tmp[..n]);
+                        if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                            break pos;
+                        }
+                        if buf.len() > 1_048_576 { return; }
+                    };
+                    let head = String::from_utf8_lossy(&buf[..head_end]).to_string();
+                    let mut body_bytes = buf[head_end + 4..].to_vec();
+                    let content_len = head
+                        .to_ascii_lowercase()
+                        .split("\r\n")
+                        .find_map(|l| l.strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok()))
+                        .unwrap_or(0);
+                    while body_bytes.len() < content_len {
+                        let n = sock.read(&mut tmp).await.unwrap_or(0);
+                        if n == 0 { break; }
+                        body_bytes.extend_from_slice(&tmp[..n]);
+                    }
+                    let mut lines = head.split("\r\n");
+                    let request_line = lines.next().unwrap_or("");
+                    let mut parts = request_line.split_whitespace();
+                    let method = parts.next().unwrap_or("").to_string();
+                    let path = parts.next().unwrap_or("").to_string();
+                    let mut auth = None;
+                    let mut headers = HashMap::new();
+                    for line in lines {
+                        if let Some((k, v)) = line.split_once(':') {
+                            let key = k.trim().to_ascii_lowercase();
+                            let val = v.trim().to_string();
+                            if key == "authorization" { auth = Some(val.clone()); }
+                            headers.insert(key, val);
+                        }
+                    }
+                    hits.lock().await.push(Hit {
+                        origin: name,
+                        method,
+                        path,
+                        auth,
+                        body: String::from_utf8_lossy(&body_bytes).to_string(),
+                        headers,
+                    });
+
+                    let idx = served.fetch_add(1, Ordering::SeqCst);
+                    let reply = replies.get(idx).cloned().unwrap_or(OriginReply {
+                        status: 500,
+                        headers: HashMap::new(),
+                        json: Some(json!({ "error": "origin script exhausted" })),
+                        body: None,
+                        delay_ms: None,
+                    });
+                    if let Some(d) = reply.delay_ms {
+                        tokio::time::sleep(Duration::from_millis(d)).await;
+                    }
+                    let mut out_headers = String::new();
+                    for (k, v) in &reply.headers {
+                        let mut val = v.clone();
+                        for (n, url) in urls.lock().await.iter() {
+                            val = val.replace(&format!("{{{n}}}"), url);
+                        }
+                        out_headers.push_str(&format!("{k}: {val}\r\n"));
+                    }
+                    let body_out = match (&reply.json, &reply.body) {
+                        (Some(j), _) => j.to_string(),
+                        (None, Some(b)) => b.clone(),
+                        _ => String::new(),
+                    };
+                    let resp = format!(
+                        "HTTP/1.1 {} {}\r\ncontent-type: application/json\r\ncontent-length: {}\r\n{}connection: close\r\n\r\n{}",
+                        reply.status,
+                        status_text(reply.status),
+                        body_out.len(),
+                        out_headers,
+                        body_out
+                    );
+                    let _ = sock.write_all(resp.as_bytes()).await;
+                    let _ = sock.flush().await;
+                    let _ = sock.shutdown().await;
+                });
             }
-        })
+        });
+        base
     }
 
-    #[tokio::test]
-    async fn redirect_308_swaps_whole_origin() {
-        let _a = spawn_origin_server(
-            39801,
-            "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39802/any/path\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-        )
-        .await;
-        let _b = spawn_origin_server(
-            39802,
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 14\r\nConnection: close\r\n\r\n{\"origin\":\"b\"}",
-        )
-        .await;
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        let r = agh_fetch_impl("GET", "http://127.0.0.1:39801", "", "/status", None).await;
-        assert_eq!(r.status, 200, "{}", r.body_text);
-        assert_eq!(r.body_text, "{\"origin\":\"b\"}");
-    }
-
-    #[tokio::test]
-    async fn redirect_chain_of_three_then_stop() {
-        // A(39803) → B(39804) → C(39805) → D(39806): 3 hops total; the 4th 308
-        // is not followed, 308 is returned as-is
-        let _a = spawn_origin_server(39803, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39804/x\r\nContent-Length: 0\r\n\r\n").await;
-        let _b = spawn_origin_server(39804, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39805/x\r\nContent-Length: 0\r\n\r\n").await;
-        let _c = spawn_origin_server(39805, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39806/x\r\nContent-Length: 0\r\n\r\n").await;
-        let _d = spawn_origin_server(39806, "HTTP/1.1 308 Permanent Redirect\r\nLocation: http://127.0.0.1:39807/x\r\nContent-Length: 0\r\n\r\n").await;
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        let r = agh_fetch_impl("GET", "http://127.0.0.1:39803", "", "/status", None).await;
-        assert_eq!(r.status, 308, "3 跳后应原样返回 308 而不是继续跟随");
-    }
-
-    #[tokio::test]
-    async fn redirect_cross_host_is_refused() {
-        // 127.0.0.2 is a different hostname, so the hop must be refused before the
-        // Authorization header goes anywhere
-        let _a = spawn_origin_server(
-            39811,
-            "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.2:39812/control/status\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-        )
-        .await;
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        let r = agh_fetch_impl(
-            "GET",
-            "http://127.0.0.1:39811",
-            "Basic YWRtaW46ZGVtbw==",
-            "/status",
-            None,
-        )
-        .await;
-        assert_eq!(r.status, 502, "{}", r.body_text);
-        assert!(r.body_text.contains("其他主机"), "{}", r.body_text);
-    }
-
-    #[tokio::test]
-    async fn smoke_timeout_is_502() {
-        // 10.255.255.1 is unroutable so the connection always times out (skip
-        // if this machine happens to have a strange route)
-        let r = agh_fetch_impl("GET", "http://10.255.255.1:3990", "", "/status", None).await;
-        if r.status == 502 && r.body_text.contains("超时") {
-            assert_eq!(r.status, 502);
-        } else {
-            eprintln!("skip: 非预期错误(可能无防火墙黑洞路由):{} {}", r.status, error_body("x"));
+    fn resolve_placeholders(raw: &str, bases: &[(String, String)]) -> String {
+        let mut out = raw.to_string();
+        for (n, b) in bases {
+            out = out.replace(&format!("{{{n}}}"), b);
         }
+        out
+    }
+
+    fn err_str(e: serde_json::Error) -> String {
+        e.to_string()
+    }
+
+    async fn run_scenario(scn: &Scenario) -> Result<(), String> {
+        let hits = Arc::new(Mutex::new(Vec::new()));
+        let urls = Arc::new(Mutex::new(HashMap::new()));
+        let mut bases: Vec<(String, String)> = Vec::new();
+        for (name, replies) in &scn.origins {
+            let base = spawn_scripted_origin(name.clone(), replies.clone(), hits.clone(), urls.clone()).await;
+            bases.push((name.clone(), base));
+        }
+        {
+            let mut u = urls.lock().await;
+            for (n, b) in &bases {
+                u.insert(n.clone(), b.clone());
+            }
+        }
+
+        let target = match &scn.request.target {
+            None => bases.iter().find(|(n, _)| n == "A").map(|(_, b)| b.clone()).unwrap_or_default(),
+            Some(None) => String::new(),
+            Some(Some(t)) => resolve_placeholders(t, &bases),
+        };
+        let body_json = scn.request.body.as_ref().map(|b| b.to_string());
+        let result = agh_fetch_impl_with_timeouts(
+            &scn.request.method,
+            &target,
+            scn.request.auth.as_deref().unwrap_or(""),
+            &format!("/api/agh{}", scn.request.path),
+            body_json.as_deref(),
+            BACKSTOP_MS,
+            BACKSTOP_MS,
+        )
+        .await;
+
+        let expect = &scn.expect;
+        if result.status != expect.status {
+            return Err(format!("status {} != {} (body: {})", result.status, expect.status, result.body_text));
+        }
+        let parsed: Option<Value> = if result.body_text.is_empty() {
+            None
+        } else {
+            serde_json::from_str(&result.body_text).map_err(err_str).ok()
+        };
+        match &expect.kind {
+            Some(k) => {
+                let got = parsed.as_ref().and_then(|v| v.get("kind")).and_then(|v| v.as_str());
+                if got != Some(k.as_str()) {
+                    return Err(format!("kind {got:?} != {k:?} (body: {})", result.body_text));
+                }
+                if parsed.as_ref().and_then(|v| v.get("error")).and_then(|v| v.as_str()).is_none() {
+                    return Err("kind errors must carry a technical detail".into());
+                }
+            }
+            None => {
+                if parsed.as_ref().and_then(|v| v.get("kind")).is_some() {
+                    return Err(format!("unexpected kind (body: {})", result.body_text));
+                }
+            }
+        }
+        if let Some(want) = &expect.json {
+            if parsed.as_ref() != Some(want) {
+                return Err(format!("body {:?} != {:?}", parsed, want));
+            }
+        }
+        if let Some(seen_spec) = &expect.seen {
+            let observed = hits.lock().await;
+            let origins: Vec<String> = observed.iter().map(|h| h.origin.clone()).collect();
+            if observed.len() != seen_spec.len() {
+                return Err(format!("hit count {} != {} ({:?})", observed.len(), seen_spec.len(), origins));
+            }
+            for (i, spec) in seen_spec.iter().enumerate() {
+                let h = &observed[i];
+                let ctx = format!("hit {i} ({:?})", h);
+                if h.origin != spec.origin {
+                    return Err(format!("{ctx}: origin {} != {}", h.origin, spec.origin));
+                }
+                if let Some(m) = &spec.method {
+                    if &h.method != m {
+                        return Err(format!("{ctx}: method {} != {}", h.method, m));
+                    }
+                }
+                if let Some(p) = &spec.path {
+                    if &h.path != p {
+                        return Err(format!("{ctx}: path {} != {}", h.path, p));
+                    }
+                }
+                if let Some(a) = &spec.auth {
+                    match a {
+                        None => {
+                            if h.auth.is_some() {
+                                return Err(format!("{ctx}: auth must be absent"));
+                            }
+                        }
+                        Some(v) => {
+                            if h.auth.as_deref() != Some(v.as_str()) {
+                                return Err(format!("{ctx}: auth {:?} != {:?}", h.auth, v));
+                            }
+                        }
+                    }
+                }
+                if let Some(b) = &spec.body {
+                    match b {
+                        None => {
+                            if !h.body.is_empty() {
+                                return Err(format!("{ctx}: body must be empty, got {:?}", h.body));
+                            }
+                        }
+                        Some(v) => match serde_json::from_str::<Value>(&h.body) {
+                            Ok(got) => {
+                                if &got != v {
+                                    return Err(format!("{ctx}: body {got} != {v}"));
+                                }
+                            }
+                            Err(_) => return Err(format!("{ctx}: body {:?} is not JSON", h.body)),
+                        },
+                    }
+                }
+                for name in &spec.absent_headers {
+                    if h.headers.contains_key(name) {
+                        return Err(format!("{ctx}: must not forward header {name}"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn contract_scenarios() {
+        let contract: Contract = serde_json::from_str(CONTRACT_JSON).expect("fixture must parse");
+        let mut failures = Vec::new();
+        for scn in &contract.scenarios {
+            if let Err(msg) = run_scenario(scn).await {
+                failures.push(format!("{}: {msg}", scn.id));
+            }
+        }
+        assert!(failures.is_empty(), "contract failures:\n{}", failures.join("\n"));
     }
 }

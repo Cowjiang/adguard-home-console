@@ -28,13 +28,17 @@
 
 ## AGH 代理
 
+代理逻辑在 `server/proxy.mjs`（`createAghProxy()`），是前端契约（`src/lib/api.ts`，场景夹具 `contract/agh-proxy.contract.json`）的两个 Adapter 之一；`index.mjs` 只负责装配。
+
 - 目标实例由请求头 `X-AGH-Target` 指定；缺失或不是 http(s) 时直接 400，不猜默认值。
 - 路径映射为 `<origin>/control/<path>`，query 原样保留。
 - 只向 AGH 转发 `Authorization` 与 `Content-Type`；非 GET/HEAD 且客户端未给 Content-Type 时补 `application/json`。
 - 请求体经 `express.json` 解析后重新序列化，响应体全量读取后透传——两端都不是流式。
 - 上游 301/302/307/308 手动跟随，最多 3 次；跟随只取 `location` 的 origin（原 path 与 query 丢弃），且**仅限同主机**：每次跟随都会重放 `Authorization`，跳到别的主机等于把管理密码交给对方，因此跨主机重定向直接 502。
-- 超时 25 秒；路径含 `/filtering/refresh` 时放宽到 120 秒。
-- 连接与超时错误统一映射为 502，超时给固定文案；密码与 `Authorization` 不写日志。
+- 超时 25 秒，按剥除 query 后的路径段判定；路径含 `/filtering/refresh` 时放宽到 120 秒。
+- 代理自身生成的失败统一为 `{error, kind}` JSON（400/502）：`kind` 是机器可读枚举（`missing_target`/`invalid_target`/`timeout`/`cross_host_redirect`/`invalid_redirect`/`network`），用户文案由前端 `api.ts` 按 kind 走 i18n（`proxy.*` 词域），适配器不携带文案；上游响应（含其错误）原样透传。密码与 `Authorization` 不写日志。
+- 与 Rust Adapter 的允许差异：请求体经 `express.json({limit:'4mb'})`，超限 413、坏 JSON 400（Rust 侧走本地 IPC 无上限）。
+- 契约由 `npm run test:server` 驱动同一份场景夹具验收（Rust 侧在 `cargo test` 里加载同一文件）。
 
 ## 开发与生产
 

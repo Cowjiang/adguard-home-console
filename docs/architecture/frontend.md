@@ -32,9 +32,10 @@
 ## API 客户端
 
 - `api(cfg, path, {method, body, signal})` 是唯一出口，默认 GET。
-- 壳内判据是 `window.__TAURI_INTERNALS__`，命中则 `invoke('agh_fetch', …)`，IPC 层失败映射为 502。
+- 代理契约以本文件为唯一书面定义（`AghProxyRequest`/`AghProxyResult`/`AghProxyErrorKind`），Express 与 Rust 两个 Adapter 的行为由 `contract/agh-proxy.contract.json` 钉住。
+- 壳内判据是 `window.__TAURI_INTERNALS__`，命中则 `invoke('agh_fetch', …)`，IPC 层失败映射为 502（kind `network`）。
 - 浏览器分支请求 `/api/agh<path>`，带 `X-AGH-Target` 与 Basic `Authorization`。
-- 非 2xx 抛 `ApiError`，正文按 `error`、`message`、前 200 字节、`HTTP <n>` 依次取。
+- 非 2xx 抛 `ApiError`：适配器生成的失败带 `kind`，文案按 kind 走 i18n（`proxy.*` 词域），`detail` 保留技术细节；上游透传的错误正文按 `error`、`message`、前 200 字节、`HTTP <n>` 依次取。
 - SWR 统一 fetcher 是 `swrFetcher`，key 形态 `['<简称>', cfg, '<agh path>']`，同一端点只用一个键名；`qs()` 生成 query，数组值重复追加、空值跳过。
 - AGH 响应类型集中在 `src/lib/api.ts`，字段契约见 `docs/agh-api.md`。
 

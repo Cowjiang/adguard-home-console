@@ -11,6 +11,10 @@ const devHost = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // vitest covers src/ only; server/ uses the node:test runner (npm run test:server)
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
   server: {
     host: devHost || false,
     port: 5173,

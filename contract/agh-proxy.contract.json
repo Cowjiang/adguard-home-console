@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "comment": [
+    "AGH proxy contract, owned by the frontend (src/lib/api.ts). Both adapters",
+    "implement it: server/proxy.mjs (Express, web/PWA) and src-tauri/src/proxy.rs",
+    "(agh_fetch, Tauri shell). Each runner (server/proxy.test.mjs, proxy.rs tests)",
+    "loads THIS file and drives its adapter against scripted origin servers, so a",
+    "semantic change on one side fails the other.",
+    "Runner rules (both runners implement these identically):",
+    "- request.target defaults to origin A; null omits the header entirely",
+    "  (Express) or sends the empty string (Rust).",
+    "- origins: replies consumed per hit in order; exhausted -> 500 {error}.",
+    "- reply: {status, headers?, json? | body?, delayMs?}; {A}/{B} in header",
+    "  values resolve to the origin base URLs.",
+    "- expect.kind present -> body JSON must carry that kind; absent -> it must",
+    "  not (upstream bodies pass through untouched).",
+    "- expect.seen asserts the hits the origin observed: method/path subset,",
+    "  auth null = header absent, body null = empty body, object = parsed",
+    "  deep-equal, absentHeaders = header names the adapter must not forward.",
+    "- Runners use a short backstop timeout (300ms); the production default is",
+    "  25s (120s for /filtering/refresh), so s12 pairs a 2000ms origin delay",
+    "  with the short backstop instead of sleeping 25s."
+  ],
+  "scenarios": [
+    {
+      "id": "s01-get-forwards-path-auth-and-empty-body",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": { "A": [{ "status": 200, "json": { "ok": "A1" } }] },
+      "expect": {
+        "status": 200,
+        "json": { "ok": "A1" },
+        "seen": [
+          { "origin": "A", "method": "GET", "path": "/control/status", "auth": "Basic dGVzdDp0ZXN0", "body": null }
+        ]
+      }
+    },
+    {
+      "id": "s02-query-string-preserved",
+      "request": { "method": "GET", "path": "/stats?limit=5", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": { "A": [{ "status": 200, "json": { "n": 1 } }] },
+      "expect": {
+        "status": 200,
+        "json": { "n": 1 },
+        "seen": [{ "origin": "A", "path": "/control/stats?limit=5" }]
+      }
+    },
+    {
+      "id": "s03-upstream-401-passes-through-unmapped",
+      "request": { "method": "GET", "path": "/status" },
+      "origins": { "A": [{ "status": 401, "json": { "error": "Unauthorized" } }] },
+      "expect": {
+        "status": 401,
+        "json": { "error": "Unauthorized" },
+        "seen": [{ "origin": "A", "path": "/control/status", "auth": null }]
+      }
+    },
+    {
+      "id": "s04-missing-target-is-400",
+      "request": { "method": "GET", "path": "/status", "target": null },
+      "origins": {},
+      "expect": { "status": 400, "kind": "missing_target", "seen": [] }
+    },
+    {
+      "id": "s05-invalid-target-scheme-is-400",
+      "request": { "method": "GET", "path": "/status", "target": "ftp://example.com" },
+      "origins": {},
+      "expect": { "status": 400, "kind": "invalid_target", "seen": [] }
+    },
+    {
+      "id": "s06-redirect-same-host-replays-path-and-auth",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": {
+        "A": [{ "status": 302, "headers": { "location": "{B}/control/status" } }],
+        "B": [{ "status": 200, "json": { "ok": "B1" } }]
+      },
+      "expect": {
+        "status": 200,
+        "json": { "ok": "B1" },
+        "seen": [
+          { "origin": "A", "path": "/control/status", "auth": "Basic dGVzdDp0ZXN0" },
+          { "origin": "B", "path": "/control/status", "auth": "Basic dGVzdDp0ZXN0" }
+        ]
+      }
+    },
+    {
+      "id": "s07-relative-location-resolves-then-replays-path",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": {
+        "A": [
+          { "status": 302, "headers": { "location": "/control/landed" } },
+          { "status": 200, "json": { "ok": "A2" } }
+        ]
+      },
+      "expect": {
+        "status": 200,
+        "json": { "ok": "A2" },
+        "seen": [
+          { "origin": "A", "path": "/control/status" },
+          { "origin": "A", "path": "/control/status" }
+        ]
+      }
+    },
+    {
+      "id": "s08-redirect-cross-host-is-refused",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": {
+        "A": [{ "status": 302, "headers": { "location": "http://other.example.invalid/control/x" } }]
+      },
+      "expect": {
+        "status": 502,
+        "kind": "cross_host_redirect",
+        "seen": [{ "origin": "A", "path": "/control/status" }]
+      }
+    },
+    {
+      "id": "s09-redirect-hop-cap-passes-through",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": {
+        "A": [
+          { "status": 302, "headers": { "location": "{B}/control/status" } },
+          { "status": 302, "headers": { "location": "{B}/control/status" } }
+        ],
+        "B": [
+          { "status": 302, "headers": { "location": "{A}/control/status" } },
+          { "status": 302, "headers": { "location": "{A}/control/status" } }
+        ]
+      },
+      "expect": {
+        "status": 302,
+        "seen": [
+          { "origin": "A", "path": "/control/status" },
+          { "origin": "B", "path": "/control/status" },
+          { "origin": "A", "path": "/control/status" },
+          { "origin": "B", "path": "/control/status" }
+        ]
+      }
+    },
+    {
+      "id": "s10-redirect-303-is-not-followed",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": {
+        "A": [{ "status": 303, "headers": { "location": "{B}/control/status" } }]
+      },
+      "expect": {
+        "status": 303,
+        "seen": [{ "origin": "A", "path": "/control/status" }]
+      }
+    },
+    {
+      "id": "s11-post-body-passes-through",
+      "request": {
+        "method": "POST",
+        "path": "/protection",
+        "auth": "Basic dGVzdDp0ZXN0",
+        "body": { "enabled": false, "duration": 30000 }
+      },
+      "origins": { "A": [{ "status": 200, "json": { "ok": true } }] },
+      "expect": {
+        "status": 200,
+        "json": { "ok": true },
+        "seen": [
+          {
+            "origin": "A",
+            "method": "POST",
+            "path": "/control/protection",
+            "body": { "enabled": false, "duration": 30000 }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s12-backstop-timeout-yields-kind",
+      "request": { "method": "GET", "path": "/status", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": { "A": [{ "status": 200, "json": { "slow": true }, "delayMs": 2000 }] },
+      "expect": {
+        "status": 502,
+        "kind": "timeout",
+        "seen": [{ "origin": "A", "path": "/control/status" }]
+      }
+    },
+    {
+      "id": "s13-only-auth-and-content-type-are-forwarded",
+      "request": {
+        "method": "GET",
+        "path": "/status",
+        "auth": "Basic dGVzdDp0ZXN0",
+        "extraHeaders": { "X-Extra": "1" }
+      },
+      "origins": { "A": [{ "status": 200, "json": { "ok": true } }] },
+      "expect": {
+        "status": 200,
+        "seen": [{ "origin": "A", "path": "/control/status", "absentHeaders": ["x-extra"] }]
+      }
+    },
+    {
+      "id": "s14-upstream-5xx-passes-through-unmapped",
+      "request": { "method": "GET", "path": "/stats", "auth": "Basic dGVzdDp0ZXN0" },
+      "origins": { "A": [{ "status": 503, "json": { "error": "boom" } }] },
+      "expect": {
+        "status": 503,
+        "json": { "error": "boom" }
+      }
+    }
+  ]
+}
