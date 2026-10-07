@@ -35,15 +35,11 @@ objc2 = "0.6.4"
 [profile.dev.package."*"]
 opt-level = 0
 
-# The iOS 27 SDK forces the UIScene lifecycle: Info.plist must declare
-# UIApplicationSceneManifest (referencing tao's TaoSceneDelegate). tao 0.35.3
-# already has scene support, but release builds hit a bug where scene
-# configuration is released too early (fixed upstream in #1245; 0.37 is not in
-# tauri-runtime-wry 2.11.4's dependency range ^0.35). Patched to the community
-# backport branch (= 0.35.3 + the five-line #1245 fix; verified on iOS 26/27 by
-# Argos-Dynamics).
+# iOS 27's UIScene lifecycle needs tao's #1245 fix (the scene configuration was
+# released before UIKit retained it, which only broke release builds). Upstream
+# landed it in tao 0.37, and tauri-runtime-wry 2.12 (tauri 2.12) depends on that,
+# so the community 0.35.3 backport this repo patched in until 2026-10-07 is gone.
 [patch.crates-io]
-tao = { git = "https://github.com/Argos-Dynamics/tao", branch = "argos/0.35.3-scene-config-autorelease" }
 # Local vendored fork: adds appearAnimation (entrance animation for native
 # controls, used by the back button). Upstream 0.1.8 lacks it, and native
 # controls float above the WebView, so the effect can only be done on the
