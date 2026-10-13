@@ -29,7 +29,9 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 .agents/logs/
 .agents/reviews/
 
-# 本机 agent 工具产物
+# 本机 agent 工具产物与本地专属规则/备份
 .playwright-mcp/
 .zcodeignore
 .impeccable/
+AGENTS.local.md
+.local-backup/
