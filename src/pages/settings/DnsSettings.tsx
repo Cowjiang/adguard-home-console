@@ -50,7 +50,7 @@ export function DnsSettings() {
     try {
       const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
         method: 'POST',
-        body: { upstream_dns: toLines(d.upstream_dns) },
+        body: { upstream_dns: toCleanUpstreamLines(d.upstream_dns) },
       })
       const errs = Object.fromEntries(Object.entries(r ?? {}).filter(([, v]) => v && v.toLowerCase() !== 'ok'))
       setTestResult(errs)
@@ -88,6 +88,9 @@ export function DnsSettings() {
   const lines = (arr: string[] | undefined) => (arr ?? []).join('\n')
   function toLines(arr: string[] | undefined): string[] {
     return (arr ?? []).map((s) => s.trim()).filter(Boolean)
+  }
+  function toCleanUpstreamLines(arr: string[] | undefined): string[] {
+    return (arr ?? []).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'))
   }
 
   return (

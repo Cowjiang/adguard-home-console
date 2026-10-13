@@ -48,6 +48,15 @@ export interface BenchmarkOptions {
   runner?: (cfg: SvrConfig, upstream: string, timeoutMs: number) => Promise<{ latencyMs?: number; ok: boolean; error?: string }>
 }
 
+/** Extracts clean target address from an upstream DNS config entry (skips comments, strips domain routing prefixes) */
+export function extractUpstreamAddress(line: string): string | null {
+  const s = line.trim()
+  if (!s || s.startsWith('#')) return null
+  const domainRouteMatch = s.match(/^\[.*?\](.*)$/)
+  const addr = domainRouteMatch ? domainRouteMatch[1].trim() : s
+  return addr || null
+}
+
 export function calculateMedian(values: number[]): number | undefined {
   if (!values.length) return undefined
   const sorted = [...values].sort((a, b) => a - b)
@@ -136,7 +145,13 @@ export async function benchmarkUpstreams(
   upstreams: string[],
   options: BenchmarkOptions = {},
 ): Promise<UpstreamBenchmarkResult[]> {
-  const cleanList = upstreams.map((s) => s.trim()).filter(Boolean)
+  const cleanList = Array.from(
+    new Set(
+      upstreams
+        .map((s) => extractUpstreamAddress(s) || '')
+        .filter(Boolean),
+    ),
+  )
   if (!cleanList.length) return []
 
   const rounds = Math.max(1, options.rounds ?? 3)
@@ -184,23 +199,17 @@ export async function benchmarkUpstreams(
   })
 }
 
-export function toSvrConfig(inst: Instance): SvrConfig | null {
+export function toBenchmarkTarget(inst: Instance): BenchmarkTarget | null {
   const ep = activeEndpoint(inst)
   if (!ep) return null
   return {
-    url: ep.url,
-    username: ep.username,
-    password: ep.password,
-  }
-}
-
-export function toBenchmarkTarget(inst: Instance): BenchmarkTarget | null {
-  const cfg = toSvrConfig(inst)
-  if (!cfg) return null
-  return {
     id: inst.id,
     label: inst.label || inst.id,
-    cfg,
+    cfg: {
+      url: ep.url,
+      username: ep.username,
+      password: ep.password,
+    },
   }
 }
 

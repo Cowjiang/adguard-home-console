@@ -57,7 +57,18 @@ export function UpstreamBenchmarkSheet({
 
     try {
       if (hasMultipleInstances && selectedInstanceId === 'all') {
-        const targets = availableInstances
+        const onlineInstances = availableInstances.filter((inst) => {
+          const view = instances.find((x) => x.id === inst.id)
+          return view?.online !== 'down'
+        })
+
+        if (!onlineInstances.length) {
+          toast(t('common.noData'), 'err')
+          setTesting(false)
+          return
+        }
+
+        const targets = onlineInstances
           .map((inst) => toBenchmarkTarget(inst))
           .filter((tgt): tgt is NonNullable<typeof tgt> => tgt !== null)
 
@@ -128,7 +139,13 @@ export function UpstreamBenchmarkSheet({
   function handleApplyBest() {
     const best = validUpstreams.slice(0, 4).map((r) => r.upstream)
     if (!best.length) return
-    onApply?.(best)
+    // Safely preserve domain-routing rules (e.g. [/example.com/]10.0.0.1) and comment lines
+    const preserved = initialUpstreams.filter((line) => {
+      const s = line.trim()
+      return s.startsWith('#') || s.startsWith('[/')
+    })
+    const merged = [...preserved, ...best]
+    onApply?.(merged)
     toast(t('advanced.benchmarkApplied'), 'ok')
     onClose()
   }
@@ -185,13 +202,13 @@ export function UpstreamBenchmarkSheet({
               value={selectedInstanceId}
               onChange={(e) => setSelectedInstanceId(e.target.value)}
             >
-              <option value="all">⚡ 全部在线节点 (跨实例对比)</option>
+              <option value="all">⚡ {t('advanced.benchmarkAllOnlineNodes')}</option>
               {availableInstances.map((inst) => {
                 const view = instances.find((x) => x.id === inst.id)
                 const isDown = view?.online === 'down'
                 return (
                   <option key={inst.id} value={inst.id}>
-                    {inst.label || inst.id} {isDown ? '(离线)' : ''}
+                    {inst.label || inst.id} {isDown ? t('advanced.benchmarkOffline') : ''}
                   </option>
                 )
               })}
@@ -232,7 +249,11 @@ export function UpstreamBenchmarkSheet({
       {testing && progress && (
         <div className="glass flex flex-col gap-2 rounded-2xl p-3">
           <div className="flex items-center justify-between text-[12px] text-t2">
-            <span className="truncate">{progress.current ? `正在测试: ${progress.current}` : t('advanced.benchmarkTesting')}</span>
+            <span className="truncate">
+              {progress.current
+                ? t('advanced.benchmarkTestingCurrent', { current: progress.current })
+                : t('advanced.benchmarkTesting')}
+            </span>
             <span className="num font-medium">
               {progress.completed} / {progress.total} ({Math.round((progress.completed / Math.max(1, progress.total)) * 100)}%)
             </span>
@@ -334,7 +355,7 @@ export function UpstreamBenchmarkSheet({
                     {rtt !== undefined ? (
                       <span className="num w-16 text-right text-[13px] font-bold text-t1">{rtt} ms</span>
                     ) : (
-                      <span className="w-16 text-right text-[12px] text-[var(--err)]">Failed</span>
+                      <span className="w-16 text-right text-[12px] text-[var(--err)]">{t('advanced.benchmarkFailed')}</span>
                     )}
                   </div>
                 </div>
@@ -377,7 +398,7 @@ export function UpstreamBenchmarkSheet({
       ) : (
         !testing && (
           <div className="py-8 text-center text-[13px] text-t3">
-            {cleanList.length > 0 ? '点击上方按钮开始测试各上游延迟' : t('common.noData')}
+            {cleanList.length > 0 ? t('advanced.benchmarkPromptStart') : t('common.noData')}
           </div>
         )
       )}

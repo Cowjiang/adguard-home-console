@@ -4,6 +4,7 @@ import {
   benchmarkUpstreams,
   calculateMedian,
   classifyStatus,
+  extractUpstreamAddress,
   summarizeSamples,
   type BenchmarkSample,
   type BenchmarkTarget,
@@ -13,6 +14,26 @@ import type { SvrConfig } from '../api'
 vi.mock('../api', () => ({
   api: vi.fn(),
 }))
+
+describe('extractUpstreamAddress', () => {
+  it('extracts plain IPs and URLs', () => {
+    expect(extractUpstreamAddress('1.1.1.1')).toBe('1.1.1.1')
+    expect(extractUpstreamAddress('https://dns.google/dns-query')).toBe('https://dns.google/dns-query')
+  })
+
+  it('skips empty lines and comments', () => {
+    expect(extractUpstreamAddress('')).toBeNull()
+    expect(extractUpstreamAddress('   ')).toBeNull()
+    expect(extractUpstreamAddress('# comment line')).toBeNull()
+    expect(extractUpstreamAddress('  # indented comment')).toBeNull()
+  })
+
+  it('strips domain routing prefixes', () => {
+    expect(extractUpstreamAddress('[/example.com/]10.0.0.1')).toBe('10.0.0.1')
+    expect(extractUpstreamAddress('[/corp.internal/office.local/]https://dns.corp/dns-query')).toBe('https://dns.corp/dns-query')
+    expect(extractUpstreamAddress('[//]192.168.1.1')).toBe('192.168.1.1')
+  })
+})
 
 describe('calculateMedian', () => {
   it('handles empty arrays', () => {
@@ -95,6 +116,22 @@ describe('benchmarkUpstreams', () => {
   it('returns empty array when no upstreams provided', async () => {
     const res = await benchmarkUpstreams(cfg, [])
     expect(res).toEqual([])
+  })
+
+  it('filters comments and extracts domain routing prefixes before probing', async () => {
+    const runner = vi.fn().mockImplementation(async (_cfg, upstream: string) => {
+      return { latencyMs: 20, ok: true }
+    })
+
+    const results = await benchmarkUpstreams(cfg, ['# comment', '   ', '[/corp.local/]10.0.0.1'], {
+      rounds: 1,
+      runner,
+    })
+
+    expect(runner).toHaveBeenCalledTimes(1)
+    expect(runner).toHaveBeenCalledWith(cfg, '10.0.0.1', 5000)
+    expect(results).toHaveLength(1)
+    expect(results[0].upstream).toBe('10.0.0.1')
   })
 
   it('runs multiple rounds and sorts results by latency', async () => {
