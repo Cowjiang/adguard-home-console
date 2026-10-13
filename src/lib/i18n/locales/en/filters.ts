@@ -73,6 +73,16 @@ const enFilters = {
   checkNoMatch: 'No rule matched',
   checkFailed: 'Check failed: {{msg}}',
   checkHint: 'Calls the AdGuard Home filtering engine directly; the result matches a real DNS query, including wildcards and custom rules.',
+  syncAction: 'Sync to other instances',
+  syncModalTitle: 'Sync rules to other instances',
+  syncModalDesc: 'Overwrite selected target instances with the current rules. Note: Existing rules on target instances will be replaced.',
+  syncTargetSelect: 'Select target instances',
+  syncButton: 'Confirm & start sync',
+  syncSuccessToast: 'Successfully synced to {{count}} instances',
+  syncPartialToast: 'Partial sync: {{success}} succeeded, {{failed}} failed',
+  syncNoTargetSelected: 'Please select at least one target instance',
+  syncSourceDesc: 'Source: {{count}} {{type}}',
+  syncOfflineBadge: 'Offline',
 }
 
 export default enFilters

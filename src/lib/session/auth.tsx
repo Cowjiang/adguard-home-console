@@ -82,7 +82,7 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx>(null as unknown as AuthCtx)
 
 /** SWR keys embed the cfg by content; revalidate only this instance's keys */
-function mutateInstanceData(ep: SvrConfig): Promise<unknown> {
+export function mutateInstanceData(ep: SvrConfig): Promise<unknown> {
   return mutate((key) => {
     if (!Array.isArray(key) || key.length < 2) return false
     const c = key[1] as Partial<SvrConfig> | undefined

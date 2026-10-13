@@ -21,7 +21,7 @@
 | 2026-09-23 | process | [修正 release 工作流的变更列表与历史保留策略](proposals/process/2026-09-23-release-notes-and-history-retention.md) | implemented |
 | 2026-09-23 | process | [收敛 Agent 入口并按任务逐层披露](proposals/process/2026-09-23-progressive-agent-entrypoints.md) | implemented |
 | 2026-09-24 | simplification | [弃用并移除 SwiftUI 原生 iOS 线](proposals/simplification/2026-09-24-retire-swift-ios-line.md) | implemented |
-| 2026-09-24 | process | [给 iOS 工程生成加门禁，并把可控项移进 tauri 配置](proposals/process/2026-09-24-ios-project-generation-gate.md) | implemented |
+| 2026-09-24 | process | [给 iOS 工程生成加门禁，并把受控项移进 tauri 配置](proposals/process/2026-09-24-ios-project-generation-gate.md) | implemented |
 | 2026-09-24 | bug-fix | [把 Rust 静态库从 app 包的资源阶段摘掉](proposals/bug-fix/2026-09-24-ios-bundle-ships-libapp-archive.md) | implemented |
 | 2026-09-24 | bug-fix | [让移动端客户端页获得原生返回按钮与侧滑返回](proposals/bug-fix/2026-09-24-clients-back-nav.md) | implemented |
 | 2026-09-24 | bug-fix | [顶栏右侧按钮高度统一对齐返回胶囊](proposals/bug-fix/2026-09-24-header-action-height.md) | implemented |
@@ -45,6 +45,8 @@
 | 2026-10-07 | bug-fix | [修回 iOS 工程的 pre-build 脚本调用方式，让 Xcode 阶段不再 panic](proposals/bug-fix/2026-10-07-ios-xcode-script-phase.md) | implemented |
 | 2026-10-07 | bug-fix | [修回 iOS release 构建的 Swift 静态链接](proposals/bug-fix/2026-10-07-ios-release-swift-link.md) | implemented |
 | 2026-10-07 | process | [把发版拆成 GitHub Release / npm / GHCR 三个消费者](proposals/process/2026-10-07-multi-channel-release.md) | implemented |
+| 2026-10-12 | feature | [为多实例增加集群级防护并发控制](proposals/feature/2026-10-12-multi-instance-cluster-protection.md) | implemented |
+| 2026-10-12 | feature | [为多实例增加 DNS 重写与自定义规则单向同步](proposals/feature/2026-10-12-multi-instance-rules-sync.md) | implemented |
 
 ## 与 docs/ 的分工
 

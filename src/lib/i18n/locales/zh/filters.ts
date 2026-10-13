@@ -72,6 +72,16 @@ const zhFilters = {
   checkNoMatch: '没有命中任何规则',
   checkFailed: '检测失败:{{msg}}',
   checkHint: '直接调用 AdGuard Home 的过滤引擎,结果与真实 DNS 查询一致,支持通配符与自定义规则匹配。',
+  syncAction: '同步到其他实例',
+  syncModalTitle: '同步规则至其他实例',
+  syncModalDesc: '将当前实例的规则覆盖至所选目标实例。注意：目标实例的原有规则将被完全替换。',
+  syncTargetSelect: '选择目标实例',
+  syncButton: '确认并开始同步',
+  syncSuccessToast: '已成功同步至 {{count}} 台实例',
+  syncPartialToast: '部分同步完成：{{success}} 台成功，{{failed}} 台失败',
+  syncNoTargetSelected: '请至少选择一个目标实例',
+  syncSourceDesc: '当前来源：{{count}} 条 {{type}}',
+  syncOfflineBadge: '离线',
 }
 
 export default zhFilters
