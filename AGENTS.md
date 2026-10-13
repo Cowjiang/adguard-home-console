@@ -2,9 +2,7 @@
 
 AdGuard Home v0.107.79 cross-platform management console: a Web/PWA app and a Tauri 2 shell (desktop and iOS/Android mobile) live in one repository.
 
-## Local configuration (`AGENTS.local.md`)
-
-If `AGENTS.local.md` exists in the repository root, load and apply it alongside this file. Local workflow rules, private paths, draft proposal workflows (`.local-backup/`), and developer environment overrides defined there take precedence during local development.
+If `AGENTS.local.md` exists, load it.
 
 ## Read by task, layer by layer
 
@@ -32,12 +30,12 @@ Take the global constraints from this file; open only the next layer relevant to
 | `.agents/` | Proposals, skills, and process records; enter by purpose from `.agents/README.md` |
 | `.github/workflows/` | `release.yml`: one build feeding three channels — Release tarball, npm package, GHCR image (nightly from `dev` on a timer, stable on `vX.Y.Z` tags); `ci.yml`: pull request verification |
 
-`dist/`, `node_modules/`, `src-tauri/gen/`, and `src-tauri/target/` are build or generated output; `_probe/`, `.local-backup/`, and `AGENTS.local.md` are local-only material. None of them are committed.
+`dist/`, `node_modules/`, `src-tauri/gen/`, and `src-tauri/target/` are build or generated output; `_probe/` is local-only material. None of them are committed.
 
 ## Always follow
 
-- Register a proposal per `.agents/README.md` before implementing non-trivial changes; small changes go through the Direct track. Proposal templates and classification follow the pipeline docs. (Draft and exploratory proposals stay in `.local-backup/proposals/` per `AGENTS.local.md` until ready for formal tracking).
-- Never commit credentials, signing values, machine-specific configuration, or forensic screenshots. `_probe/`, `.local-backup/`, and `AGENTS.local.md` are local-only material and must not be assumed to exist after a fresh clone.
+- Register a proposal per `.agents/README.md` before implementing non-trivial changes; small changes go through the Direct track. Proposal templates and classification follow the pipeline docs.
+- Never commit credentials, signing values, machine-specific configuration, or forensic screenshots. `_probe/` is local-only material and must not be assumed to exist after a fresh clone.
 
 ## Code conventions
 
