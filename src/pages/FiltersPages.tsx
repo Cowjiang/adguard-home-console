@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
-  Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink,
+  Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink, ArrowLeftRight,
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
@@ -17,6 +17,8 @@ import { IconBubble } from '../components/ui/atoms'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 import { runMutation } from '../lib/mutation'
+import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { syncUserRulesToInstances, syncRewritesToInstances } from '../lib/session/rulesSync'
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -196,8 +198,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 /* ================= Custom filtering rules ================= */
 
 export function RulesPage() {
-  const { cfg } = useAuth()
+  const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const sheet = useSheet()
   const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -223,7 +226,28 @@ export function RulesPage() {
 
   return (
     <Screen>
-      <PageHeader back title={t('filters.customTitle')} subtitle={t('filters.customSub', { n: activeCount })} />
+      <PageHeader back title={t('filters.customTitle')} subtitle={t('filters.customSub', { n: activeCount })} right={
+        instances.length > 1 ? (
+          <HeaderAction
+            onClick={() => {
+              const currentRules = (draft ?? (data?.user_rules ?? []).join('\n')).split('\n').map((s) => s.trim()).filter(Boolean)
+              sheet.open(
+                <SyncSheetContent
+                  itemCount={currentRules.length}
+                  itemTypeLabel={t('protection.customRulesRow')}
+                  onSync={(targets) => syncUserRulesToInstances(targets, currentRules)}
+                  onClose={() => sheet.close()}
+                />
+              )
+            }}
+            label={t('filters.syncAction')}
+            className="w-11 text-accent lg:w-auto lg:px-2.5"
+            native={{ sfSymbol: 'arrow.triangle.2.circlepath', foreground: 'accent' }}
+          >
+            <ArrowLeftRight size={17} />
+          </HeaderAction>
+        ) : undefined
+      } />
       <Card className="p-4">
         <textarea
           className="field"
@@ -416,7 +440,7 @@ export function ServicesPage() {
 /* ================= DNS rewrites ================= */
 
 export function RewritesPage() {
-  const { cfg } = useAuth()
+  const { cfg, instances } = useAuth()
   const { t } = useTranslation()
   const sheet = useSheet()
   const confirm = useConfirm()
@@ -476,14 +500,36 @@ export function RewritesPage() {
   return (
     <Screen>
       <PageHeader back title={t('filters.rwTitle')} subtitle={t('filters.rwCountSub', { n: entries?.length ?? 0 })} right={
-        <HeaderAction
-          onClick={openAdd}
-          label={t('common.add')}
-          className="w-11 text-accent lg:w-10"
-          native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
-        >
-          <Plus size={19} />
-        </HeaderAction>
+        <div className="flex items-center gap-1.5">
+          {instances.length > 1 && (
+            <HeaderAction
+              onClick={() => {
+                const list = entries ?? []
+                sheet.open(
+                  <SyncSheetContent
+                    itemCount={list.length}
+                    itemTypeLabel={t('protection.rewritesRow')}
+                    onSync={(targets) => syncRewritesToInstances(targets, list)}
+                    onClose={() => sheet.close()}
+                  />
+                )
+              }}
+              label={t('filters.syncAction')}
+              className="w-11 text-t2 hover:text-accent lg:w-auto lg:px-2.5"
+              native={{ sfSymbol: 'arrow.triangle.2.circlepath' }}
+            >
+              <ArrowLeftRight size={17} />
+            </HeaderAction>
+          )}
+          <HeaderAction
+            onClick={openAdd}
+            label={t('common.add')}
+            className="w-11 text-accent lg:w-10"
+            native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+          >
+            <Plus size={19} />
+          </HeaderAction>
+        </div>
       } />
 
       <Group>
