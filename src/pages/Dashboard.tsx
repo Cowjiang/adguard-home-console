@@ -18,6 +18,7 @@ import { ProtectionCard } from '../components/protection/ProtectionCard'
 import { DashSkeleton } from '../components/dashboard/DashSkeleton'
 import { RangePicker, type RangeKey } from '../components/dashboard/RangePicker'
 import { ServerInfoCard } from '../components/dashboard/ServerInfoCard'
+import { ClusterHealthCard } from '../components/dashboard/ClusterHealthCard'
 import { UpstreamTable } from '../components/dashboard/UpstreamTable'
 import { InfoCell } from '../components/dashboard/InfoCell'
 import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
@@ -360,6 +361,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
+        <ClusterHealthCard />
         <ServerInfoCard />
       </div>
 
@@ -471,6 +473,7 @@ export default function Dashboard() {
             <UpstreamTable stats={stats} />
           </Card>
 
+          <ClusterHealthCard />
           <ServerInfoCard />
         </div>
       </div>
@@ -495,6 +498,3 @@ function OtherStats({ cfg, onData }: { cfg: SvrConfig; onData: (url: string, s: 
   }, [cfg.url, data, onData])
   return null
 }
-
-
-

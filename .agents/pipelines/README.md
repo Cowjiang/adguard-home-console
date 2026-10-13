@@ -48,6 +48,7 @@
 | 2026-10-12 | feature | [为多实例增加集群级防护并发控制](proposals/feature/2026-10-12-multi-instance-cluster-protection.md) | implemented |
 | 2026-10-12 | feature | [为多实例增加 DNS 重写与自定义规则单向同步](proposals/feature/2026-10-12-multi-instance-rules-sync.md) | implemented |
 | 2026-10-13 | process | [为 Pull Request 和核心分支增加自动化 CI 检查](proposals/process/2026-10-13-pull-request-ci-workflow.md) | implemented |
+| 2026-10-13 | feature | [多实例运维能力闭环套件（P1: 订阅列表同步、客户端同步与健康矩阵面板）](proposals/feature/2026-10-13-multi-instance-cluster-operations.md) | implemented |
 
 ## 与 docs/ 的分工
 

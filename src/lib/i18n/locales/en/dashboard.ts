@@ -36,7 +36,17 @@ const enDashboard = {
   stopped: 'Stopped',
   dnsPort: 'DNS port',
   uptime: 'Uptime',
-  aggregateNote: 'Totals and leaderboards merge {{n}} instances; trends show the selected instance only.'
+  aggregateNote: 'Totals and leaderboards merge {{n}} instances; trends show the selected instance only.',
+  clusterHealthTitle: 'Cluster Health',
+  clusterHealthyBadge: 'All Healthy',
+  clusterDegradedBadge: 'Degraded',
+  activeInstance: 'Active',
+  switchInstance: 'Switch to instance',
+  protectionOn: 'Protected',
+  protectionOff: 'Unprotected',
+  probeAll: 'Probe All',
+  probing: 'Probing…',
+  offline: 'Offline',
 }
 
 export default enDashboard

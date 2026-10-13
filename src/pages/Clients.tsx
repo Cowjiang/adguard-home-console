@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
   Plus, Laptop, Smartphone, Globe, ShieldAlert, Baby,
-  UserRound, ArrowDownUp, ChevronDown, ChevronUp,
+  UserRound, ArrowDownUp, ChevronDown, ChevronUp, ArrowLeftRight,
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type ClientsData, type AghClient, type AutoClient, type Stats } from '../lib/api'
@@ -24,6 +24,8 @@ import { useSheet, useConfirm } from '../components/ui/sheet'
 import { runMutation } from '../lib/mutation'
 import { Loading, EmptyState, SearchBar, Badge, SourceBadge, Pagination } from '../components/ui/atoms'
 import { usePick, PickSelect } from '../components/ui/menu'
+import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { syncClientsToInstances } from '../lib/session/rulesSync'
 
 
 /* ---------- Sorting ---------- */
@@ -49,7 +51,7 @@ const whoisLine = (w: Record<string, string> | undefined) =>
   [w?.country, w?.orgname].filter(Boolean).join(' ')
 
 export default function Clients() {
-  const { cfg } = useAuth()
+  const { cfg, instances } = useAuth()
   const { t } = useTranslation()
   const sheet = useSheet()
   const confirm = useConfirm()
@@ -267,14 +269,34 @@ export default function Clients() {
         title={t('clients.title')}
         subtitle={t('clients.countSub', { p: clients.length, a: autos.length })}
         right={
-          <HeaderAction
-            onClick={() => openForm(null)}
-            label={t('clients.add')}
-            className="w-11 text-accent lg:w-10"
-            native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
-          >
-            <Plus size={19} />
-          </HeaderAction>
+          <div className="flex items-center gap-1.5">
+            {instances.length > 1 && (
+              <HeaderAction
+                onClick={() => {
+                  sheet.open(
+                    <SyncSheetContent
+                      itemCount={clients.length}
+                      itemTypeLabel={t('clients.title')}
+                      onSync={(targets) => syncClientsToInstances(targets, clients)}
+                      onClose={() => sheet.close()}
+                    />
+                  )
+                }}
+                label={t('filters.syncAction')}
+                className="w-11 text-t2 hover:text-accent lg:w-10"
+              >
+                <ArrowLeftRight size={17} />
+              </HeaderAction>
+            )}
+            <HeaderAction
+              onClick={() => openForm(null)}
+              label={t('clients.add')}
+              className="w-11 text-accent lg:w-10"
+              native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+            >
+              <Plus size={19} />
+            </HeaderAction>
+          </div>
         }
       />
 

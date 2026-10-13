@@ -4,7 +4,7 @@
  * only the React wiring, see lib/session/auth.tsx).
  */
 import { describe, expect, it, vi } from 'vitest'
-import { backoffMs, createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS } from './probe'
+import { backoffMs, createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS, type ProbeOutcome } from './probe'
 import type { Instance, SvrConfig } from './instances'
 import type { Status } from '../api'
 import { api } from '../api'
@@ -31,6 +31,7 @@ function harness() {
   const calls: string[] = []
   const session: Record<string, boolean> = {}
   let activeId: string | null = null
+  const outcomes: { inst: Instance; outcome: ProbeOutcome }[] = []
   const engine = createProbeEngine({
     fetchStatus: async (ep) => {
       calls.push(ep.url)
@@ -39,11 +40,15 @@ function harness() {
     wasProbeOk: (id) => session[id] ?? false,
     isActive: (id) => activeId === id,
     now: () => t,
+    onOutcome: (inst, ep, outcome) => {
+      outcomes.push({ inst, outcome })
+    },
   })
   return {
     engine,
     calls,
     session,
+    outcomes,
     setOk: (v: boolean) => {
       ok = v
     },
@@ -211,6 +216,45 @@ describe('probe', () => {
     const retry = engine.probe(inst, cfg)
     resolvers[1](OK)
     await expect(retry).resolves.toBeDefined()
+  })
+
+  it('measures and records round-trip latencyMs on success, undefined on failure', async () => {
+    let t = 100
+    const inst = mkInst('a')
+    const engine = createProbeEngine({
+      fetchStatus: async () => {
+        t += 42
+        return OK
+      },
+      wasProbeOk: () => false,
+      isActive: () => true,
+      now: () => t,
+    })
+
+    const outcome = await engine.probe(inst, cfg)
+    expect(outcome?.ok).toBe(true)
+    expect(outcome?.latencyMs).toBe(42)
+
+    const failEngine = createProbeEngine({
+      fetchStatus: async () => null,
+      wasProbeOk: () => false,
+      isActive: () => true,
+      now: () => t,
+    })
+    const failOutcome = await failEngine.probe(inst, cfg)
+    expect(failOutcome?.ok).toBe(false)
+    expect(failOutcome?.latencyMs).toBeUndefined()
+  })
+
+  it('dispatches onOutcome callback for both probe and probeAll', async () => {
+    const h = harness()
+    const a = mkInst('a')
+    const b = mkInst('b')
+
+    await h.engine.probeAll([a, b], true)
+    expect(h.outcomes).toHaveLength(2)
+    expect(h.outcomes.map((o) => o.inst.id)).toEqual(['a', 'b'])
+    expect(h.outcomes[0].outcome.ok).toBe(true)
   })
 
   it('reset clears a backed-off cadence (connect path)', async () => {
