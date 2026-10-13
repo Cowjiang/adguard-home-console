@@ -40,6 +40,25 @@ const enQuerylog = {
   copyDomain: 'Copy domain',
   blockDomain: 'Block this domain',
   whitelistDomain: 'Add to allowlist',
+
+  // P2-2 Analytics & Multi-Instance Aggregation
+  analytics: 'Analytics',
+  analyticsTitle: 'Query Log Analytics',
+  analyticsSub: 'Multidimensional metrics and slow-query diagnostics from sampled log entries',
+  instanceFilter: 'Node scope',
+  allInstances: '🌐 All Online Nodes (Aggregated)',
+  cacheHitRate: 'Cache hit rate',
+  avgLatency: 'Average latency',
+  totalSample: 'Sample size',
+  slowQueries: 'Slow queries (Top latency)',
+  noSlowQueries: 'No slow queries detected',
+  reasonsDist: 'Response & block distribution',
+  topDomains: 'Top queried domains',
+  topClients: 'Top active clients',
+  topUpstreams: 'Upstream latency & volume',
+  drillDownHint: '💡 Click any item to filter the query log',
+  node: 'Node',
+  queriesUnit: 'queries',
 }
 
 export default enQuerylog
