@@ -108,7 +108,7 @@ describe('query log analytics', () => {
     ]
     const list2: QueryLogItem[] = [
       mockItem({ time: '2026-10-13T10:00:15Z', question: { name: 'c.com', type: 'A', class: 'IN' } }),
-      // duplicate on list2 with same time & domain & client & instance
+      // duplicate on list2 with same time & domain & type & client & instance
       mockItem({ time: '2026-10-13T10:00:15Z', question: { name: 'c.com', type: 'A', class: 'IN' } }),
     ]
 
@@ -123,6 +123,28 @@ describe('query log analytics', () => {
     expect(merged[0]._instanceLabel).toBe('Backup Node')
     expect(merged[1].question.name).toBe('a.com')
     expect(merged[2].question.name).toBe('b.com')
+  })
+
+  it('preserves concurrent A and AAAA queries with the same timestamp and domain', () => {
+    const aQuery = mockItem({
+      time: '2026-10-13T10:00:00.123Z',
+      question: { name: 'dualstack.com', type: 'A', class: 'IN' },
+      client: '192.168.1.50',
+    })
+    const aaaaQuery = mockItem({
+      time: '2026-10-13T10:00:00.123Z',
+      question: { name: 'dualstack.com', type: 'AAAA', class: 'IN' },
+      client: '192.168.1.50',
+    })
+
+    const k1 = keyOfAggregated(aQuery)
+    const k2 = keyOfAggregated(aaaaQuery)
+    expect(k1).not.toBe(k2)
+
+    const merged = mergeQueryLogLists([
+      { instanceId: 'inst-1', instanceLabel: 'Node 1', items: [aQuery, aaaaQuery] },
+    ])
+    expect(merged.length).toBe(2)
   })
 
   it('generates consistent keyOfAggregated keys', () => {

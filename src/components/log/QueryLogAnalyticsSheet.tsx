@@ -12,6 +12,7 @@ import {
   Users,
   Globe,
   AlertTriangle,
+  X,
 } from 'lucide-react'
 import { Card } from '../ui/primitives'
 import { Badge } from '../ui/atoms'
@@ -41,6 +42,14 @@ export function QueryLogAnalyticsSheet({
     onClose()
   }
 
+  const resolveFilterKey = (reason: string, kind: string): string => {
+    if (kind === 'blocked') return 'blocked'
+    if (kind === 'rewrite') return 'rewritten'
+    if (reason === 'NotFilteredWhiteList') return 'whitelist'
+    if (kind === 'ok') return 'allowed'
+    return 'all'
+  }
+
   return (
     <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden text-left">
       {/* Header */}
@@ -52,6 +61,13 @@ export function QueryLogAnalyticsSheet({
           </div>
           <p className="mt-0.5 text-[12px] text-t3">{t('querylog.analyticsSub')}</p>
         </div>
+        <button
+          onClick={onClose}
+          className="press glass flex h-7 w-7 items-center justify-center rounded-full text-t3 transition-colors hover:text-t1"
+          aria-label="Close"
+        >
+          <X size={15} />
+        </button>
       </div>
 
       <div className="no-scrollbar flex-1 space-y-4 overflow-y-auto py-3">
@@ -140,12 +156,17 @@ export function QueryLogAnalyticsSheet({
             <span>{t('querylog.reasonsDist')}</span>
           </div>
 
-          <Card className="p-3 !rounded-xl space-y-2">
+          <Card className="p-2 !rounded-xl divide-y divide-[var(--glass-border)]">
             {stats.reasonsDistribution.map((item) => {
               const meta = reasonMeta(item.reason, t)
+              const fk = resolveFilterKey(item.reason, meta.kind)
               return (
-                <div key={item.reason} className="space-y-1">
-                  <div className="flex items-center justify-between text-[12px]">
+                <button
+                  key={item.reason}
+                  onClick={() => handleDrill('filter', fk)}
+                  className="press flex w-full flex-col gap-1.5 p-2 text-left transition-colors hover:bg-white/[0.04]"
+                >
+                  <div className="flex w-full items-center justify-between text-[12px]">
                     <span className="flex items-center gap-1.5 text-t2">
                       <Badge kind={meta.kind}>{meta.label}</Badge>
                       <span className="text-[11px] text-t3">({item.reason})</span>
@@ -170,7 +191,7 @@ export function QueryLogAnalyticsSheet({
                       }}
                     />
                   </div>
-                </div>
+                </button>
               )
             })}
           </Card>

@@ -51,9 +51,9 @@ export interface QueryLogAnalyticsResult {
   topUpstreams: UpstreamStat[]
 }
 
-/** Generates a collision-resistant unique key for query log item */
+/** Generates a collision-resistant unique key for query log item including qtype */
 export function keyOfAggregated(item: AggregatedQueryLogItem): string {
-  return `${item.time}|${item.question?.name ?? ''}|${item.client ?? ''}|${item._instanceId ?? ''}`
+  return `${item.time}|${item.question?.name ?? ''}|${item.question?.type ?? ''}|${item.client ?? ''}|${item._instanceId ?? ''}`
 }
 
 /** Merges multiple query log lists from different instances into a unified, time-sorted list */

@@ -116,9 +116,17 @@ export default function QueryLog() {
       try {
         if (selectedInstanceId === 'all') {
           // Multi-instance aggregation mode
+          const oldest = mode === 'older' ? items[items.length - 1]?.time : undefined
+          if (mode === 'older' && !oldest) return
+
           const results = await Promise.allSettled(
             targetEndpoints.map(async (target) => {
-              const path = '/querylog' + qs({ limit: 80, search: debounced || undefined, reason: reasons })
+              const path = '/querylog' + qs({
+                limit: 80,
+                older_than: oldest,
+                search: debounced || undefined,
+                reason: reasons,
+              })
               const data = await api<{ data: QueryLogItem[] }>(target.cfg, path)
               return {
                 instanceId: target.id,
@@ -127,6 +135,10 @@ export default function QueryLog() {
               }
             })
           )
+
+          if (results.length > 0 && results.every((r) => r.status === 'rejected')) {
+            toast(t('querylog.loadFailed', { msg: 'All instances unreachable' }), 'err')
+          }
 
           const lists = results
             .filter((r): r is PromiseFulfilledResult<{ instanceId: string; instanceLabel: string; items: QueryLogItem[] }> => r.status === 'fulfilled')
@@ -137,11 +149,14 @@ export default function QueryLog() {
             setItems(merged)
             setExhausted(merged.length === 0)
           } else {
+            let addedCount = 0
             setItems((cur) => {
               const seen = new Set(cur.map(keyOfAggregated))
               const add = merged.filter((x) => !seen.has(keyOfAggregated(x)))
+              addedCount = add.length
               return [...cur, ...add]
             })
+            setExhausted(addedCount === 0 || merged.length === 0)
           }
         } else {
           // Single instance mode
@@ -285,6 +300,7 @@ export default function QueryLog() {
         onDrillDown={(type, value) => {
           if (type === 'domain' || type === 'client') {
             setSearch(value)
+            setDebounced(value.trim())
             syncUrl({ q: value })
           } else if (type === 'filter') {
             setFilterKey(value)
