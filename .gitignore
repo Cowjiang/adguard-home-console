@@ -11,6 +11,9 @@ _probe
 .idea
 _p*.cjs
 
+# Cargo 本地配置
+.cargo/
+
 # Xcode / iOS / Tauri(2026-09-21 iOS 施工追加)
 *.xcuserstate
 *.xcresult

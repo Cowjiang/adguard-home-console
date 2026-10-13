@@ -1,5 +1,0 @@
-# 项目级覆盖:~/.cargo/config 把 crates.io 换成了 ustc 的 git:// 索引(9418 端口,常被墙)。
-# Xcode "Build Rust Code" 阶段经 `npm run`(cwd=仓库根)调用 cargo,需要这份根目录配置;
-# src-tauri/.cargo/config.toml 为同一覆盖(该目录内直接跑 cargo 时生效)。
-[source.ustc]
-registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
