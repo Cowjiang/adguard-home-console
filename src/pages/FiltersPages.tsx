@@ -18,7 +18,7 @@ import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 import { runMutation } from '../lib/mutation'
 import { SyncSheetContent } from '../components/protection/SyncSheetContent'
-import { syncUserRulesToInstances, syncRewritesToInstances } from '../lib/session/rulesSync'
+import { syncUserRulesToInstances, syncRewritesToInstances, syncFilterListsToInstances } from '../lib/session/rulesSync'
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -27,7 +27,7 @@ const HOUR_MS = 3_600_000
 /* ================= Blacklist / whitelist filters ================= */
 
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
-  const { cfg } = useAuth()
+  const { cfg, instances } = useAuth()
   const { t } = useTranslation()
   const sheet = useSheet()
   const pick = usePick()
@@ -115,9 +115,35 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   return (
     <Screen>
       <PageHeader back title={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')} subtitle={t('filters.listCountSub', { n: filters.length, interval: data ? hoursLabel(data.interval / HOUR_MS) : '…' })} right={
-        <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
-        </HeaderAction>
+        <div className="flex items-center gap-1.5">
+          {instances.length > 1 && (
+            <HeaderAction
+              onClick={() => {
+                sheet.open(
+                  <SyncSheetContent
+                    itemCount={filters.length}
+                    itemTypeLabel={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')}
+                    onSync={(targets) =>
+                      syncFilterListsToInstances(
+                        targets,
+                        whitelist ? [] : filters,
+                        whitelist ? filters : []
+                      )
+                    }
+                    onClose={() => sheet.close()}
+                  />
+                )
+              }}
+              label={t('filters.syncAction')}
+              className="w-11 text-t2 hover:text-accent lg:w-10"
+            >
+              <ArrowLeftRight size={17} />
+            </HeaderAction>
+          )}
+          <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
+          </HeaderAction>
+        </div>
       } />
 
       {isLoading && <Loading />}
