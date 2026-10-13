@@ -47,6 +47,7 @@
 | 2026-10-07 | process | [把发版拆成 GitHub Release / npm / GHCR 三个消费者](proposals/process/2026-10-07-multi-channel-release.md) | implemented |
 | 2026-10-12 | feature | [为多实例增加集群级防护并发控制](proposals/feature/2026-10-12-multi-instance-cluster-protection.md) | implemented |
 | 2026-10-12 | feature | [为多实例增加 DNS 重写与自定义规则单向同步](proposals/feature/2026-10-12-multi-instance-rules-sync.md) | implemented |
+| 2026-10-13 | process | [为 Pull Request 和核心分支增加自动化 CI 检查](proposals/process/2026-10-13-pull-request-ci-workflow.md) | implemented |
 
 ## 与 docs/ 的分工
 
