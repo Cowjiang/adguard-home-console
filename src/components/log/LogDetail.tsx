@@ -9,6 +9,7 @@ import { copyText } from '../../lib/clipboard'
 import { REASON_META, qtypeColor, type ReasonLabelKey } from '../../lib/constants'
 import { fmtTimeFull, fmtMs } from '../../lib/format'
 import type { QueryLogItem, FilteringStatus } from '../../lib/api'
+import type { AggregatedQueryLogItem } from '../../lib/log/analytics'
 
 type TFn = (key: ReasonLabelKey) => string
 
@@ -24,7 +25,7 @@ export function reasonMeta(reason: string, t: TFn) {
 export function LogDetail({
   item, filtering, onSaveRule,
 }: {
-  item: QueryLogItem
+  item: QueryLogItem | AggregatedQueryLogItem
   filtering?: FilteringStatus
   onSaveRule: (rule: string, block: boolean) => void
 }) {
@@ -33,6 +34,7 @@ export function LogDetail({
   const domain = item.question.name
   const blocked = meta.kind === 'blocked'
   const [copied, setCopied] = useState(false)
+  const instanceLabel = (item as AggregatedQueryLogItem)._instanceLabel
 
   const copy = async () => {
     const ok = await copyText(domain)
@@ -59,6 +61,7 @@ export function LogDetail({
       </div>
 
       <div className="glass mb-3 rounded-2xl px-4 py-3 text-[13px]">
+        {instanceLabel && <DetailRow label={t('querylog.node')} value={instanceLabel} />}
         <DetailRow label={t('querylog.client')} value={`${item.client_info?.name || t('agh.unknown')} (${item.client})${item.client_proto ? ' · ' + item.client_proto.toUpperCase() : ''}`} />
         <DetailRow label={t('querylog.status')} value={item.status || '—'} />
         <DetailRow label={t('querylog.elapsed')} value={fmtMs(Number(item.elapsedMs))} />

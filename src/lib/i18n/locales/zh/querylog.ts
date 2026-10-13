@@ -39,6 +39,25 @@ const zhQuerylog = {
   copyDomain: '复制域名',
   blockDomain: '拦截此域名',
   whitelistDomain: '加入白名单',
+
+  // P2-2 Analytics & Multi-Instance Aggregation
+  analytics: '透视分析',
+  analyticsTitle: '查询日志下钻透视分析',
+  analyticsSub: '基于当前采集日志样本的多维指标透视与慢查询诊断',
+  instanceFilter: '节点范围',
+  allInstances: '🌐 全部在线节点 (跨节点聚合)',
+  cacheHitRate: '缓存命中率',
+  avgLatency: '平均耗时',
+  totalSample: '分析样本',
+  slowQueries: '慢查询诊断 (Top 耗时)',
+  noSlowQueries: '无显著慢查询记录',
+  reasonsDist: '拦截与响应分布',
+  topDomains: 'Top 请求域名',
+  topClients: 'Top 活跃客户端',
+  topUpstreams: '上游 DNS 响应耗时与处理量',
+  drillDownHint: '💡 点击任意条目可快速下钻至对应日志过滤',
+  node: '节点',
+  queriesUnit: '次',
 }
 
 export default zhQuerylog
