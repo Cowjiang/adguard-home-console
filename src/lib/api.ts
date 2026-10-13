@@ -95,15 +95,29 @@ export async function api<T = unknown>(
       pathWithQuery: '/api/agh' + path,
       bodyJson: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
     }
+    const invokePromise = invoke('agh_fetch', { ...req })
+    const abortPromise = opts.signal
+      ? new Promise<never>((_, reject) => {
+          opts.signal!.addEventListener(
+            'abort',
+            () => reject(new DOMException('The user aborted a request.', 'AbortError')),
+            { once: true }
+          )
+        })
+      : null
     try {
-      const r = (await invoke('agh_fetch', { ...req })) as {
+      if (opts.signal?.aborted) {
+        throw new DOMException('The user aborted a request.', 'AbortError')
+      }
+      const r = (await (abortPromise ? Promise.race([invokePromise, abortPromise]) : invokePromise)) as {
         status: number
         content_type: string
         body_text: string
       }
       status = r.status
       text = r.body_text ?? ''
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.name === 'AbortError') throw e
       // IPC failure (missing command / serialization error etc.): same
       // semantics as a network error
       const detail = String((e as Error)?.message ?? e)

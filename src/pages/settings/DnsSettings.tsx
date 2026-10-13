@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
-import { Play, Trash2 } from 'lucide-react'
+import { Play, Trash2, Zap } from 'lucide-react'
 import { useAuth } from '../../lib/session/auth'
 import { api, swrFetcher, type DnsInfo } from '../../lib/api'
 import { PageHeader, Screen, Card, Group, GroupTitle, Rows, Row, Switch, Button } from '../../components/ui/primitives'
@@ -12,6 +12,8 @@ import { Loading } from '../../components/ui/atoms'
 import { fmtBytes } from '../../lib/format'
 import { runMutation } from '../../lib/mutation'
 import { useDraftForm } from '../../lib/useDraftForm'
+import { useSheet } from '../../components/ui/sheet'
+import { UpstreamBenchmarkSheet } from '../../components/dns/UpstreamBenchmarkSheet'
 import { Field } from './Field'
 /* ================= DNS settings ================= */
 
@@ -19,6 +21,7 @@ export function DnsSettings() {
   const { cfg } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
+  const sheet = useSheet()
   const { data, mutate, isLoading } = useSWR<DnsInfo>(cfg ? ['dns', cfg, '/dns_info'] : null, swrFetcher)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<Record<string, string> | null | undefined>(undefined)
@@ -47,7 +50,7 @@ export function DnsSettings() {
     try {
       const r = await api<Record<string, string> | null>(cfg, '/test_upstream_dns', {
         method: 'POST',
-        body: { upstream_dns: toLines(d.upstream_dns) },
+        body: { upstream_dns: toCleanUpstreamLines(d.upstream_dns) },
       })
       const errs = Object.fromEntries(Object.entries(r ?? {}).filter(([, v]) => v && v.toLowerCase() !== 'ok'))
       setTestResult(errs)
@@ -55,6 +58,20 @@ export function DnsSettings() {
     } catch (e: any) {
       toast(t('common.testFailed', { msg: e.message }), 'err')
     }
+  }
+
+  function openBenchmark() {
+    if (!d) return
+    sheet.open(
+      <UpstreamBenchmarkSheet
+        initialUpstreams={d.upstream_dns ?? []}
+        onApply={(bestUpstreams) => {
+          set('upstream_dns', bestUpstreams)
+        }}
+        onClose={sheet.close}
+      />,
+      { title: t('advanced.benchmarkTitle') }
+    )
   }
 
   async function clearCache() {
@@ -71,6 +88,9 @@ export function DnsSettings() {
   const lines = (arr: string[] | undefined) => (arr ?? []).join('\n')
   function toLines(arr: string[] | undefined): string[] {
     return (arr ?? []).map((s) => s.trim()).filter(Boolean)
+  }
+  function toCleanUpstreamLines(arr: string[] | undefined): string[] {
+    return (arr ?? []).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'))
   }
 
   return (
@@ -141,7 +161,7 @@ export function DnsSettings() {
                 />
               </Rows>
             </Group>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="block">
                 <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.upstreamTimeout')}</span>
                 <input className="field num" type="number" value={d.upstream_timeout} onChange={(e) => set('upstream_timeout', Number(e.target.value))} />
@@ -149,6 +169,11 @@ export function DnsSettings() {
               <div className="flex items-end">
                 <Button variant="glass" className="w-full" onClick={testUpstreams}>
                   <Play size={14} /> {t('advanced.testUpstreams')}
+                </Button>
+              </div>
+              <div className="flex items-end">
+                <Button variant="primary" className="w-full gap-1.5" onClick={openBenchmark}>
+                  <Zap size={14} /> {t('advanced.benchmarkTitle')}
                 </Button>
               </div>
             </div>
