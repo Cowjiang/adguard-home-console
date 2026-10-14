@@ -16,7 +16,10 @@ export function AboutSettings() {
       <GroupTitle>{t('settings.aboutGroup')}</GroupTitle>
       <Group>
         <Rows>
-          <Row icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Info size={17} /></IconBubble>} title={APP_NAME} value={'v' + APP_VERSION} />
+          {/* The version goes in the subtitle, as on the settings hub: a nightly
+              string is long enough that a trailing value squeezes the app name
+              out of the row on a phone width. */}
+          <Row icon={<IconBubble color="var(--accent)" bg="var(--accent-soft)"><Info size={17} /></IconBubble>} title={APP_NAME} subtitle={'v' + APP_VERSION} />
           <Row
             icon={<IconBubble color="var(--violet)" bg="var(--violet-soft)"><Network size={17} /></IconBubble>}
             title={t('settings.compatibility')}
