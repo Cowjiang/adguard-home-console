@@ -36,7 +36,7 @@
    - `workflow_dispatch` 默认干跑（`publish=false`）：手动触发不再静默发布；补发显式设 `publish=true`。
 2. **npm 包名定为 `agh-console`**，与镜像名、容器名、`/opt/agh-console`、systemd 单元、README 里已有的命令一致。`registry.npmjs.org` 对 `agh-console` 与 `adguard-home-console` 都返回 404（未被占用，2026-10-07 实测）。
    - `bin` 只放一个条目 `agh-console → server/index.mjs`（补 shebang）：npm exec 的规则是「包只有一个 bin 条目时就用它」，所以 `npx agh-console` 成立。
-   - 仓库非公开（`api.github.com/repos/Cowjiang/adguard-home-console` 对匿名请求 404），而 npm 明示「私有仓库不生成 provenance」，所以首版用 `NPM_TOKEN` 且不加 `--provenance`；`NPM_TOKEN` 缺失时该 job 告警跳过，而不是把整条发版打红。
+   - 仓库非公开（`api.github.com/repos/Cowjiang/adguard-home-console` 对匿名请求 404），而 npm 明示「私有仓库不生成 provenance」，所以首版用 `NPM_TOKEN` 且不加 `--provenance`；`NPM_TOKEN` 缺失时该 job 告警跳过，而不是把整条发版打红。（2026-10-15 仓库已转为 public，provenance 因此可用，见 `docs/engineering.md`。）
    - 发布物即验证物：CI 里 `npm pack` 出 tgz、`scripts/check-npm-pack.mjs` 断言内容后，`npm publish <tgz>`，发布阶段不重新打包。
    - npm 的 `latest` 只在第一个 stable 发布后才存在；在那之前 `npx agh-console` 会 ETARGET，需要先发一个 stable 或手动 `npm dist-tag add` 引导（已写进 docs）。
 3. **镜像仍由 `Dockerfile` 自建**，保证 `docker build .` 可独立复现；构建阶段改 `--platform=$BUILDPLATFORM`，前端 bundle 与架构无关，不再在 arm64 的 QEMU 下重跑一遍。

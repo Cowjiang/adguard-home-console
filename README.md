@@ -48,7 +48,7 @@ docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:lates
 
 Multi-arch (amd64 / arm64). A stable `vX.Y.Z` tag publishes `latest`, `X.Y.Z` and `X.Y`; the nightly built from `dev` publishes `nightly` and `sha-<commit>`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
 
-The GHCR package inherits the repository's visibility: while the repository is private, `docker login ghcr.io` (token with `read:packages`) is required; switching the package to public in its settings removes that step.
+The GHCR package is public. Note that a package does **not** inherit the repository's visibility — that is its own switch in the package settings — so a private package would instead require `docker login ghcr.io` with a `read:packages` token.
 
 Or with Docker Compose:
 
