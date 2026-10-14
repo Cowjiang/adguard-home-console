@@ -64,6 +64,7 @@
 - `release.yml` 里的 action 一律钉在 **node24 主线**（node20 的动作会被 runner 强制降级运行并逐 job 打弃用告警）；升大版本前逐个核对本流程用到的 input 在新版里是否仍然存在，本仓没有 Dependabot 兜底。
 - npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。`NPM_TOKEN` 未配置时该 job 只告警跳过，不影响其余渠道；私有仓库拿不到 provenance，故不加 `--provenance`。
 - iOS 产物由 `release.yml` 的 `ios` job（`macos-latest`）构建：`./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` 出**未签名** ipa（资产名固定 `agh-console.ipa`），安装者用自己的 Apple ID 重签；签名值与本地一致，只走仓库变量，缺省兜底 `unsigned` 与 `tauri.conf.json#identifier`。stable 恒构建，nightly 只在仓库公开、`AGH_IOS_NIGHTLY=true` 或手动 `workflow_dispatch` 时构建（私有仓库的 macOS 分钟按 10× 计费）；`release` job 用 `!cancelled()` 接住 iOS 的失败，ipa 缺失只让运行页变红，不阻断 tarball / npm / 镜像。
+- 版本只有一个来源：`release-plan.mjs --set-version <版本> <build>` 同时写 `package.json`、`src-tauri/tauri.conf.json` 与 iOS 工程的 plist 两项，前端与 iOS 包的应用内版本因此等于该次发版的版本（镜像用 `APP_VERSION` build-arg 传入——改上下文里的 `package.json` 会让 `pnpm install` 的缓存层每次发版重跑）。iOS 的 `CFBundleShortVersionString` 只接受 1–3 段纯数字，故工程里记**核心版本 + 数字 build**，完整 nightly 串只在界面里；仓库内三个声明值平时与 `package.json` 同值。`src-tauri/Cargo.toml` 的 crate 版本不参与（不出现在任何产物或界面里）。
 - GHCR 包继承仓库可见性：仓库私有时 README 里的匿名 `docker run` 需要先把包设为 public（或在目标机 `docker login ghcr.io`）。
 
 ## 验证入口

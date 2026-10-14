@@ -62,8 +62,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 1.0.0
-        CFBundleVersion: "1.0.0"
+        CFBundleShortVersionString: 0.1.0
+        CFBundleVersion: "0.1.0"
     entitlements:
       path: adguard-home-console_iOS/adguard-home-console_iOS.entitlements
     scheme:

@@ -139,11 +139,13 @@ jobs:
         if: needs.prepare.outputs.channel == 'nightly'
         run: pnpm check && pnpm test && npm run test:server && pnpm test:release
 
-      # Stamped once, then carried by the tarball, the npm package and the image
+      # Stamped once, then carried by the tarball, the npm package, the image and
+      # the iOS bundle
       - name: Stamp version
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: node scripts/release-plan.mjs --set-version "$VERSION"
+          BUILD: ${{ github.run_number }}
+        run: node scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
 
       - run: pnpm build
 
@@ -227,6 +229,17 @@ jobs:
           bundle_id="${AGH_BUNDLE_ID:-$(node -p "require('./src-tauri/tauri.conf.json').identifier")}"
           printf 'AGH_APPLE_TEAM=%s\nAGH_BUNDLE_ID=%s\n' "${AGH_APPLE_TEAM:-unsigned}" "$bundle_id" > .env.signing
           echo "bundle id: $bundle_id"
+
+      # Same stamp as the build job: package.json decides what the UI reports
+      # (vite.config.ts injects it, and tauri-cli runs pnpm build), and the iOS
+      # project takes the core version with this run's number as the bundle
+      # version. Must precede the build; xcodegen turns project.yml into the
+      # app's Info.plist when the project is generated below.
+      - name: Stamp version
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD: ${{ github.run_number }}
+        run: node scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
 
       # The command the local Mac runs, plus --no-sign. pnpm build is not a step
       # of its own: tauri-cli runs build.beforeBuildCommand, and the frontend
@@ -402,6 +415,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: ${{ needs.prepare.outputs.publish == 'true' }}
           tags: ${{ needs.prepare.outputs.docker_tags }}
+          # What Settings → About reports inside the image (vite.config.ts reads
+          # APP_VERSION; see the Dockerfile for why this is not a stamped file)
+          build-args: |
+            APP_VERSION=${{ needs.prepare.outputs.version }}
           labels: |
             org.opencontainers.image.title=AGH Console
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

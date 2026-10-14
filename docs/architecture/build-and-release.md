@@ -29,7 +29,7 @@
 
 - **prepare**：`scripts/release-plan.mjs` 按 ref 算出渠道、版本与各处 tag（`pnpm test:release` 钉住这张映射表）。
 - **build**（ubuntu）：`pnpm install --frozen-lockfile` → 把版本写回 `package.json` → `pnpm build` → `scripts/check-npm-pack.mjs` 打包并校验 npm 产物 → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 两个产物一起上传。
-- **ios**（macos）：`brew install xcodegen` 与 `rustup target add aarch64-apple-ios` → 由仓库变量落盘 `.env.signing` → `./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` → ipa 改名为 `agh-console.ipa` 上传。它不消费 `build` 的产物：前端由 tauri-cli 的 `beforeBuildCommand`（`pnpm build`）自己构建并编进 Rust 二进制。
+- **ios**（macos）：`brew install xcodegen` 与 `rustup target add aarch64-apple-ios` → 由仓库变量落盘 `.env.signing` → `--set-version` 写发版版本（前端与 iOS 工程）→ `./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` → ipa 改名为 `agh-console.ipa` 上传。它不消费 `build` 的产物：前端由 tauri-cli 的 `beforeBuildCommand`（`pnpm build`）自己构建并编进 Rust 二进制。
 - **release / npm / docker**：只消费上述产物，不再各自安装依赖或重新构建；`release` 额外把 ipa 挂到同一条 Release 上。
 
 | 渠道 | 触发 | 版本 | Release | npm dist-tag | 镜像 tag |
@@ -50,6 +50,7 @@
 - iOS 的成本门与容错：macOS runner 在私有仓库按 10× 计费，所以 **stable 恒构建，nightly 只在仓库公开、`AGH_IOS_NIGHTLY=true`，或手动 `workflow_dispatch` 时构建**；`release` 的 `needs` 含 `ios`（不加会与 iOS 构建抢跑、ipa 时有时无），但容错只对 iOS 开口：`!cancelled()` 让 iOS 失败时照常发 tarball / npm / 镜像，而 `needs.build.result == 'success'` 保持既有语义——`build` 失败依旧不发布。ipa 缺失时运行页是红的，Release 不会被静默降级。
 - 签名值不进 CI 配置也不用 secrets：`AGH_APPLE_TEAM` / `AGH_BUNDLE_ID` 从仓库变量读，未设置时分别兜底为 `unsigned` 与 `tauri.conf.json#identifier`（不签名的构建里 team 只是 XcodeGen 的占位符）。
 - 资产名固定为 `agh-console.ipa`（与 `agh-console.tar.gz` 同风格）：nightly 的原地 upsert 因此是**替换**而不是逐日堆积一个 ipa。
+- 版本只有一个来源：`scripts/release-plan.mjs` 算出的发版版本。`--set-version <版本> <build>` 一次写完 `package.json`、`src-tauri/tauri.conf.json` 与 iOS 工程的 `CFBundleShortVersionString`/`CFBundleVersion`；前端经 `vite.config.ts` 的 `define` 把 `package.json` 的版本编进 `dist`（应用内「关于」页显示的就是它），镜像走 `build-args: APP_VERSION` 而不改上下文里的 `package.json`。iOS 的 plist 只收 1–3 段纯数字，所以记的是**核心版本 + 数字 build**（CI 传 `github.run_number`），nightly 的 prerelease 后缀只出现在应用界面里。
 - `concurrency` 按 ref 串行，不取消进行中的运行；Release 与 tag 都不删除，既是回滚点，也是「相对上一版」变更列表的基线。
 
 ## Release 说明

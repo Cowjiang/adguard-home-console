@@ -4,7 +4,10 @@
  * Actions outputs, printed for humans otherwise.
  *
  *   node scripts/release-plan.mjs                 print the plan for this run
- *   node scripts/release-plan.mjs --set-version V stamp V into package.json
+ *   node scripts/release-plan.mjs --set-version V [build]
+ *                                                 stamp V into package.json,
+ *                                                 tauri.conf.json and the iOS
+ *                                                 project (build = CFBundleVersion)
  *   node scripts/release-plan.mjs --self-test     pin the mapping table
  *
  * Channels (decision: .agents/pipelines/proposals/process/2026-10-07-multi-channel-release.md):
@@ -21,8 +24,11 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
 const PACKAGE_URL = new URL('../package.json', import.meta.url);
+const TAURI_CONFIG_URL = new URL('../src-tauri/tauri.conf.json', import.meta.url);
+const APPLE_PROJECT_URL = new URL('../src-tauri/gen/apple/project.yml', import.meta.url);
 const STABLE_TAG = /^v(\d+)\.(\d+)\.(\d+)$/;
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
+const BUILD = /^[1-9]\d*$/;
 const DATE = /^\d{8}$/;
 const SHA = /^[0-9a-f]{7,40}$/;
 // The integration branch the scheduled nightly builds from; a dispatch from
@@ -134,13 +140,60 @@ function runPlan() {
   for (const warning of result.warnings) console.log(`::warning::${warning}`);
 }
 
-function setVersion(version) {
+/**
+ * The version an iOS bundle can carry: CFBundleShortVersionString accepts only
+ * 1–3 dot-separated integers, and cargo-mobile2 rejects any other segment as
+ * `BundleVersionInvalid` when it reads the project's Info.plist. The nightly
+ * prerelease suffix therefore stays out of the plist — the UI reports the full
+ * version, CFBundleVersion carries the difference.
+ */
+export function coreVersion(version) {
+  return version.split('-')[0];
+}
+
+/** Rewrite the two version keys of gen/apple/project.yml (xcodegen renders them
+ *  into the app's Info.plist). build is optional: without it the bundle version
+ *  stays the core version. */
+export function stampAppleProject(project, version, build) {
+  return project
+    .replace(/^(\s*CFBundleShortVersionString:).*$/m, `$1 ${coreVersion(version)}`)
+    .replace(/^(\s*CFBundleVersion:).*$/m, `$1 "${build ?? coreVersion(version)}"`);
+}
+
+function setVersion(version, build) {
   if (!VERSION.test(version || '')) fail(`'${version}' 不是合法 semver`);
+  if (build !== undefined && !BUILD.test(build)) fail(`build '${build}' 不是正整数`);
+
   const pkg = JSON.parse(readFileSync(PACKAGE_URL, 'utf8'));
-  if (pkg.version === version) return console.log(`release-plan: package.json 已是 ${version}`);
-  pkg.version = version;
-  writeFileSync(PACKAGE_URL, `${JSON.stringify(pkg, null, 2)}\n`);
-  console.log(`release-plan: package.json version → ${version}`);
+  if (pkg.version === version) {
+    console.log(`release-plan: package.json 已是 ${version}`);
+  } else {
+    pkg.version = version;
+    writeFileSync(PACKAGE_URL, `${JSON.stringify(pkg, null, 2)}\n`);
+    console.log(`release-plan: package.json version → ${version}`);
+  }
+
+  const tauri = JSON.parse(readFileSync(TAURI_CONFIG_URL, 'utf8'));
+  if (tauri.version === version) {
+    console.log(`release-plan: tauri.conf.json 已是 ${version}`);
+  } else {
+    tauri.version = version;
+    writeFileSync(TAURI_CONFIG_URL, `${JSON.stringify(tauri, null, 2)}\n`);
+    console.log(`release-plan: tauri.conf.json version → ${version}`);
+  }
+
+  // Everything that carries a version is stamped from here: the web build reads
+  // package.json (vite.config.ts injects it), tauri takes the config value, and
+  // the iOS job regenerates the project (scripts/ios-signing.sh rebuilds it
+  // whenever the pbxproj is missing) so the plist picks these two up.
+  const project = readFileSync(APPLE_PROJECT_URL, 'utf8');
+  const stamped = stampAppleProject(project, version, build);
+  if (stamped === project) {
+    console.log(`release-plan: iOS 工程已是 ${coreVersion(version)}/${build ?? coreVersion(version)}`);
+  } else {
+    writeFileSync(APPLE_PROJECT_URL, stamped);
+    console.log(`release-plan: iOS 工程 → ${coreVersion(version)}（build ${build ?? coreVersion(version)}）`);
+  }
 }
 
 function selfTest() {
@@ -230,11 +283,35 @@ function selfTest() {
   assert.throws(() => plan({ ...base, baseVersion: 'nope' }), /不是 semver/);
   assert.throws(() => plan({ ...base, date: '2026-10-07' }), /不是 YYYYMMDD/);
 
-  console.log('release-plan: self-test ok（nightly/stable/dispatch、非法 tag/semver/sha 拒绝、镜像引用全限定）');
+  // The iOS bundle takes the core version: the plist rejects the nightly
+  // suffix, so CFBundleVersion carries the difference.
+  assert.equal(coreVersion('0.1.0-nightly.20261007.abc1234'), '0.1.0');
+  assert.equal(coreVersion('1.2.3'), '1.2.3');
+  const sample = [
+    '    info:',
+    '      properties:',
+    '        CFBundleShortVersionString: 1.0.0',
+    '        CFBundleVersion: "1.0.0"',
+    '',
+  ].join('\n');
+  assert.equal(
+    stampAppleProject(sample, '0.1.0-nightly.20261007.abc1234', '137'),
+    [
+      '    info:',
+      '      properties:',
+      '        CFBundleShortVersionString: 0.1.0',
+      '        CFBundleVersion: "137"',
+      '',
+    ].join('\n'),
+  );
+  // Without a build number the bundle version is the core version.
+  assert.equal(stampAppleProject(sample, '1.2.3').includes('CFBundleVersion: "1.2.3"'), true);
+
+  console.log('release-plan: self-test ok（nightly/stable/dispatch、非法 tag/semver/sha 拒绝、镜像引用全限定、iOS 工程版本映射）');
 }
 
-const [flag, value] = process.argv.slice(2);
+const [flag, value, build] = process.argv.slice(2);
 if (flag === '--self-test') selfTest();
-else if (flag === '--set-version') setVersion(value);
+else if (flag === '--set-version') setVersion(value, build);
 else if (flag) fail(`未知参数 ${flag}`);
 else runPlan();

@@ -52,7 +52,7 @@
 
 ## 窗口与构建
 
-- `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.cowjiang.aghconsole`、单窗口 `main`（960×640，最小 400×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。
+- `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.cowjiang.aghconsole`、version 与 `package.json` 同值（发版时由 `release-plan.mjs --set-version` 一起写）、单窗口 `main`（960×640，最小 400×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。
 - `beforeDevCommand`/`beforeBuildCommand` 复用 pnpm 脚本，壳与 Web 构建同一份 `dist/`。
 - iOS 在 setup 中禁用 WKWebView 的前进/后退手势，页面转场由前端自己负责（见 `docs/web-interaction.md`）。
 - `src-tauri/gen/` 只生成 apple 一套工程且不入库；生成与构建统一走 `./scripts/ios-signing.sh`，签名值来自被忽略的 `.env.signing`。

@@ -3,7 +3,7 @@
 **Class:** process
 **Status:** implemented
 **Date:** 2026-10-07
-**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly。随后在合并到 `main` 后跑了真实 nightly，暴露并修掉镜像引用与手动重跑两个问题，见 Accept 末两项）
+**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly。随后在合并到 `main` 后跑了真实 nightly，暴露并修掉镜像引用与手动重跑两个问题，见 Accept 末两项）；2026-10-15（标注「版本统一」后续项已由 `2026-10-15-version-single-source.md` 落地）
 **Source:** 用户要求「调整 release 以适配 npx 和 docker 发版」
 
 ## Goal
@@ -78,5 +78,5 @@
 
 **后续（不在本次）**
 - 把纯前端依赖降到 `devDependencies`，缩短 `npx` 首次安装时间——需要重算 `pnpm-lock.yaml`，本机拿不到 pnpm 12，故不做。
-- `src-tauri/tauri.conf.json`（1.0.0）与 npm 版本的统一；两者目前仍各自演进。
+- `src-tauri/tauri.conf.json`（1.0.0）与 npm 版本的统一；两者目前仍各自演进。（2026-10-15 已落地：见 `2026-10-15-version-single-source.md`，版本改为单一来源并连带覆盖 iOS 工程。）
 - 仓库转为 public 后开启 `--provenance` + trusted publishing，退掉长期 token。

@@ -60,4 +60,6 @@ export const SERVICE_CACHE_KEY = 'agh.services.v1'
 
 /** Display name; matches the Tauri shell productName in tauri.conf.json */
 export const APP_NAME = 'AGH Console'
-export const APP_VERSION = '1.0.0'
+/** Build-time constant: the release version in shipped artifacts, otherwise
+ *  package.json#version (see vite.config.ts and src/types/app-version.d.ts) */
+export const APP_VERSION = __APP_VERSION__
