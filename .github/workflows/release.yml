@@ -1,9 +1,11 @@
 name: Release
 
-# Two channels, one build, three consumers: the GitHub Release tarball, the npm
+# Two channels, one build, four consumers: the GitHub Release tarball, the npm
 # package and the GHCR image all carry the same version, computed once in the
 # prepare job (scripts/release-plan.mjs; `node scripts/release-plan.mjs --self-test`
-# pins the mapping).
+# pins the mapping); the iOS IPA rides along on the Release as a fourth one,
+# built by the `ios` job from the same ref (unsigned, no version stamp — see
+# .agents/pipelines/proposals/process/2026-10-15-release-ipa-artifact.md).
 #
 #   nightly  schedule from `dev` / dispatch   one rolling prerelease, tag `nightly` moved to each build
 #                                              npm dist-tag nightly, image :nightly :<version> :sha-<sha>
@@ -159,9 +161,112 @@ jobs:
             agh-console.tar.gz
             *.tgz
 
+  # The only artifact that needs macOS. Built unsigned on purpose: CI has no
+  # Apple certificate, and the IPA is meant to be re-signed by whoever installs
+  # it (Sideloadly / AltStore / Xcode with their own Apple ID). The Tauri CLI's
+  # IOS_CERTIFICATE / IOS_CERTIFICATE_PASSWORD / IOS_MOBILE_PROVISION env vars
+  # are the hook if a signed IPA is ever wanted here.
+  ios:
+    needs: prepare
+    # macOS minutes bill at 10× on a private repository, where a daily build
+    # would eat the free 2000-minute allowance and then stall every channel, so
+    # a private nightly has to opt in. Stable and a public repository build it
+    # unconditionally, and so does a dispatch: both are deliberate.
+    if: >-
+      needs.prepare.outputs.skip != 'true' &&
+      (needs.prepare.outputs.channel == 'stable' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event.repository.private == false ||
+      vars.AGH_IOS_NIGHTLY == 'true')
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The Rust half dominates an iOS build; the cache keys off Cargo.lock.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # XcodeGen renders src-tauri/gen/apple/project.yml; the brew formula ships
+      # the SettingPresets that scripts/ios-signing.sh asserts on.
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Add the iOS Rust target
+        run: rustup target add aarch64-apple-ios
+
+      # Print what the Xcode script phase will look for: it shells out to
+      # `pnpm run -- tauri ios xcode-script`, so node, pnpm and cargo all have to
+      # be reachable from the build it inherits the environment from.
+      - name: Check the toolchain
+        run: |
+          node -v && pnpm -v && cargo -V
+          xcodebuild -version | head -n 2
+          rustup target list --installed | grep -qx aarch64-apple-ios
+
+      # ios-signing.sh reads .env.signing, which is machine-local by design. With
+      # signing off the team id is only an XcodeGen placeholder, so the job runs
+      # before any secret exists; set the two repository variables to keep the
+      # CI bundle id in step with the one the local Mac builds.
+      - name: Write the signing file
+        env:
+          AGH_APPLE_TEAM: ${{ vars.AGH_APPLE_TEAM }}
+          AGH_BUNDLE_ID: ${{ vars.AGH_BUNDLE_ID }}
+        run: |
+          bundle_id="${AGH_BUNDLE_ID:-$(node -p "require('./src-tauri/tauri.conf.json').identifier")}"
+          printf 'AGH_APPLE_TEAM=%s\nAGH_BUNDLE_ID=%s\n' "${AGH_APPLE_TEAM:-unsigned}" "$bundle_id" > .env.signing
+          echo "bundle id: $bundle_id"
+
+      # The command the local Mac runs, plus --no-sign. pnpm build is not a step
+      # of its own: tauri-cli runs build.beforeBuildCommand, and the frontend
+      # ends up embedded in the Rust binary.
+      - name: Build the IPA
+        run: ./scripts/ios-signing.sh tauri build --target aarch64 --no-sign
+
+      # Fixed asset name, like agh-console.tar.gz: the nightly release is
+      # upserted in place, so a name carrying the version would pile up one IPA
+      # per night instead of replacing the previous one.
+      - name: Collect the IPA
+        run: |
+          ipa="$(find src-tauri/gen/apple/build -name '*.ipa' -print -quit)"
+          if [ -z "$ipa" ]; then
+            echo "::error::iOS 构建没有产出 ipa"
+            exit 1
+          fi
+          mv "$ipa" agh-console.ipa
+          # A zip that lost its Payload is still a valid ipa and would ship as
+          # the release asset: assert the bundle is actually in there.
+          unzip -l agh-console.ipa | grep -E 'Payload/.+\.app/Info\.plist' || {
+            echo "::error::ipa 里没有 Payload/<App>.app/Info.plist"
+            exit 1
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-ipa
+          if-no-files-found: error
+          path: agh-console.ipa
+
   release:
-    needs: [prepare, build]
-    if: needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.skip != 'true'
+    needs: [prepare, build, ios]
+    # The iOS job must not be able to block the web, npm and image channels, and
+    # it must not race them either (an IPA that arrives after the release has been
+    # created would be missing from it), hence both the extra need and
+    # !cancelled(). A failed build still blocks publishing: without its tarball
+    # there is nothing to publish. The IPA step at the end attaches one only when
+    # the macOS job actually produced it.
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -214,6 +319,22 @@ jobs:
           body_path: release-notes.md
           files: agh-console.tar.gz
           prerelease: ${{ needs.prepare.outputs.prerelease }}
+
+      # The IPA rides along only when the macOS job produced one. A step of its
+      # own, so a missing file can never fail the release upsert above; --clobber
+      # replaces the asset the same way the tarball is replaced.
+      - uses: actions/download-artifact@v8
+        if: needs.ios.result == 'success'
+        with:
+          name: ios-ipa
+
+      - name: Attach the IPA
+        if: needs.ios.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: gh release upload "$TAG" agh-console.ipa --clobber --repo "$REPO"
 
   npm:
     needs: [prepare, build]

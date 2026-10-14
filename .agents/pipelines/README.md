@@ -51,6 +51,7 @@
 | 2026-10-13 | feature | [多实例运维能力闭环套件（P1: 订阅列表同步、客户端同步与健康矩阵面板）](proposals/feature/2026-10-13-multi-instance-cluster-operations.md) | implemented |
 | 2026-10-13 | feature | [上游 DNS 并发测速与基准测试](proposals/feature/2026-10-13-upstream-dns-benchmark.md) | implemented |
 | 2026-10-13 | feature | [实现跨节点查询日志聚合与交互式下钻分析](proposals/feature/2026-10-13-query-log-analytics.md) | implemented |
+| 2026-10-15 | process | [在 release 工作流里构建并附带 iOS IPA](proposals/process/2026-10-15-release-ipa-artifact.md) | implemented |
 
 ## 与 docs/ 的分工
 

@@ -86,6 +86,10 @@ pnpm install --prod
 pnpm start
 ```
 
+### iOS
+
+Every release also carries `agh-console.ipa`, built from the same commit as the other artifacts. It is **unsigned**, because it is built without an Apple certificate: iOS only installs apps signed by a certificate you own, so re-sign it with your own Apple ID before installing. Sideloadly and AltStore do that on Windows or macOS, Xcode on macOS. A free Apple ID is enough — its signing profile expires after seven days, after which the app has to be re-signed to run again.
+
 ### Build from source
 
 Requires Node.js ≥ 24 and pnpm (`corepack enable` is enough; both versions are pinned in `package.json`).

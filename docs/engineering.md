@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-10-07
+**Updated:** 2026-10-15
 
 ## 实现约束
 
@@ -63,6 +63,7 @@
 - 镜像 tag 由 `release-plan.mjs` 输出为**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 当成 Docker Hub 名字，会去推 `library/<tag>` 并拿到 401——首次真实 nightly 就是这么失败的。
 - `release.yml` 里的 action 一律钉在 **node24 主线**（node20 的动作会被 runner 强制降级运行并逐 job 打弃用告警）；升大版本前逐个核对本流程用到的 input 在新版里是否仍然存在，本仓没有 Dependabot 兜底。
 - npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。`NPM_TOKEN` 未配置时该 job 只告警跳过，不影响其余渠道；私有仓库拿不到 provenance，故不加 `--provenance`。
+- iOS 产物由 `release.yml` 的 `ios` job（`macos-latest`）构建：`./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` 出**未签名** ipa（资产名固定 `agh-console.ipa`），安装者用自己的 Apple ID 重签；签名值与本地一致，只走仓库变量，缺省兜底 `unsigned` 与 `tauri.conf.json#identifier`。stable 恒构建，nightly 只在仓库公开、`AGH_IOS_NIGHTLY=true` 或手动 `workflow_dispatch` 时构建（私有仓库的 macOS 分钟按 10× 计费）；`release` job 用 `!cancelled()` 接住 iOS 的失败，ipa 缺失只让运行页变红，不阻断 tarball / npm / 镜像。
 - GHCR 包继承仓库可见性：仓库私有时 README 里的匿名 `docker run` 需要先把包设为 public（或在目标机 `docker login ghcr.io`）。
 
 ## 验证入口
