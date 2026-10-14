@@ -27,7 +27,7 @@
 | 2026-09-24 | bug-fix | [顶栏右侧按钮高度统一对齐返回胶囊](proposals/bug-fix/2026-09-24-header-action-height.md) | implemented |
 | 2026-09-24 | bug-fix | [日志页筛选状态同步进 URL，避免返回时被旧筛选覆盖](proposals/bug-fix/2026-09-24-log-filter-url-sync.md) | implemented |
 | 2026-09-24 | bug-fix | [修掉原生选择器覆盖层撑宽文档导致的页面横向拖动](proposals/bug-fix/2026-09-24-native-select-doc-overflow.md) | implemented |
-| 2026-09-24 | feature | [把 iOS 壳的顶栏操作按钮改成原生液态玻璃](proposals/feature/2026-09-24-native-glass-header-actions.md) | implemented |
+| 2026-09-24 | feature | [把 iOS 壳的顶栏操作按钮改成原生液体玻璃](proposals/feature/2026-09-24-native-glass-header-actions.md) | implemented |
 | 2026-09-23 | process | [把架构文档拆成 docs/architecture/ 并按代码重建](proposals/process/2026-09-23-architecture-docs-rebuild.md) | implemented |
 | 2026-09-23 | process | [统一 docs 的文件名与页面元信息](proposals/process/2026-09-23-docs-naming-and-metadata.md) | implemented |
 | 2026-09-24 | feature | [为 React UI 引入中英双语](proposals/feature/2026-09-24-ui-i18n.md) | implemented |
@@ -45,12 +45,13 @@
 | 2026-10-07 | bug-fix | [修回 iOS 工程的 pre-build 脚本调用方式，让 Xcode 阶段不再 panic](proposals/bug-fix/2026-10-07-ios-xcode-script-phase.md) | implemented |
 | 2026-10-07 | bug-fix | [修回 iOS release 构建的 Swift 静态链接](proposals/bug-fix/2026-10-07-ios-release-swift-link.md) | implemented |
 | 2026-10-07 | process | [把发版拆成 GitHub Release / npm / GHCR 三个消费者](proposals/process/2026-10-07-multi-channel-release.md) | implemented |
-| 2026-10-12 | feature | [为多实例增加集群级防护并发控制](proposals/feature/2026-10-12-multi-instance-cluster-protection.md) | implemented |
+| 2026-10-12 | feature | [为多实例增加集群级保护并发控制](proposals/feature/2026-10-12-multi-instance-cluster-protection.md) | implemented |
 | 2026-10-12 | feature | [为多实例增加 DNS 重写与自定义规则单向同步](proposals/feature/2026-10-12-multi-instance-rules-sync.md) | implemented |
 | 2026-10-13 | process | [为 Pull Request 和核心分支增加自动化 CI 检查](proposals/process/2026-10-13-pull-request-ci-workflow.md) | implemented |
 | 2026-10-13 | feature | [多实例运维能力闭环套件（P1: 订阅列表同步、客户端同步与健康矩阵面板）](proposals/feature/2026-10-13-multi-instance-cluster-operations.md) | implemented |
 | 2026-10-13 | feature | [上游 DNS 并发测速与基准测试](proposals/feature/2026-10-13-upstream-dns-benchmark.md) | implemented |
 | 2026-10-13 | feature | [实现跨节点查询日志聚合与交互式下钻分析](proposals/feature/2026-10-13-query-log-analytics.md) | implemented |
+| 2026-10-13 | feature | [配置快照与历史版本还原（Configuration Snapshots & Rollback）](proposals/feature/2026-10-13-configuration-snapshots-and-rollback.md) | proposed |
 
 ## 与 docs/ 的分工
 
