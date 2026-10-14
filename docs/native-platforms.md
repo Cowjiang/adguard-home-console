@@ -1,7 +1,7 @@
 # 原生平台现状
 
 **Status:** current
-**Updated:** 2026-10-07
+**Updated:** 2026-10-15
 
 ## Tauri 2 壳
 
@@ -15,7 +15,7 @@ iOS 只有这一条线。2026-09-24 起原先并行的纯 SwiftUI 线退役：�
 
 ## 签名与生成
 
-- 签名值只放根目录被忽略的 `.env.signing`：`AGH_APPLE_TEAM` 和 `AGH_BUNDLE_ID`。
+- 签名值只放根目录被忽略的 `.env.signing`：`AGH_APPLE_TEAM` 和 `AGH_BUNDLE_ID`。**bundle id 的规范值是 `com.cowjiang.aghconsole`**（= `src-tauri/tauri.conf.json#identifier`，也是 CI 未配变量时的兜底）：本机 `.env.signing` 与仓库变量 `AGH_BUNDLE_ID` 都应与它同值——不同值时，本地构建的包与 CI 的包在设备上会变成两个应用，而 App Store 的 bundle id 全局唯一、注册后不可更换。
 - `src-tauri/gen/apple/project.yml` 使用 `${...}` 占位符。生成和构建走 `scripts/ios-signing.sh`，它在调用工具前检查变量。
 - `*.xcodeproj` 是生成产物，不入库。克隆后先运行 `./scripts/ios-signing.sh generate tauri`，再打开工程；日常构建用 `pnpm ios:build`。
 - 部署目标是 `src-tauri/gen/apple/project.yml` 里的 `15.0`（Xcode 27 拒绝 Tauri 默认的 14.0）；`src-tauri/tauri.conf.json` 的 `bundle.iOS.minimumSystemVersion` 与之保持同值。`generate` 只跑 `xcodegen`，**不**调用 `tauri ios init`：init 会重写 `project.yml` 并把 `{{apple.development-team}}` 渲染成明文 team id 写进被跟踪文件。

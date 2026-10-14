@@ -8,6 +8,8 @@
 
 Full management UI in your browser, as a PWA on your phone, or in a native shell on desktop and mobile — English & 简体中文, light & dark.
 
+**AGH Console** is the app's product name — it is what the browser tab, the desktop window and your phone's home screen show. The npm package and the container image are published as `agh-console`; "AdGuard Home Console" is this repository's project name.
+
 English | [简体中文简介](docs/assets/README.zh-CN.md)
 
 [![CI](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml/badge.svg)](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml)
