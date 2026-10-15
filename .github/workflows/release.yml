@@ -352,8 +352,14 @@ jobs:
     needs: [prepare, build]
     if: needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    # Trusted publishing: the registry trades this job's OIDC token for a publish
+    # grant, so no npm credential is stored anywhere. The package carries the
+    # matching configuration (type github, repository, workflow release.yml), and
+    # npm only accepts publishes from that workflow. id-token is what makes the
+    # exchange possible; without it npm finds no credential and fails.
+    permissions:
+      id-token: write
     env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       PACKAGE_NAME: ${{ needs.prepare.outputs.package_name }}
       VERSION: ${{ needs.prepare.outputs.version }}
       NPM_TAG: ${{ needs.prepare.outputs.npm_tag }}
@@ -362,28 +368,23 @@ jobs:
         with:
           name: release-assets
 
+      # No registry-url: it writes an .npmrc with a token placeholder, and npm
+      # would fail on the unresolved variable instead of using OIDC.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
 
       # The tarball is packed and verified by the build job; this step only ships
-      # it, so what is published is exactly what was checked. Until the token
-      # exists the channel warns and skips instead of failing the release.
+      # it, so what is published is exactly what was checked. --provenance works
+      # now that the repository is public; the attestation is signed by the OIDC
+      # identity above.
       - name: Publish the verified tarball
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN is not set — skipping the npm channel"
-            exit 0
-          fi
           if npm view "$PACKAGE_NAME@$VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE_NAME@$VERSION is already published — nothing to do"
             exit 0
           fi
-          npm publish ./*.tgz --tag "$NPM_TAG"
-      # --provenance stays off on purpose: npm generates no attestations for
-      # packages built from a private repository. Turn it on together with
-      # `id-token: write` if this repository is ever made public.
+          npm publish ./*.tgz --tag "$NPM_TAG" --provenance
 
   docker:
     needs: [prepare, build]
