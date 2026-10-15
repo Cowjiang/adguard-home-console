@@ -1,0 +1,103 @@
+name: Cut Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Version bump type (auto, patch, minor, major, custom). Auto infers patch/minor; major must be manually chosen.'
+        required: true
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - custom
+        default: auto
+      version:
+        description: 'Custom version (required if type is custom, e.g. 0.2.0 or 1.0.0)'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run (calculate next version and notes without committing or pushing tags)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: cut-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cut-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Proposal verification
+        run: node scripts/verify-proposals.mjs
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Install git-cliff (optional high-performance generator)
+        uses: orhun/git-cliff-action@v4
+        continue-on-error: true
+
+      - name: Calculate and bump version
+        id: bump
+        run: |
+          ARGS="--type ${{ inputs.type }}"
+          if [ "${{ inputs.type }}" = "custom" ] && [ -n "${{ inputs.version }}" ]; then
+            ARGS="--version ${{ inputs.version }}"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          node .github/scripts/bump-version.mjs $ARGS
+
+      - name: Commit, push branch and tag
+        if: ${{ inputs.dry_run != true }}
+        env:
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+          RELEASE_TAG: ${{ steps.bump.outputs.release_tag }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/tauri.conf.json CHANGELOG.md
+          if [ -f src-tauri/gen/apple/project.yml ]; then
+            git add src-tauri/gen/apple/project.yml
+          fi
+          git commit -m "chore(release): ${RELEASE_TAG}"
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "${RELEASE_TAG}"
+
+          # Dual-trigger safeguard: GitHub suppresses push: tags workflows when pushed by default GITHUB_TOKEN.
+          # Explicitly dispatch release.yml against the newly pushed tag if RELEASE_PAT is not set.
+          if [ -z "${{ secrets.RELEASE_PAT }}" ]; then
+            echo "RELEASE_PAT not detected; dispatching release.yml explicitly for ${RELEASE_TAG}..."
+            gh workflow run release.yml --ref "${RELEASE_TAG}" -f publish=true || true
+          fi

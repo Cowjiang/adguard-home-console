@@ -2,7 +2,7 @@ name: Release
 
 # Two channels, one build, four consumers: the GitHub Release tarball, the npm
 # package and the GHCR image all carry the same version, computed once in the
-# prepare job (scripts/release-plan.mjs; `node scripts/release-plan.mjs --self-test`
+# prepare job (scripts/release-plan.mjs; `node .github/scripts/release-plan.mjs --self-test`
 # pins the mapping); the iOS IPA rides along on the Release as a fourth one,
 # built by the `ios` job from the same ref (unsigned, no version stamp — see
 # .agents/pipelines/proposals/process/2026-10-15-release-ipa-artifact.md).
@@ -93,7 +93,7 @@ jobs:
           REF_NAME: ${{ steps.target.outputs.ref }}
           SHA: ${{ steps.commit.outputs.sha }}
           INPUT_PUBLISH: ${{ inputs.publish }}
-        run: node scripts/release-plan.mjs
+        run: node .github/scripts/release-plan.mjs
 
       # The nightly tag rolls: it always points at the newest build, and the
       # commit it currently holds doubles as the baseline for the next notes.
@@ -145,7 +145,7 @@ jobs:
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
           BUILD: ${{ github.run_number }}
-        run: node scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
+        run: node .github/scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
 
       - run: pnpm build
 
@@ -239,7 +239,7 @@ jobs:
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
           BUILD: ${{ github.run_number }}
-        run: node scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
+        run: node .github/scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
 
       # The command the local Mac runs, plus --no-sign. pnpm build is not a step
       # of its own: tauri-cli runs build.beforeBuildCommand, and the frontend
@@ -300,7 +300,7 @@ jobs:
           AFTER: ${{ needs.prepare.outputs.sha }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
           BRANCH: ${{ needs.prepare.outputs.ref }}
-        run: bash scripts/release-notes.sh
+        run: bash .github/scripts/release-notes.sh
 
       # One rolling nightly: the tag moves to the newest build and the release is
       # updated in place, so the release list never grows past a single entry.
