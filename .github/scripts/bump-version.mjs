@@ -12,7 +12,8 @@
  *   node .github/scripts/bump-version.mjs --self-test
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import { coreVersion, stampAppleProject } from './release-plan.mjs';
 
@@ -64,7 +65,7 @@ export function inferBumpTypeFromCommits(commitMessages) {
 
 export function isAncestor(tag, target = 'HEAD') {
   try {
-    execSync(`git merge-base --is-ancestor "${tag}" "${target}"`, { stdio: 'ignore' });
+    execFileSync('git', ['merge-base', '--is-ancestor', tag, target], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -73,7 +74,7 @@ export function isAncestor(tag, target = 'HEAD') {
 
 export function getPreviousTag(target = 'HEAD') {
   try {
-    const stdout = execSync("git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname", {
+    const stdout = execFileSync('git', ['tag', '--list', 'v[0-9]*.[0-9]*.[0-9]*', '--sort=-v:refname'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -93,7 +94,7 @@ export function getPreviousTag(target = 'HEAD') {
 export function getCommitsSince(tag) {
   try {
     const range = tag ? `${tag}..HEAD` : 'HEAD';
-    const stdout = execSync(`git log --no-merges --pretty='%h|%s' ${range}`, {
+    const stdout = execFileSync('git', ['log', '--no-merges', '--pretty=%h|%s', range], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -272,9 +273,13 @@ function selfTest() {
 }
 
 const args = process.argv.slice(2);
+// `file://${process.argv[1]}` only matches where argv[1] is already a POSIX path
+// (the CI runner); on Windows it is D:\… and the concatenation never equals
+// import.meta.url, so the script used to exit silently there.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (args.includes('--self-test')) {
   selfTest();
-} else if (import.meta.url === `file://${process.argv[1]}`) {
+} else if (isMain) {
   const typeIndex = args.indexOf('--type');
   const type = typeIndex !== -1 ? args[typeIndex + 1] : 'auto';
   const verIndex = args.indexOf('--version');
