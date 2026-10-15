@@ -75,6 +75,7 @@
 - Web 代码：`pnpm check`、`pnpm test`、`pnpm build`。测试用 vitest（include 限定 `src/`），覆盖纯逻辑（契约归一、存储迁移等）；测试文件与被测源文件同目录（`*.test.ts`），随 `pnpm check` 一起做类型检查；组件渲染与端到端仍靠手测与 mock。
 - 代理契约：`npm run test:server`（node:test，驱动 `contract/agh-proxy.contract.json` 对 Express 适配器）；同一份夹具在 `cargo test` 中驱动 Rust 适配器。
 - pnpm 12 默认启用供应链策略：**发布未满 `minimumReleaseAge` 的版本会被拒绝安装**（`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`）。这不是 lockfile 坏了，也不要关策略：`pnpm clean --lockfile && pnpm install` 重新解析会挑隔离期外的版本，或等窗口过去。`--frozen-lockfile`（CI 与 Docker）安装时会复检该策略。
+- 同一策略还把「哪些依赖允许跑构建脚本」记在 **`pnpm-workspace.yaml`**（`allowBuilds`，目前批准 `lefthook` 的 postinstall）。凡是脱离仓库根、只拷贝部分文件去装依赖的地方都必须带上这个文件：`Dockerfile` 的两层 `pnpm install` 因此与 `package.json`、`pnpm-lock.yaml` 一起拷贝——缺了它 `--frozen-lockfile` 直接以 `ERR_PNPM_IGNORED_BUILDS` 中止（v0.2.0 的镜像构建就是挂在第一步 `pnpm install` 上，而非 buildx 推送）。
 - Rust 测试：`cd src-tauri && cargo test`（契约 runner 自起临时 origin，不再依赖 mock-agh；mock 仅用于本地联调与多实例演练）。
 - 多实例与代理策略验证：再起一个 `node scripts/mock-agh.mjs`，用 `PORT`/`HOST` 换监听地址（默认仍是 127.0.0.1:3990；真机访问需要显式设 `HOST`），并用 `MOCK_SCALE`、`MOCK_REVERSE`、`MOCK_AVG_TIME`、`MOCK_VERSION`、`MOCK_TIME_UNITS`、`MOCK_STATS_INTERVAL` 让第二实例的数据可区分。`MOCK_REDIRECT_TO` 配合 `GET /__redirect-test` 用于验证代理的跨主机重定向拒绝（该路径仅测试用，不属于 AGH 契约）。
 - iOS 工程生成与构建使用 `scripts/ios-signing.sh`：生成后校验 pbxproj 的关键设置（图标、签名、bundle id、部署目标、XcodeGen 预设哨兵），构建前缺工程时自动重建；机器专属的构建故障与修复记录在 `.agents/reviews/`，不作为通用构建步骤。
