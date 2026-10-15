@@ -135,6 +135,19 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Web/PWA shells only: the native back swipe over a same-document history entry
+   reveals an underlay that WebKit paints itself -- it is blank, and the page
+   cannot draw into it (measured frame by frame, see docs/web-interaction.md).
+   The iOS shell turns that gesture off at the source (src-tauri/src/lib.rs) and
+   drives its own edge swipe from a real snapshot; browsers have no such switch,
+   so the gesture is suppressed here instead and back in the web build goes
+   through the in-app capsule, whose CSS transition uses the correct snapshot.
+   html[data-tauri-shell] is stamped by src/main.tsx from isTauriShell(), so
+   both Tauri shells are unaffected by this rule. */
+html:not([data-tauri-shell]) body {
+  overscroll-behavior-x: none;
+}
+
 /* Ambient glow background */
 .ambient {
   position: fixed;

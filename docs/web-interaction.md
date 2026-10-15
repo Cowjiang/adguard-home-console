@@ -38,6 +38,7 @@
 - SWR 数据在 tab 切换时随页面重挂自动重验证（`revalidate()` 入口不检查在线状态）；status 不归 SWR 管，落地 tab 根页（`TAB_ROOT_ROUTES`）时由 Layout 调一次 `refreshStatus()`。
 - 断网自愈（`.agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md`）：SWR 的在线状态不读 `navigator.onLine`、只认 `offline`/`online` 事件，iOS WKWebView/PWA 里事件可能丢失，丢失后轮询/focus/reconnect/错误重试被同一标志全部门死。全局 `SWRConfig` 设 `refreshWhenOffline: true` 让轮询不停摆；auth 以 15s 重探 `/status`（外加 `visibilitychange`/`online` 即时探），从失败恢复成功时全局 `mutate` 一次解救冻结的 key——15s 是恢复上界，事件可靠时仍是即时。
 - body 的 `overscroll-behavior-y: none` 压掉浏览器原生下拉刷新（整页 reload）与橡皮筋，是自研下拉接管的前提；删除它会导致双重刷新。
+- Web/PWA 侧再压一条横轴：`html:not([data-tauri-shell]) body { overscroll-behavior-x: none }`，压掉浏览器原生侧滑返回。原因同 iOS 壳关闭 `allowsBackForwardNavigationGestures`——同文档条目的手势揭示层由 WebKit 自己画、内容是空白且页面画不进去，浏览器端没有 Rust 那样的开关，只能从 CSS 侧收掉手势，返回交给应用内返回胶囊（它的 CSS 过渡用的是正确快照）。`data-tauri-shell` 由 `src/main.tsx` 依据 `isTauriShell()` 打在 `<html>` 上，两个 Tauri 壳（含 iOS App）完全不受这条规则影响。见 `.agents/pipelines/proposals/bug-fix/2026-10-16-pwa-back-swipe-blank.md`。
 
 ## 路由与转场
 
