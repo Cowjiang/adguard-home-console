@@ -34,8 +34,10 @@ const FORBIDDEN = [
   'node_modules/',
 ];
 
-const raw = execFileSync('npm', ['pack', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
-const [packed] = JSON.parse(raw);
+const raw = execFileSync('npm', ['pack', '--json', '--ignore-scripts'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+const start = raw.indexOf("[");
+const end = raw.lastIndexOf("]");
+const [packed] = JSON.parse(start !== -1 && end !== -1 ? raw.slice(start, end + 1) : raw);
 const entries = new Map(packed.files.map((file) => [file.path, file]));
 
 const errors = [];

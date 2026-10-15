@@ -89,9 +89,20 @@ EOF
 # Regenerate the project from gen/apple/project.yml and verify it
 generate_project() {
 	cd "$APPLE_DIR"
+	# project.yml declares Externals and assets as sources, but git carries neither: the first is
+	# excluded by this directory's .gitignore, the second is an empty directory. Both are filled
+	# by the build, so a fresh clone has neither and xcodegen refuses to generate — it only checks
+	# that they exist, not that they hold anything.
+	mkdir -p Externals assets
 	echo "[ios-signing] xcodegen generate(team=$AGH_APPLE_TEAM bundle=$AGH_BUNDLE_ID)"
 	local out
-	out=$(xcodegen generate 2>&1)
+	# set -e aborts on this assignment, so a failing xcodegen would never reach the print below and
+	# its output would be lost; take the status and print before deciding.
+	if ! out=$(xcodegen generate 2>&1); then
+		printf '%s\n' "$out" >&2
+		echo "[ios-signing] xcodegen generate 失败，已中止（不落坏工程）。" >&2
+		exit 1
+	fi
 	printf '%s\n' "$out"
 	if printf '%s' "$out" | grep -q 'settings found'; then
 		echo "[ios-signing] xcodegen 报出缺失的默认设置组（上面几行 No \"…\" settings found）:SettingPresets 没装全。" >&2

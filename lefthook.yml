@@ -1,0 +1,24 @@
+# Lefthook Git hooks configuration
+# Documentation: https://github.com/evilmartians/lefthook
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    verify-proposals:
+      glob: "*.md"
+      run: node scripts/verify-proposals.mjs
+
+pre-push:
+  parallel: false
+  commands:
+    type-check:
+      run: pnpm check
+    release-plan-test:
+      run: pnpm test:release
+    verify-proposals:
+      run: node scripts/verify-proposals.mjs

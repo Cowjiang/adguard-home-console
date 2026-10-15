@@ -24,6 +24,7 @@ import { AppearanceSettings } from './pages/settings/AppearanceSettings'
 import { ServerSettings } from './pages/settings/InstanceList'
 import { InstanceEdit } from './pages/settings/InstanceEdit'
 import { AboutSettings } from './pages/settings/AboutSettings'
+import { SnapshotSettings } from './pages/settings/SnapshotSettings'
 import { FiltersPage, RulesPage, ServicesPage, RewritesPage, CheckHostPage } from './pages/FiltersPages'
 import { DnsSettings } from './pages/settings/DnsSettings'
 import { AccessSettings } from './pages/settings/AccessSettings'
@@ -97,48 +98,49 @@ export default function App() {
   return (
     <SWRConfig value={SWR_GLOBAL}>
       <AuthProvider>
-      <SheetProvider>
-        <BrowserRouter>
-          <DebugAutoLogin />
-          <Routes>
-            <Route path="/login" element={<LoginRoute />} />
-            <Route element={<Protected><Layout /></Protected>}>
-              <Route path="/" element={<Dashboard />} />
-              {/* Former /stats analysis page merged into the desktop overview;
-                  keep stale deep links working */}
-              <Route path="/stats" element={<Navigate to="/" replace />} />
-              <Route path="/top/:kind" element={<TopListPage />} />
-              <Route path="/logs" element={<QueryLog />} />
-              <Route path="/logs/detail" element={<LogDetailPage />} />
-              <Route path="/protection" element={<Protection />} />
-              <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
-              <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />
-              <Route path="/protection/rules" element={<RulesPage />} />
-              <Route path="/protection/services" element={<ServicesPage />} />
-              <Route path="/protection/check" element={<CheckHostPage />} />
-              <Route path="/rewrites" element={<RewritesPage />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/clients/detail" element={<ClientDetailPage />} />
-              <Route path="/clients/form" element={<ClientFormPage />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/general" element={<GeneralSettings />} />
-              <Route path="/settings/dns" element={<DnsSettings />} />
-              <Route path="/settings/access" element={<AccessSettings />} />
-              <Route path="/settings/encryption" element={<EncryptionSettings />} />
-              <Route path="/settings/dhcp" element={<DhcpSettings />} />
-              <Route path="/settings/system" element={<SystemPage />} />
-              <Route path="/settings/appearance" element={<AppearanceSettings />} />
-              <Route path="/settings/server" element={<ServerSettings />} />
-              <Route path="/settings/server/edit" element={<InstanceEdit />} />
-              <Route path="/settings/about" element={<AboutSettings />} />
-              <Route path="/settings/app" element={<Navigate to="/settings" replace />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          <ToastHost />
-        </BrowserRouter>
-      </SheetProvider>
-    </AuthProvider>
+        <SheetProvider>
+          <BrowserRouter>
+            <DebugAutoLogin />
+            <Routes>
+              <Route path="/login" element={<LoginRoute />} />
+              <Route element={<Protected><Layout /></Protected>}>
+                <Route path="/" element={<Dashboard />} />
+                {/* Former /stats analysis page merged into the desktop overview;
+                    keep stale deep links working */}
+                <Route path="/stats" element={<Navigate to="/" replace />} />
+                <Route path="/top/:kind" element={<TopListPage />} />
+                <Route path="/logs" element={<QueryLog />} />
+                <Route path="/logs/detail" element={<LogDetailPage />} />
+                <Route path="/protection" element={<Protection />} />
+                <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
+                <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />
+                <Route path="/protection/rules" element={<RulesPage />} />
+                <Route path="/protection/services" element={<ServicesPage />} />
+                <Route path="/protection/check" element={<CheckHostPage />} />
+                <Route path="/rewrites" element={<RewritesPage />} />
+                <Route path="/clients" element={<Clients />} />
+                <Route path="/clients/detail" element={<ClientDetailPage />} />
+                <Route path="/clients/form" element={<ClientFormPage />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/general" element={<GeneralSettings />} />
+                <Route path="/settings/dns" element={<DnsSettings />} />
+                <Route path="/settings/access" element={<AccessSettings />} />
+                <Route path="/settings/encryption" element={<EncryptionSettings />} />
+                <Route path="/settings/dhcp" element={<DhcpSettings />} />
+                <Route path="/settings/system" element={<SystemPage />} />
+                <Route path="/settings/snapshots" element={<SnapshotSettings />} />
+                <Route path="/settings/appearance" element={<AppearanceSettings />} />
+                <Route path="/settings/server" element={<ServerSettings />} />
+                <Route path="/settings/server/edit" element={<InstanceEdit />} />
+                <Route path="/settings/about" element={<AboutSettings />} />
+                <Route path="/settings/app" element={<Navigate to="/settings" replace />} />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+            <ToastHost />
+          </BrowserRouter>
+        </SheetProvider>
+      </AuthProvider>
     </SWRConfig>
   )
 }

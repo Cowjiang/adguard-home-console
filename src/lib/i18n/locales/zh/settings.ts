@@ -1,4 +1,4 @@
-/** 设置中心与各子页(外观/语言为阶段一样板;通用、系统、服务器、关于为阶段二) */
+/** 设置中心与各子页(外观/语言为阶段一样本;通用、系统、服务器、关于为阶段二) */
 
 const zhSettings = {
   appearance: '外观',
@@ -23,9 +23,12 @@ const zhSettings = {
   itemDhcpDesc: '地址分配与静态租约',
   itemSystem: '系统管理',
   itemSystemDesc: '版本更新、重置数据',
+  itemSnapshots: '配置快照与备份',
+  itemSnapshotsDesc: '历史配置快照、安全备份与一键回退',
   itemAppearanceDesc: '应用主题、界面语言',
   itemServer: '实例管理',
-  itemServerDesc: '多台 AdGuard Home 的连接与切换',  itemAbout: '关于',
+  itemServerDesc: '多台 AdGuard Home 的连接与切换',
+  itemAbout: '关于',
   queryLogGroup: '查询日志',
   enableQueryLog: '启用查询日志',
   enableQueryLogSub: '记录所有 DNS 请求',
@@ -103,6 +106,42 @@ const zhSettings = {
   aboutGroup: '应用',
   compatibility: '兼容性',
   compatibilitySub: 'AdGuard Home v0.107.79+ 全新 API',
+
+  // Snapshots
+  snapshotsTitle: '配置快照与备份',
+  snapshotsDesc: '管理当前实例的配置快照，并在需要时安全比对与回退。',
+  snapshotCreate: '创建快照',
+  snapshotImport: '导入快照',
+  snapshotExportBundle: '导出集群包',
+  snapshotFilterAll: '全部',
+  snapshotFilterManual: '手动快照',
+  snapshotFilterAuto: '自动保护',
+  snapshotTriggerManual: '手动',
+  snapshotTriggerPreSync: '同步前备份',
+  snapshotTriggerPreRollback: '还原前备份',
+  snapshotTriggerScheduled: '定时',
+  snapshotEmptyTitle: '暂无配置快照',
+  snapshotEmptyDesc: '点击右上角「创建快照」为当前节点保存首个配置备份。',
+  snapshotLabelPlaceholder: '快照名称（如：调整上游DNS前备份）',
+  snapshotDescPlaceholder: '备注说明（可选）',
+  snapshotCreateSuccess: '快照创建成功',
+  snapshotDeleteConfirmTitle: '删除此快照？',
+  snapshotDeleteConfirmMsg: '删除后无法恢复此份历史配置快照。',
+  snapshotDeleted: '快照已删除',
+  snapshotCompareRestore: '比对与还原',
+  snapshotExportJson: '导出 JSON',
+  snapshotDiffTitle: '配置差异与还原检查',
+  snapshotDiffSelectModules: '选择要还原的配置模块',
+  snapshotDiffNoChanges: '当前运行配置与该快照无差异',
+  snapshotDiffChangesDetected: '检测到 {{count}} 处配置变更',
+  snapshotDiffChecksumWarning: '警告：快照校验和不匹配，文件可能已被外部修改或损坏。',
+  snapshotRestoreConfirmTitle: '确认执行还原回滚？',
+  snapshotRestoreConfirmMsg: '系统将在还原前自动保存当前状态的安全快照。还原操作将覆盖选中模块的配置，请确认。',
+  snapshotRestoreStart: '确认开始还原',
+  snapshotRestoreSuccess: '已成功还原 {{count}} 个模块的配置',
+  snapshotRestorePartial: '部分模块还原失败（成功 {{succeeded}}，失败 {{failed}}）',
+  snapshotBackupBeforeSync: '同步前自动备份目标节点快照（推荐）',
+  snapshotRollbackHint: '可在「设置 - 配置快照与备份」中一键回退到同步前状态。',
 }
 
 export default zhSettings
