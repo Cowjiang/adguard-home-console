@@ -18,11 +18,14 @@
   "keywords": [
     "adguard",
     "adguard-home",
+    "adguardhome",
     "agh",
     "adblock",
     "ad-blocker",
     "dns",
     "self-hosted",
+    "homelab",
+    "pwa",
     "dashboard",
     "tauri"
   ],
