@@ -42,14 +42,15 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:server": "node --test 'server/*.test.mjs'",
-    "test:release": "node scripts/release-plan.mjs --self-test",
+    "test:release": "node .github/scripts/release-plan.mjs --self-test",
     "check:pack": "node scripts/check-npm-pack.mjs",
     "start": "node server/index.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "ios:build": "./scripts/ios-signing.sh tauri build --target aarch64",
     "ios:clean": "find src-tauri/gen/apple/Externals -name '*.a' -delete && rm -rf ~/Library/Developer/Xcode/DerivedData/adguard-home-console-* src-tauri/target/aarch64-apple-ios",
-    "ios:deploy": "./scripts/ios-deploy.sh"
+    "ios:deploy": "./scripts/ios-deploy.sh",
+    "prepare": "node -e \"if (fs.existsSync('.git')) { try { require('child_process').execSync('lefthook install', { stdio: 'inherit' }) } catch {} }\""
   },
   "dependencies": {
     "@sosweetham/tauri-plugin-system-components-api": "^0.1.8",
@@ -64,6 +65,8 @@
     "swr": "^2.3.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.11.5",
     "@types/express": "^4.17.21",
@@ -71,6 +74,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "latest",
     "concurrently": "^9.1.0",
+    "lefthook": "^2.2.2",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
