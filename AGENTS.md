@@ -61,6 +61,6 @@ Run the checks that match the scope of your change:
 ## Branches and releases
 
 - Direct-track small changes can be committed straight to `dev` and pushed; Noted-track changes merge into `dev` after proposal and PR review. Pushing `dev` publishes nothing, but the scheduled nightly builds from it.
-- Only when releasing, merge `dev` into `main` and push it, then push a `vX.Y.Z` tag: the tag is what publishes stable, a push to `main` alone publishes nothing.
+- Only when releasing, merge `dev` into `main` and push it, then dispatch **Cut Release** (`.github/workflows/cut-release.yml`) from `main`: it bumps the version, writes `CHANGELOG.md`, commits `chore(release): vX.Y.Z`, tags, and triggers `release.yml`. The tag is what publishes stable, a push to `main` alone publishes nothing.
 - The nightly timer only fires once `release.yml` sits on `main` — scheduled workflows run from the default branch only.
 - Concrete run, check, and platform-generation commands are reached from the relevant `docs/README.md` fact pages; proposal validation is reached from the `.agents/README.md` pipeline docs.

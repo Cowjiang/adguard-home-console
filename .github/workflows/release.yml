@@ -170,16 +170,15 @@ jobs:
   # are the hook if a signed IPA is ever wanted here.
   ios:
     needs: prepare
-    # macOS minutes bill at 10× on a private repository, where a daily build
-    # would eat the free 2000-minute allowance and then stall every channel, so
-    # a private nightly has to opt in. Stable and a public repository build it
-    # unconditionally, and so does a dispatch: both are deliberate.
+    # Being public is what lets the nightly carry an IPA: macOS minutes bill at
+    # 10× on a private repository, where a daily build would eat the free
+    # allowance and then stall every channel. Stable and a dispatch always run,
+    # and so does a private repository's stable — only its nightly is skipped.
     if: >-
       needs.prepare.outputs.skip != 'true' &&
       (needs.prepare.outputs.channel == 'stable' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event.repository.private == false ||
-      vars.AGH_IOS_NIGHTLY == 'true')
+      github.event.repository.private == false)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
