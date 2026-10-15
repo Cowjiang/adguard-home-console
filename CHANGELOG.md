@@ -3,6 +3,102 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.2.0] - 2026-10-15
+
+### Features
+
+- feat(ci): implement lefthook, action scripts migration, auto-tagging and changelog system ([1e2a4d3](https://github.com/Cowjiang/adguard-home-console/commit/1e2a4d3))
+- feat(version): take the in-app version from the release version ([b1a6a7d](https://github.com/Cowjiang/adguard-home-console/commit/b1a6a7d))
+- feat(snapshot): implement snapshot management UI, diff sheet, sync integration and i18n (Part 2) ([f5c096e](https://github.com/Cowjiang/adguard-home-console/commit/f5c096e))
+- feat(snapshot): implement core schemas, capture, storage, diff and restore engines (Part 1) ([966f8a0](https://github.com/Cowjiang/adguard-home-console/commit/966f8a0))
+- feat(querylog): implement multi-instance aggregation and drill-down analytics (P2-2) ([f0b0e19](https://github.com/Cowjiang/adguard-home-console/commit/f0b0e19))
+- feat(dns): implement upstream DNS concurrent benchmark and multi-instance comparison (P2-1) ([b562fc4](https://github.com/Cowjiang/adguard-home-console/commit/b562fc4))
+- feat(cluster): implement multi-instance filter lists, client sync, and health matrix (P1) ([0b3a46e](https://github.com/Cowjiang/adguard-home-console/commit/0b3a46e))
+- feat(multi-instance): add cluster protection concurrency and rule synchronization ([8a1b41d](https://github.com/Cowjiang/adguard-home-console/commit/8a1b41d))
+- feat(api): own the proxy contract and localize adapter error kinds ([20630eb](https://github.com/Cowjiang/adguard-home-console/commit/20630eb))
+- feat(dashboard): cross-instance totals and merged leaderboards ([2faedd2](https://github.com/Cowjiang/adguard-home-console/commit/2faedd2))
+- feat(instances): management pages and switcher ([534f71c](https://github.com/Cowjiang/adguard-home-console/commit/534f71c))
+- feat(tauri): optional second debug instance for multi-instance acceptance ([ae98f15](https://github.com/Cowjiang/adguard-home-console/commit/ae98f15))
+- feat(auth): multi-instance session layer with per-instance probing ([4c17027](https://github.com/Cowjiang/adguard-home-console/commit/4c17027))
+- feat(instances): multi-instance model, storage v2 and v1 migration ([c693688](https://github.com/Cowjiang/adguard-home-console/commit/c693688))
+
+### Bug Fixes
+
+- fix(ios): create the source dirs xcodegen needs on a fresh clone ([cc986f4](https://github.com/Cowjiang/adguard-home-console/commit/cc986f4))
+- fix(settings): keep the app name readable in the About row ([d6d295e](https://github.com/Cowjiang/adguard-home-console/commit/d6d295e))
+- fix(querylog): address review findings on pagination, key collision, and drill-down UX ([3ba464d](https://github.com/Cowjiang/adguard-home-console/commit/3ba464d))
+- fix(benchmark): address review findings on Tauri AbortSignal, rule preservation, and i18n ([b9e91dc](https://github.com/Cowjiang/adguard-home-console/commit/b9e91dc))
+- fix(release): push images to a fully qualified GHCR reference ([11c9077](https://github.com/Cowjiang/adguard-home-console/commit/11c9077))
+- fix(ios): read the deploy bundle id off the ipa instead of hardcoding it ([4f24359](https://github.com/Cowjiang/adguard-home-console/commit/4f24359))
+- fix(tauri): keep the Swift glue on the unoptimized config so release links ([836560e](https://github.com/Cowjiang/adguard-home-console/commit/836560e))
+- fix(ios): run the Xcode pre-build phase from the package root again ([059cd5b](https://github.com/Cowjiang/adguard-home-console/commit/059cd5b))
+- fix(tauri): align the crate with the npm packages and retire the tao patch ([2f55934](https://github.com/Cowjiang/adguard-home-console/commit/2f55934))
+- fix(nav): inject navigation into the instance switcher ([7388fe8](https://github.com/Cowjiang/adguard-home-console/commit/7388fe8))
+- fix(proxy): refuse cross-host redirects instead of replaying credentials ([9126fda](https://github.com/Cowjiang/adguard-home-console/commit/9126fda))
+
+### Refactoring
+
+- refactor(tauri): reuse one HTTP client instead of building one per request ([2983750](https://github.com/Cowjiang/adguard-home-console/commit/2983750))
+- refactor(settings): converge the four draft forms on useDraftForm ([a9f296d](https://github.com/Cowjiang/adguard-home-console/commit/a9f296d))
+- refactor(session): extract the probe engine into lib/session/probe ([aee5342](https://github.com/Cowjiang/adguard-home-console/commit/aee5342))
+- refactor(mutation): converge page mutation orchestration on runMutation ([7582445](https://github.com/Cowjiang/adguard-home-console/commit/7582445))
+- refactor(pages): split AdvancedSettings and Settings into pages/settings/ ([7d35fb0](https://github.com/Cowjiang/adguard-home-console/commit/7d35fb0))
+- refactor(pages): place page-private components into components/ domain dirs ([dcb074b](https://github.com/Cowjiang/adguard-home-console/commit/dcb074b))
+- refactor(layout): split Layout into layout/ pieces (TopBar/TabBar/Sidebar/InstanceSwitchList/OfflineNotice) ([91050a9](https://github.com/Cowjiang/adguard-home-console/commit/91050a9))
+- refactor(ui): split the ui grab-bag into sheet/menu/toast/primitives/atoms ([7367aa2](https://github.com/Cowjiang/adguard-home-console/commit/7367aa2))
+- refactor(src): move components and lib files into domain groups with unified shell detection ([39e4ac9](https://github.com/Cowjiang/adguard-home-console/commit/39e4ac9))
+- refactor(proxy): kind errors and contract runner in the Rust adapter ([86e3870](https://github.com/Cowjiang/adguard-home-console/commit/86e3870))
+- refactor(server): extract AGH proxy adapter with kind errors and fixture runner ([e9650ef](https://github.com/Cowjiang/adguard-home-console/commit/e9650ef))
+- refactor(frontend): share top_* normalization and unify the filtering SWR key ([278ba03](https://github.com/Cowjiang/adguard-home-console/commit/278ba03))
+
+### Documentation
+
+- docs(ci): drop the AGH_IOS_NIGHTLY switch and document Cut Release ([9f4ce3e](https://github.com/Cowjiang/adguard-home-console/commit/9f4ce3e))
+- docs: record that the repository and the GHCR package are now public ([00490b7](https://github.com/Cowjiang/adguard-home-console/commit/00490b7))
+- docs(readme): clarify the AGH Console naming and add npm keywords ([75c35e6](https://github.com/Cowjiang/adguard-home-console/commit/75c35e6))
+- docs(agents): simplify local config note in AGENTS.md ([3af5319](https://github.com/Cowjiang/adguard-home-console/commit/3af5319))
+- docs(agents): document AGENTS.local.md and ignore local backup rules ([e8d6832](https://github.com/Cowjiang/adguard-home-console/commit/e8d6832))
+- docs(readme): make the Node badge read 24 ([bda0d59](https://github.com/Cowjiang/adguard-home-console/commit/bda0d59))
+- docs(proposal): lift the fork proposal's build blocker after PRs #11/#12 ([6c70755](https://github.com/Cowjiang/adguard-home-console/commit/6c70755))
+- docs(proposals): register the iOS build-chain fixes as bug-fix proposals ([47ab63b](https://github.com/Cowjiang/adguard-home-console/commit/47ab63b))
+- docs(architecture): record the iOS release-link constraint and the trust step ([1b2fa02](https://github.com/Cowjiang/adguard-home-console/commit/1b2fa02))
+- docs(architecture): record the tauri crate/npm same-minor rule ([00c68b9](https://github.com/Cowjiang/adguard-home-console/commit/00c68b9))
+- docs(proposal): expand the iOS build blocker diagnosis with verified fixes ([bc3efbb](https://github.com/Cowjiang/adguard-home-console/commit/bc3efbb))
+- docs(proposal): mark the rust shell fork consolidation implemented ([3d43a80](https://github.com/Cowjiang/adguard-home-console/commit/3d43a80))
+- docs: sync the tauri pages with the fork baseline and the real test command ([332f862](https://github.com/Cowjiang/adguard-home-console/commit/332f862))
+- docs(proposal): add simplification proposal for the Rust shell and plugin fork ([7bac044](https://github.com/Cowjiang/adguard-home-console/commit/7bac044))
+- docs(pipelines): sync proposal table with src-layer consolidation status ([39168d6](https://github.com/Cowjiang/adguard-home-console/commit/39168d6))
+- docs(proposal): mark the src layer consolidation implemented ([fe444d4](https://github.com/Cowjiang/adguard-home-console/commit/fe444d4))
+- docs: record the mutation/draft conventions and fix drifted src paths ([1e1eb5c](https://github.com/Cowjiang/adguard-home-console/commit/1e1eb5c))
+- docs(skills): add layer-consolidation methodology skill ([00c841f](https://github.com/Cowjiang/adguard-home-console/commit/00c841f))
+- docs: add lib grouping rules to the src consolidation proposal ([4ea42be](https://github.com/Cowjiang/adguard-home-console/commit/4ea42be))
+- docs: add component placement rules to the src consolidation proposal ([b90fef8](https://github.com/Cowjiang/adguard-home-console/commit/b90fef8))
+- docs: add simplification proposal for the src page layer ([54ed6ce](https://github.com/Cowjiang/adguard-home-console/commit/54ed6ce))
+- docs: mark proxy contract ownership implemented ([ea3b3a3](https://github.com/Cowjiang/adguard-home-console/commit/ea3b3a3))
+- docs: record proxy contract ownership across docs and checks ([f14bbec](https://github.com/Cowjiang/adguard-home-console/commit/f14bbec))
+- docs: add architecture proposal for proxy contract ownership ([7fe1148](https://github.com/Cowjiang/adguard-home-console/commit/7fe1148))
+- docs: multi-instance session, storage and aggregation facts ([7b9d521](https://github.com/Cowjiang/adguard-home-console/commit/7b9d521))
+- docs: add iOS app screenshots to the README ([89991ad](https://github.com/Cowjiang/adguard-home-console/commit/89991ad))
+
+### Other
+
+- ci(release): build an unsigned iOS IPA in the release workflow ([09248bd](https://github.com/Cowjiang/adguard-home-console/commit/09248bd))
+- chore(ios): set the app identifier to com.cowjiang.aghconsole ([f45dff6](https://github.com/Cowjiang/adguard-home-console/commit/f45dff6))
+- build(cargo): ignore .cargo/ and untrack local cargo config ([1dff0c3](https://github.com/Cowjiang/adguard-home-console/commit/1dff0c3))
+- ci(workflow): add automated CI checks for pull requests and core branches ([42180e0](https://github.com/Cowjiang/adguard-home-console/commit/42180e0))
+- ci(release): keep a single rolling nightly release ([6a6a736](https://github.com/Cowjiang/adguard-home-console/commit/6a6a736))
+- ci(release): record the node24 action bump and the npm channel state ([5e3f78e](https://github.com/Cowjiang/adguard-home-console/commit/5e3f78e))
+- ci(release): move the workflow off the deprecated Node 20 actions ([16e61b7](https://github.com/Cowjiang/adguard-home-console/commit/16e61b7))
+- ci(release): publish Release, npm and GHCR from one build ([476380e](https://github.com/Cowjiang/adguard-home-console/commit/476380e))
+- chore(src): english-only dev warning in the native tab bar bridge ([546fbaf](https://github.com/Cowjiang/adguard-home-console/commit/546fbaf))
+- chore(tauri): drop the inert project cargo source override ([9e83c5a](https://github.com/Cowjiang/adguard-home-console/commit/9e83c5a))
+- chore(tauri): stop tracking plugin build outputs and packaging leftovers ([daddad8](https://github.com/Cowjiang/adguard-home-console/commit/daddad8))
+- chore(tauri): record the plugin fork baseline and add a delta script ([4b40b72](https://github.com/Cowjiang/adguard-home-console/commit/4b40b72))
+- test(contract): add shared AGH proxy contract fixture ([b058ba4](https://github.com/Cowjiang/adguard-home-console/commit/b058ba4))
+- chore(tooling): migrate to pnpm 12 and pin Node 24 ([950fbd8](https://github.com/Cowjiang/adguard-home-console/commit/950fbd8))
+- test: add vitest and cover the KVMap helpers ([0e6d793](https://github.com/Cowjiang/adguard-home-console/commit/0e6d793))
+- test(mock): make the mock multi-instance capable and fix the rewrite list ([181d1e2](https://github.com/Cowjiang/adguard-home-console/commit/181d1e2))
+
 ## [0.1.0] - 2026-10-14
 
 ### Features
