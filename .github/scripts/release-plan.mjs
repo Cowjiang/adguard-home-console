@@ -173,13 +173,19 @@ function setVersion(version, build) {
     console.log(`release-plan: package.json version → ${version}`);
   }
 
+  // The tauri config carries the core version, like the iOS project: `tauri ios
+  // build` derives `apple.bundle-version` from it, and a nightly string makes it
+  // bail out ("apple.bundle-version can only contain numbers, separated by .",
+  // after warning that the prerelease tag cannot be part of a bundle version).
+  // The full version stays in package.json, which is what the UI reports and
+  // what npm publishes.
   const tauri = JSON.parse(readFileSync(TAURI_CONFIG_URL, 'utf8'));
-  if (tauri.version === version) {
-    console.log(`release-plan: tauri.conf.json 已是 ${version}`);
+  if (tauri.version === coreVersion(version)) {
+    console.log(`release-plan: tauri.conf.json 已是 ${coreVersion(version)}`);
   } else {
-    tauri.version = version;
+    tauri.version = coreVersion(version);
     writeFileSync(TAURI_CONFIG_URL, `${JSON.stringify(tauri, null, 2)}\n`);
-    console.log(`release-plan: tauri.conf.json version → ${version}`);
+    console.log(`release-plan: tauri.conf.json version → ${coreVersion(version)}`);
   }
 
   // Everything that carries a version is stamped from here: the web build reads

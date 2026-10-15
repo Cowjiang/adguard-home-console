@@ -263,6 +263,12 @@ jobs:
             echo "::error::ipa 里没有 Payload/<App>.app/Info.plist"
             exit 1
           }
+          # What the phone will report. tauri derives these from
+          # tauri.conf.json#version (core) and the build number, so a nightly
+          # shows the core version plus its run number rather than the full
+          # nightly string — print them so the log carries that evidence.
+          unzip -p agh-console.ipa 'Payload/*.app/Info.plist' > /tmp/ipa-Info.plist
+          plutil -p /tmp/ipa-Info.plist | grep -E 'CFBundle(Short)?Version'
 
       - uses: actions/upload-artifact@v7
         with:
