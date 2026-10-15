@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import {
   ScrollText, Network, Lock, Wifi, Wrench,
   Trash, RotateCcw, DownloadCloud, Server, Plus, SunMoon,
-  Info, Eraser, ShieldQuestion,
+  Info, Eraser, ShieldQuestion, Layers,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/session/auth'
@@ -23,7 +23,6 @@ import { hoursLabel, fmtDate } from '../lib/format'
 import { APP_NAME, APP_VERSION } from '../lib/constants'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
-
 /* ================= Settings hub ================= */
 
 export default function Settings() {
@@ -38,6 +37,7 @@ export default function Settings() {
     { icon: <Wrench size={17} />, color: 'var(--violet)', title: t('settings.itemAccess'), desc: t('settings.itemAccessDesc'), to: '/settings/access' },
     { icon: <Lock size={17} />, color: 'var(--warn)', title: t('settings.itemEncryption'), desc: t('settings.itemEncryptionDesc'), to: '/settings/encryption' },
     { icon: <Wifi size={17} />, color: 'var(--ok)', title: t('settings.itemDhcp'), desc: t('settings.itemDhcpDesc'), to: '/settings/dhcp' },
+    { icon: <Layers size={17} />, color: 'var(--accent)', title: t('settings.itemSnapshots'), desc: t('settings.itemSnapshotsDesc'), to: '/settings/snapshots' },
     { icon: <ShieldQuestion size={17} />, color: 'var(--danger)', title: t('settings.itemSystem'), desc: t('settings.itemSystemDesc'), to: '/settings/system' },
   ]
   const appItems = [

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Server, Check, AlertTriangle } from 'lucide-react'
+import { Server, Check, AlertTriangle, Shield } from 'lucide-react'
 import { useAuth, mutateInstanceData } from '../../lib/session/auth'
 import { activeEndpoint, type Instance } from '../../lib/session/instances'
 import { Button } from '../ui/primitives'
 import { toast } from '../ui/toast'
 import type { SyncExecutionSummary } from '../../lib/session/rulesSync'
+import { captureInstanceSnapshot } from '../../lib/snapshot/snapshotCapture'
+import { saveSnapshot } from '../../lib/snapshot/snapshotStorage'
 
 interface SyncSheetContentProps {
   itemCount: number
@@ -23,6 +25,7 @@ export function SyncSheetContent({
   const { store, activeId, instances } = useAuth()
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
+  const [backupBeforeSync, setBackupBeforeSync] = useState(true)
 
   // Targets are other configured instances (not the currently active one)
   const otherInstances = (store?.instances ?? []).filter((i) => i.id !== activeId)
@@ -54,6 +57,35 @@ export function SyncSheetContent({
 
     setBusy(true)
     try {
+      // Automatic pre-sync safety backup if enabled
+      if (backupBeforeSync) {
+        for (const inst of targets) {
+          const ep = activeEndpoint(inst)
+          const view = instances.find((x) => x.id === inst.id)
+          if (ep) {
+            try {
+              const guard = await captureInstanceSnapshot(
+                { url: ep.url, username: ep.username, password: ep.password },
+                {
+                  id: inst.id,
+                  label: inst.label,
+                  url: ep.url,
+                  aghVersion: view?.version || 'unknown',
+                },
+                {
+                  label: `Pre-Sync Guard: ${itemTypeLabel}`,
+                  description: `Automatic safety snapshot captured before synchronizing ${itemTypeLabel} (${itemCount} items)`,
+                  trigger: 'pre_sync',
+                }
+              )
+              await saveSnapshot(guard)
+            } catch {
+              /* Non-fatal: do not block sync if snapshot capture fails */
+            }
+          }
+        }
+      }
+
       const summary = await onSync(targets)
       // Invalidate cache for targets that succeeded
       for (const inst of targets) {
@@ -66,7 +98,7 @@ export function SyncSheetContent({
           t('filters.syncPartialToast', {
             success: summary.succeeded,
             failed: summary.failed,
-          }),
+          }) + (backupBeforeSync ? ` (${t('settings.snapshotRollbackHint')})` : ''),
           'err'
         )
       } else {
@@ -136,6 +168,22 @@ export function SyncSheetContent({
             )
           })}
         </div>
+      </div>
+
+      {/* Auto Backup Toggle */}
+      <div
+        onClick={() => setBackupBeforeSync(!backupBeforeSync)}
+        className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/50 bg-card/60 p-2.5 text-[12px] text-t2 select-none hover:bg-card transition-colors"
+      >
+        <div
+          className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
+            backupBeforeSync ? 'border-accent bg-accent text-white' : 'border-border bg-transparent'
+          }`}
+        >
+          {backupBeforeSync && <Check size={11} strokeWidth={3} />}
+        </div>
+        <Shield size={14} className="text-accent flex-none" />
+        <span>{t('settings.snapshotBackupBeforeSync')}</span>
       </div>
 
       <div className="mt-2 flex gap-2">
