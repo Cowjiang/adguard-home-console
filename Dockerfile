@@ -11,8 +11,11 @@ FROM --platform=$BUILDPLATFORM node:24-alpine AS build
 WORKDIR /app
 # pnpm version comes from package.json#packageManager (the corepack bundled with
 # the base image can predate it); the "+sha512..." part is corepack metadata, not
-# part of the npm version spec
-COPY package.json pnpm-lock.yaml ./
+# part of the npm version spec.
+# pnpm-workspace.yaml has to travel with the lockfile: pnpm 12 reads the approved
+# build scripts from it (allowBuilds), and without it a frozen install aborts with
+# ERR_PNPM_IGNORED_BUILDS as soon as a dependency has a postinstall (lefthook).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")[1].split("+")[0]')" \
     && npm i -g "pnpm@$PNPM_VERSION" \
     && pnpm install --frozen-lockfile
@@ -29,8 +32,9 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 # The server only needs express at runtime; frontend deps are already bundled
-# into dist by Vite but stay installed via the shared root package.json
-COPY package.json pnpm-lock.yaml ./
+# into dist by Vite but stay installed via the shared root package.json.
+# pnpm-workspace.yaml again: same frozen-install rule as the build stage.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")[1].split("+")[0]')" \
     && npm i -g "pnpm@$PNPM_VERSION" \
     && pnpm install --prod --frozen-lockfile
