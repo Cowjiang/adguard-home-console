@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://www.conventionalcommits.org/) for commit guidelines.
 
+## [0.2.1] - 2026-10-15
+
+### Bug Fixes
+
+- fix(ci): make bump-version.mjs usable outside the Linux runner ([8e92b62](https://github.com/Cowjiang/adguard-home-console/commit/8e92b62))
+- fix(docker): ship pnpm-workspace.yaml into the image build ([48fb1f0](https://github.com/Cowjiang/adguard-home-console/commit/48fb1f0))
+
 ## [0.2.0] - 2026-10-15
 
 ### Features
