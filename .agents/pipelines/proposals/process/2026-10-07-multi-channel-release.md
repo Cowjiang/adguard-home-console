@@ -3,7 +3,7 @@
 **Class:** process
 **Status:** implemented
 **Date:** 2026-10-07
-**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly。随后在合并到 `main` 后跑了真实 nightly，暴露并修掉镜像引用与手动重跑两个问题，见 Accept 末两项）
+**Updated:** 2026-10-07（实施完成；同日按用户决策把渠道定为 **nightly + stable**：首版曾实现「push main → dev」，因 `dev` 领先 `main` 58 个提交、`main` 只在发版时动，改成定时从 `dev` 出 nightly。随后在合并到 `main` 后跑了真实 nightly，暴露并修掉镜像引用与手动重跑两个问题，见 Accept 末两项）；2026-10-15（标注「版本统一」后续项已由 `2026-10-15-version-single-source.md` 落地）
 **Source:** 用户要求「调整 release 以适配 npx 和 docker 发版」
 
 ## Goal
@@ -36,7 +36,7 @@
    - `workflow_dispatch` 默认干跑（`publish=false`）：手动触发不再静默发布；补发显式设 `publish=true`。
 2. **npm 包名定为 `agh-console`**，与镜像名、容器名、`/opt/agh-console`、systemd 单元、README 里已有的命令一致。`registry.npmjs.org` 对 `agh-console` 与 `adguard-home-console` 都返回 404（未被占用，2026-10-07 实测）。
    - `bin` 只放一个条目 `agh-console → server/index.mjs`（补 shebang）：npm exec 的规则是「包只有一个 bin 条目时就用它」，所以 `npx agh-console` 成立。
-   - 仓库非公开（`api.github.com/repos/Cowjiang/adguard-home-console` 对匿名请求 404），而 npm 明示「私有仓库不生成 provenance」，所以首版用 `NPM_TOKEN` 且不加 `--provenance`；`NPM_TOKEN` 缺失时该 job 告警跳过，而不是把整条发版打红。
+   - 仓库非公开（`api.github.com/repos/Cowjiang/adguard-home-console` 对匿名请求 404），而 npm 明示「私有仓库不生成 provenance」，所以首版用 `NPM_TOKEN` 且不加 `--provenance`；`NPM_TOKEN` 缺失时该 job 告警跳过，而不是把整条发版打红。（2026-10-15 仓库已转为 public，provenance 因此可用，见 `docs/engineering.md`。）
    - 发布物即验证物：CI 里 `npm pack` 出 tgz、`scripts/check-npm-pack.mjs` 断言内容后，`npm publish <tgz>`，发布阶段不重新打包。
    - npm 的 `latest` 只在第一个 stable 发布后才存在；在那之前 `npx agh-console` 会 ETARGET，需要先发一个 stable 或手动 `npm dist-tag add` 引导（已写进 docs）。
 3. **镜像仍由 `Dockerfile` 自建**，保证 `docker build .` 可独立复现；构建阶段改 `--platform=$BUILDPLATFORM`，前端 bundle 与架构无关，不再在 arm64 的 QEMU 下重跑一遍。
@@ -78,5 +78,5 @@
 
 **后续（不在本次）**
 - 把纯前端依赖降到 `devDependencies`，缩短 `npx` 首次安装时间——需要重算 `pnpm-lock.yaml`，本机拿不到 pnpm 12，故不做。
-- `src-tauri/tauri.conf.json`（1.0.0）与 npm 版本的统一；两者目前仍各自演进。
+- `src-tauri/tauri.conf.json`（1.0.0）与 npm 版本的统一；两者目前仍各自演进。（2026-10-15 已落地：见 `2026-10-15-version-single-source.md`，版本改为单一来源并连带覆盖 iOS 工程。）
 - 仓库转为 public 后开启 `--provenance` + trusted publishing，退掉长期 token。

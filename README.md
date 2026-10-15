@@ -8,6 +8,8 @@
 
 Full management UI in your browser, as a PWA on your phone, or in a native shell on desktop and mobile — English & 简体中文, light & dark.
 
+**AGH Console** is the app's product name — it is what the browser tab, the desktop window and your phone's home screen show. The npm package and the container image are published as `agh-console`; "AdGuard Home Console" is this repository's project name.
+
 English | [简体中文简介](docs/assets/README.zh-CN.md)
 
 [![CI](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml/badge.svg)](https://github.com/Cowjiang/adguard-home-console/actions/workflows/release.yml)
@@ -46,7 +48,7 @@ docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:lates
 
 Multi-arch (amd64 / arm64). A stable `vX.Y.Z` tag publishes `latest`, `X.Y.Z` and `X.Y`; the nightly built from `dev` publishes `nightly` and `sha-<commit>`. The image is stateless — nothing to mount. To prefill the login page, pass `-e AGH_DEFAULT_URL=http://192.168.1.2:3000`.
 
-The GHCR package inherits the repository's visibility: while the repository is private, `docker login ghcr.io` (token with `read:packages`) is required; switching the package to public in its settings removes that step.
+The GHCR package is public. Note that a package does **not** inherit the repository's visibility — that is its own switch in the package settings — so a private package would instead require `docker login ghcr.io` with a `read:packages` token.
 
 Or with Docker Compose:
 
@@ -83,6 +85,10 @@ tar xzf /path/to/agh-console.tar.gz
 pnpm install --prod
 pnpm start
 ```
+
+### iOS
+
+Every release also carries `agh-console.ipa`, built from the same commit as the other artifacts. It is **unsigned**, because it is built without an Apple certificate: iOS only installs apps signed by a certificate you own, so re-sign it with your own Apple ID before installing. Sideloadly and AltStore do that on Windows or macOS, Xcode on macOS. A free Apple ID is enough — its signing profile expires after seven days, after which the app has to be re-signed to run again.
 
 ### Build from source
 

@@ -1,11 +1,11 @@
 # 构建与发布
 
 **Status:** current
-**Updated:** 2026-10-07
+**Updated:** 2026-10-15
 
-两条交付线共用一份 Web 构建产物；发版是一条工作流、一次构建、三个消费者（GitHub Release 产物、npm 包、GHCR 镜像），服务器只拉取产物，不在服务器上构建。
+两条交付线共用一份 Web 构建产物；发版是一条工作流、一次构建、三个消费者（GitHub Release 产物、npm 包、GHCR 镜像），服务器只拉取产物，不在服务器上构建。iOS 的 ipa 由同一条工作流的 `ios` job 构建并挂进 Release。
 
-代码入口：`.github/workflows/release.yml`、`scripts/release-plan.mjs`、`scripts/check-npm-pack.mjs`、`scripts/release-notes.sh`、`scripts/server-pull.sh`、`Dockerfile`、`package.json`。
+代码入口：`.github/workflows/release.yml`、`scripts/release-plan.mjs`、`scripts/check-npm-pack.mjs`、`scripts/release-notes.sh`、`scripts/server-pull.sh`、`scripts/ios-signing.sh`、`Dockerfile`、`package.json`。
 
 ## 本地构建与验证
 
@@ -25,11 +25,12 @@
 
 ## 发布产物
 
-`.github/workflows/release.yml` 是唯一的发版入口，`prepare → build → {release, npm, docker}` 四段，三个消费者共用一次构建：
+`.github/workflows/release.yml` 是唯一的发版入口，`prepare → {build, ios} → {release, npm, docker}` 五段，四个产物共用同一个 ref 与版本：
 
 - **prepare**：`scripts/release-plan.mjs` 按 ref 算出渠道、版本与各处 tag（`pnpm test:release` 钉住这张映射表）。
-- **build**：`pnpm install --frozen-lockfile` → 把版本写回 `package.json` → `pnpm build` → `scripts/check-npm-pack.mjs` 打包并校验 npm 产物 → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 两个产物一起上传。
-- **release / npm / docker**：只消费上面这两个产物，不再各自安装依赖或重新构建。
+- **build**（ubuntu）：`pnpm install --frozen-lockfile` → 把版本写回 `package.json` → `pnpm build` → `scripts/check-npm-pack.mjs` 打包并校验 npm 产物 → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 两个产物一起上传。
+- **ios**（macos）：`brew install xcodegen` 与 `rustup target add aarch64-apple-ios` → 由仓库变量落盘 `.env.signing` → `--set-version` 写发版版本（前端与 iOS 工程）→ `./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` → ipa 改名为 `agh-console.ipa` 上传。它不消费 `build` 的产物：前端由 tauri-cli 的 `beforeBuildCommand`（`pnpm build`）自己构建并编进 Rust 二进制。
+- **release / npm / docker**：只消费上述产物，不再各自安装依赖或重新构建；`release` 额外把 ipa 挂到同一条 Release 上。
 
 | 渠道 | 触发 | 版本 | Release | npm dist-tag | 镜像 tag |
 | --- | --- | --- | --- | --- | --- |
@@ -43,8 +44,13 @@
 - 发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` 并推送；推送 `main` 本身不发布任何东西。手推非 `vX.Y.Z` 的 tag 会被 `prepare` 直接拒绝，避免 nightly tag 被当成稳定版顶掉 `:latest`。
 - nightly 走测试门（`pnpm check` / `pnpm test` / `test:server` / `test:release`）之后才打包；手动 `workflow_dispatch` 另有 `force`，勾上时忽略「`dev` 未移动」的空转判定以重跑同一提交。
 - 镜像 tag 是**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 读成 Docker Hub 名字，首次真实 nightly 因此在 `library/0.1.0-nightly…` 上 401。
-- npm 渠道发布的就是 build 校验过的那个 tgz（`agh-console`，`files` 只含 `dist`、`server`），`NPM_TOKEN` 未配置时告警跳过。私有仓库不生成 provenance，故不加 `--provenance`；npm 的 `latest` 要等第一个 stable 才存在。
+- npm 渠道发布的就是 build 校验过的那个 tgz（`agh-console`，`files` 只含 `dist`、`server`），`NPM_TOKEN` 未配置时告警跳过。仓库已转为 public（2026-10-15），provenance 因此可用（需 `id-token: write` + `--provenance`，尚未开启）；npm 的 `latest` 要等第一个 stable 才存在。
 - 镜像由 `Dockerfile` 自行构建，保证 `docker build .` 可独立复现；构建阶段跑在 builder 平台上，arm64 不再走 QEMU 编译前端。GHCR 包继承仓库可见性，设为 public 才能匿名拉取。
+- iOS 产物是**未签名**的 ipa：`--no-sign` 让 xcodebuild 带上 `CODE_SIGNING_ALLOWED=NO` 等参数归档，tauri-cli 再把 `.app` 打成 `Payload/` 结构——CI 上不需要证书、账号或描述文件，安装者用 Sideloadly / AltStore / Xcode 以自己的 Apple ID 重签。ipa 内部的 bundle version 仍是 `1.0.0`（`package.json` 与 `tauri.conf.json` 的版本统一另计），追溯靠 tag 与 Release 名。
+- iOS 的成本门与容错：macOS runner 在私有仓库按 10× 计费，所以 **stable 恒构建，nightly 只在仓库公开、`AGH_IOS_NIGHTLY=true`，或手动 `workflow_dispatch` 时构建**（仓库已于 2026-10-15 转为 public，nightly 因此自动构建）；`release` 的 `needs` 含 `ios`（不加会与 iOS 构建抢跑、ipa 时有时无），但容错只对 iOS 开口：`!cancelled()` 让 iOS 失败时照常发 tarball / npm / 镜像，而 `needs.build.result == 'success'` 保持既有语义——`build` 失败依旧不发布。ipa 缺失时运行页是红的，Release 不会被静默降级。
+- 签名值不进 CI 配置也不用 secrets：`AGH_APPLE_TEAM` / `AGH_BUNDLE_ID` 从仓库变量读，未设置时分别兜底为 `unsigned` 与 `tauri.conf.json#identifier`（不签名的构建里 team 只是 XcodeGen 的占位符）。
+- 资产名固定为 `agh-console.ipa`（与 `agh-console.tar.gz` 同风格）：nightly 的原地 upsert 因此是**替换**而不是逐日堆积一个 ipa。
+- 版本只有一个来源：`scripts/release-plan.mjs` 算出的发版版本。`--set-version <版本> <build>` 一次写完 `package.json`、`src-tauri/tauri.conf.json` 与 iOS 工程的 `CFBundleShortVersionString`/`CFBundleVersion`；前端经 `vite.config.ts` 的 `define` 把 `package.json` 的版本编进 `dist`（应用内「关于」页显示的就是它），镜像走 `build-args: APP_VERSION` 而不改上下文里的 `package.json`。iOS 的 plist 只收 1–3 段纯数字，所以记的是**核心版本 + 数字 build**（CI 传 `github.run_number`），nightly 的 prerelease 后缀只出现在应用界面里。
 - `concurrency` 按 ref 串行，不取消进行中的运行；Release 与 tag 都不删除，既是回滚点，也是「相对上一版」变更列表的基线。
 
 ## Release 说明

@@ -52,6 +52,8 @@
 | 2026-10-13 | feature | [上游 DNS 并发测速与基准测试](proposals/feature/2026-10-13-upstream-dns-benchmark.md) | implemented |
 | 2026-10-13 | feature | [实现跨节点查询日志聚合与交互式下钻分析](proposals/feature/2026-10-13-query-log-analytics.md) | implemented |
 | 2026-10-13 | feature | [配置快照与历史版本还原（Configuration Snapshots & Rollback）](proposals/feature/2026-10-13-configuration-snapshots-and-rollback.md) | proposed |
+| 2026-10-15 | process | [在 release 工作流里构建并附带 iOS IPA](proposals/process/2026-10-15-release-ipa-artifact.md) | implemented |
+| 2026-10-15 | process | [让应用内显示的版本与发版版本同源](proposals/process/2026-10-15-version-single-source.md) | implemented |
 
 ## 与 docs/ 的分工
 

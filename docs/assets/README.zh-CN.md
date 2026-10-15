@@ -1,9 +1,11 @@
 # AdGuard Home Console 简介
 
 **Status:** current
-**Updated:** 2026-09-26
+**Updated:** 2026-10-15
 
 AdGuard Home Console 是一个**非官方**的 [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome) 跨平台管理控制台：完整管理界面跑在浏览器里，也可以作为 PWA 装到手机桌面，或打包成桌面与移动端的原生应用。界面提供英文与简体中文、浅色与深色主题。
+
+**AGH Console** 是应用本身的名字：浏览器标签页、桌面窗口标题与手机桌面图标都用它。npm 包名与镜像名是 `agh-console`，「AdGuard Home Console」是本仓库的项目名。
 
 ## 为什么有这个项目
 
@@ -51,7 +53,7 @@ AdGuard Home 的 API 不返回 CORS 头，浏览器无法直连——所有第�
 三种部署通道任选其一，详细配置见英文 [README](../../README.md)：
 
 ```bash
-# Docker（amd64 / arm64；仓库私有时需先 docker login ghcr.io）
+# Docker（amd64 / arm64）
 docker run -d --name agh-console -p 8787:8787 ghcr.io/cowjiang/agh-console:latest
 
 # npx（Node ≥ 24；稳定版走 latest tag，dev 的每晚构建走 nightly tag）

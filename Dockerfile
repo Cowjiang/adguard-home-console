@@ -17,6 +17,12 @@ RUN PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")
     && npm i -g "pnpm@$PNPM_VERSION" \
     && pnpm install --frozen-lockfile
 COPY . .
+# The image reports the release version in Settings → About, so the workflow
+# passes it in here. A build arg rather than a stamped package.json on purpose:
+# an ARG only invalidates the layers below it, while editing the context file
+# would re-run the pnpm install above on every release. Unset (plain
+# `docker build .`) → the build reports package.json#version.
+ARG APP_VERSION
 RUN pnpm build
 
 FROM node:24-alpine

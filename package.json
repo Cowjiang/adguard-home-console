@@ -15,6 +15,17 @@
     "server",
     "!server/*.test.mjs"
   ],
+  "keywords": [
+    "adguard",
+    "adguard-home",
+    "agh",
+    "adblock",
+    "ad-blocker",
+    "dns",
+    "self-hosted",
+    "dashboard",
+    "tauri"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Cowjiang/adguard-home-console.git"
