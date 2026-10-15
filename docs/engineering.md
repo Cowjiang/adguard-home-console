@@ -47,23 +47,23 @@
 
 ## 发布
 
-一条工作流、一次构建、三个消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，版本只在 `prepare` 算一次（`scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
+一条工作流、一次构建、三个消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，版本只在 `prepare` 算一次（`.github/scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
 
 - 两个渠道：**nightly** 由定时任务（每天 UTC 19:17，避开整点以躲开 GitHub 的 cron 拥塞）从 `dev` 构建，版本 `<package.json 的 version>-nightly.<UTC YYYYMMDD>.<短 sha>`，Release 标 prerelease 且**只占一条**（tag 固定为 `nightly`，每次强移到最新构建后原地更新），npm dist-tag `nightly`，镜像 `<版本>`/`nightly`/`sha-<短 sha>`，**不带 `latest`**；**stable** 由 tag `vX.Y.Z` 触发，版本取自 tag，npm `latest`，镜像 `<版本>`/`X.Y`/`latest`/`sha-<短 sha>`。映射由 `pnpm test:release` 的断言钉住。
 - 因此 `releases/latest`（`scripts/server-pull.sh` 读的）、npm 的 `latest` dist-tag 与镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。
-- 推送 `main` 不再发布任何东西：发版动作是 `dev` → `main` 合并后打 `vX.Y.Z` tag 并推送。手推的 tag 若不是 `vX.Y.Z`（例如手推一个 nightly tag）会被 `prepare` 直接拒绝并说明原因。
+- 推送 `main` 不再发布任何东西：发版动作是 `dev` → `main` 合并后，在 Actions 里对 `main` 派发 **Cut Release**（`.github/workflows/cut-release.yml`：补版本 → 写 `package.json`/`tauri.conf.json`/iOS 工程/`CHANGELOG.md` → 提交 `chore(release): vX.Y.Z` + annotated tag → 推分支与 tag 并触发 `release.yml`）。手推的 tag 若不是 `vX.Y.Z`（例如手推一个 nightly tag）会被 `prepare` 直接拒绝并说明原因。
 - nightly 只在 `dev` 与滚动 tag 当前指向的提交**不同**时才发；空转的日子整条跳过，不产出空版本，也不做双架构构建。nightly 的说明正文以「上一次 nightly 的提交」为基线（滚动 tag 移动前的那个 commit），列出这一晚落了什么。
 - 定时任务的定义文件必须存在于默认分支（`main`）才会触发，而 `schedule` 事件报告的 ref 是默认分支——所以 workflow 显式把 nightly 的构建 ref 解析成 `dev`，三个 job 都按解析结果 checkout，Release tag 的 `target_commitish` 也指到那个 commit。
 - nightly 是「只在绿码上发」的渠道：build job 在打包前跑 `pnpm check`、`pnpm test`、`npm run test:server`、`pnpm test:release`；stable 不加这道门（沿用既有发布口径）。
 - `workflow_dispatch` 默认是**干跑**（`publish=false`）：只构建、校验 npm 包、构建镜像，不创建 Release、不推送；补发才把 `publish` 设为 true。另有 `force`：勾上时忽略「`dev` 未移动」的空转判定，用于手动重跑同一提交的 nightly；定时任务不受它影响。
-- Release 说明由 `scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag（nightly 与 stable tag 都算基线），再回退到最近 20 个提交。
+- Release 说明由 `.github/scripts/release-notes.sh` 生成：优先列出本次推送新增的提交，`before` 不可用时回退到最近的祖先 tag（nightly 与 stable tag 都算基线），再回退到最近 20 个提交。
 - Release 与 tag **不删除**，全部长期保留，既是回滚点，也是后续「相对上一版」变更列表的基线；**唯一例外是 nightly 的滚动 tag**（`nightly`）——它每跑一次就被强移到新构建，Release 原地更新（同名资产覆盖），因此 Release 列表里恒为一条 nightly。stable 仍是「一个版本一条 tag、一条 Release」，从不覆盖。
 - npm 的 `latest` 只在第一个 stable 发布后才存在：在此之前 `npx agh-console`（不带 tag）会 ETARGET，需先发一个 stable，或手动 `npm dist-tag add agh-console@<版本> latest` 引导。
 - `NPM_TOKEN` 必须是**能创建新包**的令牌（classic automation token，或授权范围覆盖全部包的 granular token）：npm 对无权限的发布一律返回 404，无法与「名字已被占用」区分，首次发布 `agh-console` 时尤其要先排除这一条。
 - 镜像 tag 由 `release-plan.mjs` 输出为**全限定引用**（`ghcr.io/cowjiang/agh-console:<tag>`）：buildx 把裸 tag 当成 Docker Hub 名字，会去推 `library/<tag>` 并拿到 401——首次真实 nightly 就是这么失败的。
 - `release.yml` 里的 action 一律钉在 **node24 主线**（node20 的动作会被 runner 强制降级运行并逐 job 打弃用告警）；升大版本前逐个核对本流程用到的 input 在新版里是否仍然存在，本仓没有 Dependabot 兜底。
 - npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。`NPM_TOKEN` 未配置时该 job 只告警跳过，不影响其余渠道。仓库已转为 public（2026-10-15），provenance 因此可用——开启需要给该 job 加 `id-token: write` 并给 `npm publish` 加 `--provenance`，目前尚未开启。
-- iOS 产物由 `release.yml` 的 `ios` job（`macos-latest`）构建：`./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` 出**未签名** ipa（资产名固定 `agh-console.ipa`），安装者用自己的 Apple ID 重签；签名值与本地一致，只走仓库变量，缺省兜底 `unsigned` 与 `tauri.conf.json#identifier`。stable 恒构建，nightly 只在仓库公开、`AGH_IOS_NIGHTLY=true` 或手动 `workflow_dispatch` 时构建（私有仓库的 macOS 分钟按 10× 计费；仓库已于 2026-10-15 转为 public，nightly 因此自动构建）；`release` job 用 `!cancelled()` 接住 iOS 的失败，ipa 缺失只让运行页变红，不阻断 tarball / npm / 镜像。
+- iOS 产物由 `release.yml` 的 `ios` job（`macos-latest`）构建：`./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` 出**未签名** ipa（资产名固定 `agh-console.ipa`），安装者用自己的 Apple ID 重签；签名值与本地一致，只走仓库变量，缺省兜底 `unsigned` 与 `tauri.conf.json#identifier`。stable 恒构建，nightly 只在仓库公开或手动 `workflow_dispatch` 时构建（`github.event.repository.private == false`；私有仓库的 macOS 分钟按 10× 计费，才需要这道闸——仓库已于 2026-10-15 转为 public，nightly 因此自动构建）；`release` job 用 `!cancelled()` 接住 iOS 的失败，ipa 缺失只让运行页变红，不阻断 tarball / npm / 镜像。
 - 版本只有一个来源：`release-plan.mjs --set-version <版本> <build>` 同时写 `package.json`、`src-tauri/tauri.conf.json` 与 iOS 工程的 plist 两项，前端与 iOS 包的应用内版本因此等于该次发版的版本（镜像用 `APP_VERSION` build-arg 传入——改上下文里的 `package.json` 会让 `pnpm install` 的缓存层每次发版重跑）。iOS 的 `CFBundleShortVersionString` 只接受 1–3 段纯数字，故工程里记**核心版本 + 数字 build**，完整 nightly 串只在界面里；仓库内三个声明值平时与 `package.json` 同值。`src-tauri/Cargo.toml` 的 crate 版本不参与（不出现在任何产物或界面里）。
 - GHCR 包的可见性**不随仓库继承**，是包设置里的独立开关（现已设为 public）：未公开时 README 里的匿名 `docker run` 需要先在目标机 `docker login ghcr.io`。
 
