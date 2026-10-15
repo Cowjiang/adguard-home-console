@@ -138,6 +138,44 @@ interface Underlay {
   y: number
 }
 
+/** One-shot entrance animations are never replayed inside a snapshot: a clone
+ *  re-inserted into the DOM restarts its CSS animations, and these all start
+ *  off-screen or transparent (rt-push-in from translate(100%), rt-pop-in from
+ *  -28%, page-in from opacity 0), so the revealed old page would be blank or
+ *  shifted for the whole animation.
+ *
+ *  The **root** matters as much as the descendants: while a transition runs,
+ *  the page container itself carries the rt-* class (inline style cannot
+ *  outrank a running animation either), so a capture taken in that window --
+ *  navigating again within DURATION_MS, e.g. a quick drill-down -- inherits it
+ *  and the underlay/exit layer replays the enter animation. Stripping only the
+ *  descendants (the old behavior) left exactly that hole. */
+const SNAPSHOT_STRIP_CLASSES = [
+  'page-in',
+  'content-in',
+  'tab-in',
+  'rise-in',
+  'log-flash',
+  'rt-push-in',
+  'rt-push-out',
+  'rt-pop-in',
+  'rt-pop-out',
+  'rt-pill-in',
+]
+const SNAPSHOT_STRIP_SELECTOR = SNAPSHOT_STRIP_CLASSES.map((c) => `.${c}`).join(',')
+
+/** Static snapshot hygiene: drop the transition classes from the node and its
+ *  descendants, and clear the node's own inline transform/animation/transition
+ *  (a capture taken mid-drag would otherwise bake the drag's transform into the
+ *  snapshot) */
+function sanitizeSnapshot(node: HTMLElement) {
+  node.classList.remove(...SNAPSHOT_STRIP_CLASSES)
+  node.style.transform = ''
+  node.style.animation = ''
+  node.style.transition = ''
+  node.querySelectorAll(SNAPSHOT_STRIP_SELECTOR).forEach((el) => el.classList.remove(...SNAPSHOT_STRIP_CLASSES))
+}
+
 /** Page snapshot: cloneNode, attached as real DOM nodes. Must not go through
  *  innerHTML serialization + reparsing -- the HTML parser forbids button
  *  nested inside button (tappable rows contain switch buttons), so after
@@ -147,9 +185,7 @@ function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null 
   const live = pageRef.current
   if (!live) return null
   const node = live.cloneNode(true) as HTMLElement
-  node.querySelectorAll('.page-in,.content-in,.tab-in,.rise-in,.log-flash').forEach((el) => {
-    el.classList.remove('page-in', 'content-in', 'tab-in', 'rise-in', 'log-flash')
-  })
+  sanitizeSnapshot(node)
   // Look for the live nav bar only among body's direct children: nav bars
   // cloned by transition snapshots live inside #root, and data-floating-nav is
   // stripped from them below -- otherwise the gesture's querySelector would
@@ -159,6 +195,9 @@ function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null 
   if (bar instanceof HTMLElement) {
     barNode = bar.cloneNode(true) as HTMLElement
     barNode.removeAttribute('data-floating-nav')
+    // The bar carries rt-push-in/rt-pop-in while a transition runs (barAnim);
+    // a snapshot must not replay it
+    sanitizeSnapshot(barNode)
     // Do not re-show custom buttons in the snapshot: any button a native
     // control can take over never gets a custom version; the native back pill
     // fills its spot in place as the swipe reveals it (see nativeBackButton's
@@ -176,8 +215,8 @@ function capturePage(pageRef: { current: HTMLElement | null }): Underlay | null 
   if (pill instanceof HTMLElement) {
     pillNode = pill.cloneNode(true) as HTMLElement
     pillNode.removeAttribute('data-status-pill')
-    pillNode.classList.remove('rt-pill-in')
-    pillNode.style.animation = ''
+    // Drops the rt-pill-in entrance (an arriving pop animates the live pill)
+    sanitizeSnapshot(pillNode)
   }
   return { node, barNode, pillNode, y: Math.max(0, Math.round(window.scrollY)) }
 }

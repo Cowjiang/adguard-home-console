@@ -43,7 +43,8 @@
 
 - Tab 之间的程序化跳转使用 `useTabJump`：以 `replace` 保持历史栈的层级语义，同时可以播放前进动画。层级下钻使用 `push`。
 - 「顶级路由」分两个概念：移动端 tab 根（`src/lib/nav/routes.ts` 的 `TAB_ROOT_ROUTES`，4 个 tab）与桌面侧边栏根（`TOP_LEVEL_ROUTES`）。`/clients` 只是桌面根，移动端按二级页处理：push 进入、有原生返回按钮与侧滑返回、顶部状态条不显示。
-- WKWebView 侧滑返回使用原生历史快照；程序化返回由 `src/lib/routeTransition.tsx` 的 CSS 快照层负责。转场中的新旧页面层必须不透明，相关样式为 `.rt-page-bg`。
+- 移动端边缘侧滑是自研手势（`src/lib/routeTransition.tsx` 的 `useEdgeSwipe`）：WKWebView 原生同文档侧滑的下层是空白（逐帧取证见 `.agents/logs/tauri-ios.md` §13.2），故 Rust 侧关闭 `allowsBackForwardNavigationGestures`（`src-tauri/src/lib.rs`），改由我们按历史条目 idx 保存「来路页面」克隆（`underlays`，push 落地时写入、POP/REPLACE 时修剪）当揭示层。程序化返回（返回胶囊/原生按钮/表单收尾）由 CSS 快照层（退场层 + 进场层）负责。转场中的新旧页面层必须不透明，相关样式为 `.rt-page-bg`。
+- 快照克隆必须「洁净」（`capturePage` 内的 `sanitizeSnapshot`）：根节点与全部子孙都摘掉一次性入场动画类（`page-in`、`content-in`、`tab-in`、`rise-in`、`log-flash`、`rt-push-in`、`rt-push-out`、`rt-pop-in`、`rt-pop-out`、`rt-pill-in`），根节点的内联 transform/animation/transition 也清空（拖拽中的 transform 不得被烘焙进快照）。克隆重新插入 DOM 会重播 CSS 动画，而这些入场动画的首帧都在视窗外或透明（`rt-push-in` 从 `translate(100%)` 起、`rt-pop-in` 从 -28% 起、`page-in` 从 opacity 0 起）；只清子孙、漏掉页面容器根节点时，两次导航间隔小于转场时长（390ms，例如进页面后立刻再下钻）捕获的旧页快照会在下层/退场层里重播入场动画——表现为父页快照整片空白（iOS 手势期间动画被挂起时尤其明显）或整体错位，见 `.agents/pipelines/proposals/bug-fix/2026-10-16-swipe-underlay-enter-class.md`。
 - 顶部状态 pill（Layout 的 `TopBar`，fixed 在页面容器之外）不在 `capturePage` 的页面容器克隆里，单独经 `[data-status-pill]` 捕获进退场层与侧滑下层：作为 fixed 元素挂视口容器直接子级（不进 `-y` 滚动对齐层），与旧页滚动位置无关，push 离开 tab 根页时随旧页保留、被新页盖过。pop 落地 tab 根页时真实 pill 属于新页、被 z-50 退场快照盖着，由 `useArrivalPopAnim` 挂 `.rt-pill-in` 与页面同步纯淡入（渲染期一次性判定 back 标记，侧滑提交/无动画返回页面瞬时就位、不淡入）；动画窗口结束必须摘类——`fill: both` 会持续压住内联 opacity，留着会让下拉刷新的 dimmed 淡出失效。
 - 移动端返回统一走 `src/lib/nav/backNav.ts` 的 `navBack`：有历史条目就 POP，栈空（直落子页/刷新）才 replace 回父级。返回胶囊、原生按钮与表单保存/删除收尾共用它；**不得用 replace 导航到父级列表页**——那会在栈里留下重复条目，浏览器按一次返回等于没动（客户端表单保存曾如此）。
 - 页内筛选/搜索状态（日志页的 `?filter=`、`?q=`）要同步进 URL，且用 `replace` 不压历史栈。否则 URL 停留在进入本页时的旧值，从详情页返回或刷新时组件按旧值重建，筛选会被拽回去。
