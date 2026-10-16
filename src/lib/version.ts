@@ -4,6 +4,7 @@
  * Implements:
  * - Version manifest types matching Schema 1.0
  * - SystemVersionResponse contract
+ * - Self-upgrade trigger and status API
  * - Direct remote manifest fetch on Tauri (runtime='ios')
  * - Server proxy fetch on Web/PWA (/api/system/version)
  * - Semver comparison
@@ -38,10 +39,20 @@ export interface SystemVersionResponse {
   currentVersion: string
   channel: string
   runtime: AppRuntime
+  canSelfUpgrade?: boolean
   hasUpdate: boolean
   latest?: VersionManifest
   checkFailed?: boolean
   error?: string
+}
+
+export interface UpgradeStatusResponse {
+  ok: boolean
+  status: 'idle' | 'running' | 'failed' | 'completed'
+  lastRun?: string | null
+  exitCode?: number | null
+  logs?: string
+  error?: string | null
 }
 
 export const DEFAULT_UPDATE_MANIFEST_URL =
@@ -156,6 +167,7 @@ export async function fetchSystemVersion(
         currentVersion,
         channel,
         runtime: 'ios',
+        canSelfUpgrade: false,
         hasUpdate,
         latest: manifest,
       }
@@ -165,6 +177,7 @@ export async function fetchSystemVersion(
         currentVersion,
         channel,
         runtime: 'ios',
+        canSelfUpgrade: false,
         checkFailed: true,
         error: err instanceof Error ? err.message : String(err),
         hasUpdate: false,
@@ -188,9 +201,52 @@ export async function fetchSystemVersion(
       currentVersion,
       channel,
       runtime: 'standalone',
+      canSelfUpgrade: false,
       checkFailed: true,
       error: err instanceof Error ? err.message : String(err),
       hasUpdate: false,
     }
+  }
+}
+
+/**
+ * Triggers server self-upgrade via POST /api/system/upgrade
+ */
+export async function triggerSelfUpgrade(opts?: { fetch?: typeof fetch }): Promise<{
+  ok: boolean
+  status?: string
+  message?: string
+  error?: string
+}> {
+  const fetchFn = opts?.fetch ?? globalThis.fetch
+  try {
+    const response = await fetchFn('/api/system/upgrade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      return { ok: false, error: data?.error || `HTTP ${response.status}` }
+    }
+    return data
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Queries current upgrade progress via GET /api/system/upgrade/status
+ */
+export async function getUpgradeStatus(opts?: { fetch?: typeof fetch }): Promise<UpgradeStatusResponse> {
+  const fetchFn = opts?.fetch ?? globalThis.fetch
+  try {
+    const response = await fetchFn('/api/system/upgrade/status')
+    const data = await response.json()
+    if (!response.ok) {
+      return { ok: false, status: 'failed', error: data?.error || `HTTP ${response.status}` }
+    }
+    return data
+  } catch (err) {
+    return { ok: false, status: 'failed', error: err instanceof Error ? err.message : String(err) }
   }
 }

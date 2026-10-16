@@ -126,6 +126,15 @@ const enSettings = {
   downloadTarball: 'Download Tarball',
   viewOnGitHub: 'View on GitHub',
 
+  // Self Upgrade
+  selfUpgrade: 'Self Upgrade',
+  selfUpgradeConfirmTitle: 'Upgrade Console and restart service?',
+  selfUpgradeConfirmMsg: 'The server will automatically download the latest version, back up the current installation, and restart the systemd service. Network requests may be interrupted for a few seconds.',
+  selfUpgradeStarting: 'Starting upgrade...',
+  selfUpgradeInProgress: 'Upgrading and restarting service... Please wait.',
+  selfUpgradeSuccess: 'Console updated successfully! Reloading...',
+  selfUpgradeFailed: 'Self-upgrade failed: {{msg}}',
+
   // Snapshots
   snapshotsTitle: 'Configuration Snapshots',
   snapshotsDesc: 'Manage configuration snapshots for your instances, inspect diffs, and safely roll back.',

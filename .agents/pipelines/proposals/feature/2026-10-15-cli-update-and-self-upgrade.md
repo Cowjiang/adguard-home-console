@@ -1,10 +1,10 @@
 # 支持 CLI 启动更新提示与服务端自升级闭环
 
 **Class:** feature
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-15
 **Source:** 基于 [多渠道分发的检查更新与自动更新路线图](2026-10-15-update-check-and-distribution-roadmap.md)，推进阶段二「CLI 启动更新横幅与服务端半自动更新」落地
-**Updated:** 2026-10-15
+**Updated:** 2026-10-16
 
 ## Goal
 
@@ -72,14 +72,14 @@
     - 异步落盘执行日志：将输出流写入临时日志文件以备排查；
     - 响应返回 `{ ok: true, status: 'started', message: 'Upgrade process spawned' }`。
   - `GET /api/system/upgrade/status`：
-    - 返回当前状态机状态：`idle` | `running` | `failed` | `completed` 及最新执行日志片断。
+    - 返回当前状态机状态：`idle` | `running` | `failed` | `completed` 及最新执行日志片段。
 
 ---
 
 ### 4. 前端一键更新与服务重启重连闭环
 - **UI 呈现扩展 (`AppUpdateSheet.tsx`)**：
   - 当 `latest` 存在且 `canSelfUpgrade === true` 时，在操作区展示高亮按钮「一键升级并重启」；
-  - 点击弹出确认二次弹窗，告知用户「服务将自动拉取最新构建并重启 systemd 守护进程，期间网络访问会短暂中断几秒」；
+  - 点击弹出确认二次弹窗，告知用户「服务端将自动拉取最新构建并重启 systemd 守护进程，期间网络访问会短暂中断几秒」；
   - 确认后发送 `POST /api/system/upgrade`。
 - **前端自动轮询重连**：
   - 发送升级命令后，UI 进入更新中 Loading 遮罩界面；
@@ -91,23 +91,23 @@
 
 ## Accept
 
-- [ ] **CLI 启动横幅**：
-  - [ ] 终端以 TTY 模式启动 `server/index.mjs` 时，能在后台完成版本对比并在有新版本时打印格式化横幅；
-  - [ ] 24 小时本地缓存机制生效，重复启动不触发网络查询；
-  - [ ] 环境变量 `NO_UPDATE_NOTIFIER=1` 或非 TTY 环境下静默不输出；
-  - [ ] 具备单元测试覆盖检测逻辑、缓存读写与格式化输出。
-- [ ] **升级脚本现代化**：
-  - [ ] `scripts/server-pull.sh` 在缺少 Token 文件时仍能正常匿名拉取公开 Release 产物；
-  - [ ] 支持 `--check` 与 `--dry-run` 模式，具备容错机制。
-- [ ] **服务端自升级接口**：
-  - [ ] 默认状态下 `canSelfUpgrade` 为 `false`，调用 `POST /api/system/upgrade` 响应 403；
-  - [ ] 配置 `AGH_ENABLE_SELF_UPGRADE=1` 后接口激活，成功派发任务并具备 409 防并发冲突保护；
-  - [ ] 具备完备的单元测试，覆盖安全校验、状态流转与命令调度。
-- [ ] **前端一键更新与重连**：
-  - [ ] `AppUpdateSheet.tsx` 根据 `canSelfUpgrade` 动态切换操作按钮；
-  - [ ] 确认升级后进入轮询状态，成功监测服务重启并在恢复后提示刷新；
-  - [ ] 中英双语词条完备。
-- [ ] **工程门禁**：
-  - [ ] `pnpm check` 与 `pnpm test` 保持全绿；
-  - [ ] `npm run test:server` 全部通过；
-  - [ ] `node scripts/verify-proposals.mjs --links` 校验通过。
+- [x] **CLI 启动横幅**：
+  - [x] 终端以 TTY 模式启动 `server/index.mjs` 时，能在后台完成版本对比并在有新版本时打印格式化横幅；
+  - [x] 24 小时本地缓存机制生效，重复启动不触发网络查询；
+  - [x] 环境变量 `NO_UPDATE_NOTIFIER=1` 或非 TTY 环境下静默不输出；
+  - [x] 具备单元测试覆盖检测逻辑、缓存读写与格式化输出。
+- [x] **升级脚本现代化**：
+  - [x] `scripts/server-pull.sh` 在缺少 Token 文件时仍能正常匿名拉取公开 Release 产物；
+  - [x] 支持 `--check` 与 `--dry-run` 模式，具备容错机制。
+- [x] **服务端自升级接口**：
+  - [x] 默认状态下 `canSelfUpgrade` 为 `false`，调用 `POST /api/system/upgrade` 响应 403；
+  - [x] 配置 `AGH_ENABLE_SELF_UPGRADE=1` 后接口激活，成功派发任务并具备 409 防并发冲突保护；
+  - [x] 具备完备的单元测试，覆盖安全校验、状态流转与命令调度。
+- [x] **前端一键更新与重连**：
+  - [x] `AppUpdateSheet.tsx` 根据 `canSelfUpgrade` 动态切换操作按钮；
+  - [x] 确认升级后进入轮询状态，成功监测服务重启并在恢复后提示刷新；
+  - [x] 中英双语词条完备。
+- [x] **工程门禁**：
+  - [x] `pnpm check` 与 `pnpm test` 保持全绿；
+  - [x] `npm run test:server` 全部通过；
+  - [x] `node scripts/verify-proposals.mjs --links` 校验通过。

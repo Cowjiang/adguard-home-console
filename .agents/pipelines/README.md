@@ -2,7 +2,7 @@
 | 2026-10-15 | bug-fix | [修掉 iOS 工程生成在全新克隆上的失败，并保住 xcodegen 的报错输出](proposals/bug-fix/2026-10-15-ios-project-generate-fresh-clone.md) | implemented |
 | 2026-10-15 | feature | [多渠道分发的检查更新与自动更新路线图](proposals/feature/2026-10-15-update-check-and-distribution-roadmap.md) | proposed |
 | 2026-10-15 | feature | [统一版本清单（Manifest）与应用内检查更新闭环](proposals/feature/2026-10-15-update-check-manifest-and-ui.md) | implemented |
-| 2026-10-15 | feature | [支持 CLI 启动更新提示与服务端自升级闭环](proposals/feature/2026-10-15-cli-update-and-self-upgrade.md) | proposed |
+| 2026-10-15 | feature | [支持 CLI 启动更新提示与服务端自升级闭环](proposals/feature/2026-10-15-cli-update-and-self-upgrade.md) | implemented |
 
 ## 与 docs/ 的分工
 
