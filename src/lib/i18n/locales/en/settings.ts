@@ -109,6 +109,12 @@ const enSettings = {
 
   // App / Console updates
   appVersion: 'App version',
+  updateChannel: 'Update Channel',
+  channelStable: 'Stable',
+  channelNightly: 'Nightly',
+  channelStableDesc: 'Official releases, recommended for daily use',
+  channelNightlyDesc: 'Early access to the latest features and fixes',
+  channelChanged: 'Switched to {{channel}} channel',
   checkAppUpdate: 'Check for Console Updates',
   checkingAppUpdate: 'Checking...',
   appUpToDate: 'Console is up to date',

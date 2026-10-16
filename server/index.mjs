@@ -67,6 +67,25 @@ app.get('/api/config', (_req, res) => {
   res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
 })
 
+// Version manifest asset endpoint
+app.get(['/version.json', '/version-:channel.json'], (req, res) => {
+  const channel = req.params?.channel
+  const filename = channel ? `version-${channel}.json` : 'version.json'
+  const candidates = [
+    path.join(ROOT, filename),
+    path.join(DIST, filename),
+    path.join(ROOT, 'public', filename),
+  ]
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      return res.sendFile(candidate)
+    }
+  }
+  res.status(404).json({ error: `${filename} not found` })
+})
+
 // AltStore & SideStore community distribution source
 app.get('/community-source.json', (_req, res) => {
   const candidates = [
