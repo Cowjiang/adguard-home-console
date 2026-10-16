@@ -111,6 +111,7 @@ test('checkCliUpdate: fetches remote manifest on cache miss, caches it, and prin
   try {
     const res = await checkCliUpdate({
       isTTY: true,
+      env: {},
       currentVersion: '0.2.1',
       cacheFile: tmpCache,
       fetch: mockFetch,
@@ -128,6 +129,7 @@ test('checkCliUpdate: fetches remote manifest on cache miss, caches it, and prin
     // Second call uses cache, does not fetch again
     const res2 = await checkCliUpdate({
       isTTY: true,
+      env: {},
       currentVersion: '0.2.1',
       cacheFile: tmpCache,
       fetch: mockFetch,
@@ -158,6 +160,7 @@ test('checkCliUpdate: does not show banner if current version is up to date or n
   try {
     const res = await checkCliUpdate({
       isTTY: true,
+      env: {},
       currentVersion: '0.3.0',
       cacheFile: tmpCache,
       fetch: mockFetch,
@@ -184,6 +187,7 @@ test('checkCliUpdate: error resilience on network or HTTP failure', async () => 
 
   const res = await checkCliUpdate({
     isTTY: true,
+    env: {},
     currentVersion: '0.2.1',
     cacheFile: tmpCache,
     fetch: failingFetch,

@@ -112,7 +112,7 @@ export function writeUpdateCache(cacheFile = DEFAULT_CACHE_FILE, data) {
  */
 export async function checkCliUpdate(options = {}) {
   try {
-    const env = options.env || process.env;
+    const env = options.env ?? process.env;
     const isTTY = options.isTTY ?? Boolean(process.stdout?.isTTY);
 
     // Suppression rules
