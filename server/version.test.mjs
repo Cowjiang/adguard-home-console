@@ -87,7 +87,7 @@ test('semver: compareVersions and isNewerVersion', () => {
   assert.equal(isNewerVersion('0.2.1', '0.2.1-nightly.20261007.aaa'), false);
 });
 
-test('versionHandler: detects available update', async () => {
+test('versionHandler: detects available update and reflects canSelfUpgrade', async () => {
   let fetchCount = 0;
   const mockFetch = async () => {
     fetchCount++;
@@ -101,6 +101,7 @@ test('versionHandler: detects available update', async () => {
     currentVersion: '0.2.1',
     channel: 'stable',
     detectRuntime: () => 'docker',
+    env: { AGH_ENABLE_SELF_UPGRADE: '1' },
     fetch: mockFetch,
   });
 
@@ -112,15 +113,17 @@ test('versionHandler: detects available update', async () => {
   assert.equal(ctx.response.currentVersion, '0.2.1');
   assert.equal(ctx.response.channel, 'stable');
   assert.equal(ctx.response.runtime, 'docker');
+  assert.equal(ctx.response.canSelfUpgrade, true);
   assert.equal(ctx.response.hasUpdate, true);
   assert.deepEqual(ctx.response.latest, mockManifest);
   assert.equal(fetchCount, 1);
 });
 
-test('versionHandler: current version is up to date (hasUpdate: false)', async () => {
+test('versionHandler: current version is up to date (hasUpdate: false, canSelfUpgrade defaults to false)', async () => {
   const handler = createVersionHandler({
     currentVersion: '0.3.0',
     channel: 'stable',
+    env: {},
     fetch: async () => ({
       ok: true,
       json: async () => mockManifest,
@@ -132,6 +135,7 @@ test('versionHandler: current version is up to date (hasUpdate: false)', async (
 
   assert.equal(ctx.response.ok, true);
   assert.equal(ctx.response.hasUpdate, false);
+  assert.equal(ctx.response.canSelfUpgrade, false);
   assert.equal(ctx.response.latest.version, '0.3.0');
 });
 
@@ -199,6 +203,7 @@ test('versionHandler: error resilience when remote is unreachable', async () => 
   assert.equal(ctx.response.currentVersion, '0.2.1');
   assert.equal(ctx.response.channel, 'stable');
   assert.equal(ctx.response.runtime, 'standalone');
+  assert.equal(ctx.response.canSelfUpgrade, false);
   assert.equal(ctx.response.checkFailed, true);
   assert.match(ctx.response.error, /ECONNREFUSED/);
 });

@@ -19,6 +19,8 @@ import net from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { createAghProxy } from './proxy.mjs'
 import { createVersionHandler } from './version.mjs'
+import { createUpgradeHandler } from './upgrade.mjs'
+import { checkCliUpdate } from './cli-update.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Load .env from the project root (does not override existing env vars); skip if missing
@@ -61,11 +63,15 @@ app.get('/api/health', (_req, res) => {
 
 // Default target server (optional, prefills the login page)
 app.get('/api/config', (_req, res) => {
-  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
-})
+  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })\n})
 
 // System version and remote update check
 app.get('/api/system/version', createVersionHandler())
+
+// System self-upgrade endpoints (guarded by AGH_ENABLE_SELF_UPGRADE)
+const { upgradeHandler, statusHandler } = createUpgradeHandler()
+app.post('/api/system/upgrade', upgradeHandler)
+app.get('/api/system/upgrade/status', statusHandler)
 
 // —— AGH reverse proxy (see proxy.mjs) ——
 app.use('/api/agh', createAghProxy())
@@ -139,3 +145,8 @@ if (HOSTS.length > 0) {
     console.log(`[adguard-home-console] http://localhost:${PORT}  (dist: ${DIST})`)
   })
 }
+
+// Check for CLI updates in background after startup
+setTimeout(() => {
+  checkCliUpdate().catch(() => {})
+}, 100)

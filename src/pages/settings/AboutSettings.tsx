@@ -25,6 +25,7 @@ export function AboutSettings() {
         manifest={data.latest}
         runtime={data.runtime}
         currentVersion={data.currentVersion}
+        canSelfUpgrade={data.canSelfUpgrade}
         onClose={sheet.close}
       />,
       { title: t('settings.updateDetails') }

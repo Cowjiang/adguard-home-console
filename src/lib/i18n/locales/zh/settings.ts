@@ -126,6 +126,15 @@ const zhSettings = {
   downloadTarball: '下载安装包',
   viewOnGitHub: '查看 GitHub Release',
 
+  // Self Upgrade
+  selfUpgrade: '一键升级并重启',
+  selfUpgradeConfirmTitle: '升级控制台并重启服务？',
+  selfUpgradeConfirmMsg: '服务端将自动拉取最新版本、备份当前安装并重启 systemd 守护进程。期间控制台连接将短暂中断数秒。',
+  selfUpgradeStarting: '正在启动升级...',
+  selfUpgradeInProgress: '正在升级并重启服务，请稍候...',
+  selfUpgradeSuccess: '控制台升级成功，正在重新载入...',
+  selfUpgradeFailed: '自动升级失败：{{msg}}',
+
   // Snapshots
   snapshotsTitle: '配置快照与备份',
   snapshotsDesc: '管理当前实例的配置快照，并在需要时安全比对与回退。',

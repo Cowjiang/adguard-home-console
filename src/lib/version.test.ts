@@ -4,6 +4,8 @@ import {
   compareVersions,
   isNewerVersion,
   fetchSystemVersion,
+  triggerSelfUpgrade,
+  getUpgradeStatus,
   DEFAULT_UPDATE_MANIFEST_URL,
   type VersionManifest,
   type SystemVersionResponse,
@@ -88,6 +90,7 @@ describe('version library', () => {
         currentVersion: '0.2.1',
         channel: 'stable',
         runtime: 'docker',
+        canSelfUpgrade: true,
         hasUpdate: true,
         latest: mockManifest,
       }
@@ -198,6 +201,83 @@ describe('version library', () => {
       expect(result.runtime).toBe('ios')
       expect(result.hasUpdate).toBe(false)
       expect(result.error).toBe('Network timeout')
+    })
+  })
+
+  describe('self-upgrade client functions', () => {
+    it('triggerSelfUpgrade sends POST and parses successful response', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, status: 'started', message: 'Upgrade process spawned' }),
+      })
+
+      const res = await triggerSelfUpgrade({ fetch: mockFetch as any })
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      expect(res.ok).toBe(true)
+      expect(res.status).toBe('started')
+    })
+
+    it('triggerSelfUpgrade handles non-ok error status (e.g. 403 Forbidden)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ ok: false, error: 'Self-upgrade is disabled on this server' }),
+      })
+
+      const res = await triggerSelfUpgrade({ fetch: mockFetch as any })
+      expect(res.ok).toBe(false)
+      expect(res.error).toBe('Self-upgrade is disabled on this server')
+    })
+
+    it('triggerSelfUpgrade handles network failure', async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error('Connection aborted'))
+
+      const res = await triggerSelfUpgrade({ fetch: mockFetch as any })
+      expect(res.ok).toBe(false)
+      expect(res.error).toBe('Connection aborted')
+    })
+
+    it('getUpgradeStatus sends GET and parses successful status', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          status: 'running',
+          lastRun: '2026-10-16T00:00:00.000Z',
+          logs: 'pulling...',
+        }),
+      })
+
+      const res = await getUpgradeStatus({ fetch: mockFetch as any })
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/upgrade/status')
+      expect(res.ok).toBe(true)
+      expect(res.status).toBe('running')
+      expect(res.logs).toBe('pulling...')
+    })
+
+    it('getUpgradeStatus handles server error or 403 response', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ ok: false, error: 'Self-upgrade is disabled' }),
+      })
+
+      const res = await getUpgradeStatus({ fetch: mockFetch as any })
+      expect(res.ok).toBe(false)
+      expect(res.status).toBe('failed')
+      expect(res.error).toBe('Self-upgrade is disabled')
+    })
+
+    it('getUpgradeStatus handles network throw', async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error('Fetch failed'))
+
+      const res = await getUpgradeStatus({ fetch: mockFetch as any })
+      expect(res.ok).toBe(false)
+      expect(res.status).toBe('failed')
+      expect(res.error).toBe('Fetch failed')
     })
   })
 })

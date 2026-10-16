@@ -3,6 +3,7 @@
  *
  * Implements GET /api/system/version with:
  * - Runtime environment detection (docker, systemd, npm, standalone)
+ * - Self-upgrade capability flag (canSelfUpgrade)
  * - Remote version.json manifest check with 12h in-memory caching
  * - ?force=1 cache bypass
  * - 5-second fetch timeout with AbortSignal.timeout(5000)
@@ -148,10 +149,12 @@ export function createVersionHandler(options = {}) {
   let cache = { manifest: null, cachedAt: 0 };
 
   return async function versionHandler(req, res) {
-    const currentVersion = options.currentVersion || process.env.APP_VERSION || getPackageVersion();
+    const env = options.env || process.env;
+    const currentVersion = options.currentVersion || env.APP_VERSION || getPackageVersion();
     const channel = options.channel || (currentVersion.includes('nightly') ? 'nightly' : 'stable');
-    const runtime = detectRuntimeFn(process.env, fs);
+    const runtime = detectRuntimeFn(env, fs);
     const updateUrl = resolveUpdateUrl(options, channel);
+    const canSelfUpgrade = Boolean(env.AGH_ENABLE_SELF_UPGRADE === '1' || env.AGH_ENABLE_SELF_UPGRADE === 'true');
 
     const isForce = req?.query?.force === '1' || req?.query?.force === 'true';
     const isCacheValid = !isForce && cache.manifest && (nowFn() - cache.cachedAt < cacheTtlMs);
@@ -163,6 +166,7 @@ export function createVersionHandler(options = {}) {
         currentVersion,
         channel,
         runtime,
+        canSelfUpgrade,
         hasUpdate,
         latest: cache.manifest,
       });
@@ -186,6 +190,7 @@ export function createVersionHandler(options = {}) {
         currentVersion,
         channel,
         runtime,
+        canSelfUpgrade,
         hasUpdate,
         latest: manifest,
       });
@@ -195,6 +200,7 @@ export function createVersionHandler(options = {}) {
         currentVersion,
         channel,
         runtime,
+        canSelfUpgrade,
         checkFailed: true,
         error: err.message,
       });
