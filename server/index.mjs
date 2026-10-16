@@ -63,7 +63,8 @@ app.get('/api/health', (_req, res) => {
 
 // Default target server (optional, prefills the login page)
 app.get('/api/config', (_req, res) => {
-  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })\n})
+  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
+})
 
 // System version and remote update check
 app.get('/api/system/version', createVersionHandler())
