@@ -18,6 +18,7 @@ export interface VersionManifestDownloads {
   ipa?: string
   docker?: string
   npm?: string
+  altstoreSource?: string
 }
 
 export interface VersionManifest {
@@ -57,6 +58,8 @@ export interface UpgradeStatusResponse {
 
 export const DEFAULT_UPDATE_MANIFEST_URL =
   'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/refs/heads/main/version.json'
+export const DEFAULT_ALTSTORE_SOURCE_URL =
+  'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json'
 export const DEFAULT_TIMEOUT_MS = 5000
 
 export interface SemverParts {

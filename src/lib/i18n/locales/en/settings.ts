@@ -123,6 +123,10 @@ const enSettings = {
   copied: 'Copied',
   downloadIpa: 'Download IPA',
   openInAltStore: 'Install with AltStore',
+  addAltStoreSource: 'Add AltStore Source',
+  addSideStoreSource: 'Add SideStore Source',
+  copyAltStoreSource: 'Copy Source URL',
+  altStoreSourceDesc: 'Subscribe to this source in AltStore or SideStore for automatic version alerts and background refresh.',
   downloadTarball: 'Download Tarball',
   viewOnGitHub: 'View on GitHub',
 

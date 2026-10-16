@@ -1,7 +1,7 @@
 # 多渠道分发的检查更新与自动更新路线图（Distribution Update Check & Auto-Update Roadmap）
 
 **Class:** feature
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-15
 **Source:** 用户要求「调研当前分发的检查更新和自动更新的方式，并先建立 roadmap 本地提案」
 
@@ -71,5 +71,11 @@
 - [x] **阶段二验收**：
   - [x] npm 全局运行老版本时在终端输出更新提示，不阻塞服务启动。
   - [x] 裸机 Linux 部署环境下可通过安全受控的方式在 Web UI 触发版本更新。
-- [ ] **阶段三验收**：
-  - [ ] 发布可供 AltStore / SideStore 订阅的源 JSON 文件，完成真机侧载源刷新验证。
+- [x] **阶段三验收**：
+  - [x] 发布可供 AltStore / SideStore 订阅的源 JSON 文件，完成真机侧载源刷新验证。
+
+## Implementation Links
+
+- [阶段一提案：统一版本清单与应用内检查更新](2026-10-15-update-check-manifest-and-ui.md)
+- [阶段二提案：CLI 启动更新提示与服务端自升级闭环](2026-10-15-cli-update-and-self-upgrade.md)
+- [阶段三提案：AltStore 与 SideStore 社区源规范及桌面端自动更新蓝图](2026-10-15-altstore-and-sidestore-source.md)

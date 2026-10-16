@@ -1,0 +1,36 @@
+{
+  "name": "AGH Console Community Source",
+  "identifier": "com.cowjiang.aghconsole.source",
+  "sourceURL": "https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json",
+  "subtitle": "AdGuard Home Mobile Management Console",
+  "description": "Official community distribution source for AGH Console iOS app, compatible with AltStore and SideStore.",
+  "iconURL": "https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/src-tauri/icons/icon.png",
+  "website": "https://github.com/Cowjiang/adguard-home-console",
+  "apps": [
+    {
+      "name": "AGH Console",
+      "bundleIdentifier": "com.cowjiang.aghconsole",
+      "developerName": "Cowjiang",
+      "subtitle": "Mobile console for AdGuard Home",
+      "localizedDescription": "A sleek, responsive mobile-first console for AdGuard Home instances with real-time statistics, client management, DNS rewrite rules, and multi-instance sync.",
+      "iconURL": "https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/src-tauri/icons/icon.png",
+      "tintColor": "10b981",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "0.2.1",
+          "date": "2026-10-16T06:59:08.028Z",
+          "downloadURL": "https://github.com/Cowjiang/adguard-home-console/releases/download/v0.2.1/agh-console.ipa",
+          "size": 15485760,
+          "minOSVersion": "15.0",
+          "localizedDescription": "Initial AltStore & SideStore community distribution"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}

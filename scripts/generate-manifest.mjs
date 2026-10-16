@@ -93,7 +93,7 @@ export function validateManifest(manifest) {
   if (!manifest.downloads || typeof manifest.downloads !== 'object') {
     throw new Error('downloads must be an object');
   }
-  const { tarball, ipa, docker, npm } = manifest.downloads;
+  const { tarball, ipa, docker, npm, altstoreSource } = manifest.downloads;
   if (typeof tarball !== 'string' || !tarball.startsWith('https://')) {
     throw new Error(`Invalid downloads.tarball '${tarball}'`);
   }
@@ -105,6 +105,9 @@ export function validateManifest(manifest) {
   }
   if (typeof npm !== 'string' || !npm) {
     throw new Error(`Invalid downloads.npm '${npm}'`);
+  }
+  if (altstoreSource && (typeof altstoreSource !== 'string' || !altstoreSource.startsWith('https://'))) {
+    throw new Error(`Invalid downloads.altstoreSource '${altstoreSource}'`);
   }
   return true;
 }
@@ -161,6 +164,7 @@ export function generateManifest(options = {}) {
       ipa: options.ipa || `https://github.com/${repo}/releases/download/${releaseTag}/agh-console.ipa`,
       docker: options.docker || options.image || defaultDocker,
       npm: options.npm || `${appName}@${version}`,
+      altstoreSource: options.altstoreSource || `https://raw.githubusercontent.com/${repo}/main/community-source.json`,
     },
   };
 
@@ -192,6 +196,7 @@ export function selfTest() {
     ipa: 'https://github.com/Cowjiang/adguard-home-console/releases/download/v0.2.1/agh-console.ipa',
     docker: 'ghcr.io/cowjiang/agh-console:0.2.1',
     npm: 'agh-console@0.2.1',
+    altstoreSource: 'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json',
   });
 
   // Test nightly manifest generation
@@ -207,6 +212,7 @@ export function selfTest() {
   assert.equal(nightly.releaseTag, 'nightly');
   assert.equal(nightly.downloads.docker, 'ghcr.io/cowjiang/agh-console:nightly');
   assert.equal(nightly.downloads.npm, 'agh-console@0.1.0-nightly.20261007.abc1234');
+  assert.equal(nightly.downloads.altstoreSource, 'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json');
 
   // Test argument parser
   const parsed = parseArgs([
@@ -229,6 +235,7 @@ export function selfTest() {
   assert.throws(() => validateManifest({ ...stable, version: 'invalid' }), /Invalid version/);
   assert.throws(() => validateManifest({ ...stable, publishedAt: 'not-a-date' }), /Invalid publishedAt/);
   assert.throws(() => validateManifest({ ...stable, downloads: null }), /downloads must be an object/);
+  assert.throws(() => validateManifest({ ...stable, downloads: { ...stable.downloads, altstoreSource: 'invalid-url' } }), /downloads.altstoreSource/);
 
   console.log('generate-manifest: self-test ok (stable, nightly, schema validation, arg parsing)');
 }

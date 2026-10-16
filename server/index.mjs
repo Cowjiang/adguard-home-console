@@ -23,9 +23,10 @@ import { createUpgradeHandler } from './upgrade.mjs'
 import { checkCliUpdate } from './cli-update.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ROOT = path.join(__dirname, '..')
 // Load .env from the project root (does not override existing env vars); skip if missing
 {
-  const envPath = path.join(__dirname, '..', '.env')
+  const envPath = path.join(ROOT, '.env')
   if (fs.existsSync(envPath)) {
     for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
       if (line.trim().startsWith('#')) continue
@@ -34,7 +35,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
     }
   }
 }
-const DIST = path.join(__dirname, '..', 'dist')
+const DIST = path.join(ROOT, 'dist')
 const PORT = Number(process.env.PORT || 8787)
 // HOSTS: comma-separated bind addresses; if unset, listen on all interfaces.
 // e.g. HOSTS=127.0.0.1,<AGH_HOST>,10.126.126.2 → expose only to loopback,
@@ -63,7 +64,25 @@ app.get('/api/health', (_req, res) => {
 
 // Default target server (optional, prefills the login page)
 app.get('/api/config', (_req, res) => {
-  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })\n})
+  res.json({ defaultUrl: process.env.AGH_DEFAULT_URL || '' })
+})
+
+// AltStore & SideStore community distribution source
+app.get('/community-source.json', (_req, res) => {
+  const candidates = [
+    path.join(ROOT, 'community-source.json'),
+    path.join(DIST, 'community-source.json'),
+    path.join(ROOT, 'public', 'community-source.json'),
+  ]
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      return res.sendFile(candidate)
+    }
+  }
+  res.status(404).json({ error: 'community-source.json not found' })
+})
 
 // System version and remote update check
 app.get('/api/system/version', createVersionHandler())
@@ -84,7 +103,7 @@ app.use((req, res, next) => {
   if (fs.existsSync(index)) return res.sendFile(index)
   res
     .status(503)
-    .send('<h3>前端尚未构建</h3><p>请先执行 <code>pnpm build</code>,或开发模式下访问 5173 端口。</p>')
+    .send('<h3>前端尚未构建</h3><p>请先执行 <code>pnpm build</code>，或开发模式下访问 5173 端口。</p>')
 })
 
 // HOSTS: comma-separated; entries can be IPs or interface names (e.g. tailscale0, tun0).

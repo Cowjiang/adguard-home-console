@@ -45,7 +45,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:server": "node --test 'server/*.test.mjs'",
-    "test:release": "node .github/scripts/release-plan.mjs --self-test && node scripts/generate-manifest.mjs --self-test",
+    "test:release": "node .github/scripts/release-plan.mjs --self-test && node scripts/generate-manifest.mjs --self-test && node scripts/generate-altstore-source.mjs --self-test",
     "check:pack": "node scripts/check-npm-pack.mjs",
     "start": "node server/index.mjs",
     "preview": "vite preview",

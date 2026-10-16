@@ -333,6 +333,14 @@ jobs:
           OUTPUT: version.json
         run: node scripts/generate-manifest.mjs
 
+      - name: Generate AltStore / SideStore community source
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+          NOTES_FILE: release-notes.md
+          OUTPUT: community-source.json
+        run: node scripts/generate-altstore-source.mjs
+
       # Upserts by tag: the nightly release is updated in place, and an asset
       # with the same name is replaced instead of piling up.
       - name: Create release
@@ -347,6 +355,7 @@ jobs:
           files: |
             agh-console.tar.gz
             version.json
+            community-source.json
           prerelease: ${{ needs.prepare.outputs.prerelease }}
 
       # The IPA rides along only when the macOS job produced one. A step of its
@@ -357,13 +366,23 @@ jobs:
         with:
           name: ios-ipa
 
-      - name: Attach the IPA
+      - name: Update AltStore source with exact IPA size
+        if: needs.ios.result == 'success'
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+          NOTES_FILE: release-notes.md
+          IPA_FILE: agh-console.ipa
+          OUTPUT: community-source.json
+        run: node scripts/generate-altstore-source.mjs
+
+      - name: Attach the IPA and community source
         if: needs.ios.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
-        run: gh release upload "$TAG" agh-console.ipa --clobber --repo "$REPO"
+        run: gh release upload "$TAG" agh-console.ipa community-source.json --clobber --repo "$REPO"
 
   npm:
     needs: [prepare, build]
