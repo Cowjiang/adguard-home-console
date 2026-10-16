@@ -30,6 +30,7 @@ import {
   type AggregatedQueryLogItem,
 } from '../lib/log/analytics'
 import { QueryLogAnalyticsSheet } from '../components/log/QueryLogAnalyticsSheet'
+import { consumeLogDrill, peekLogDrill } from '../lib/log/drillIntent'
 
 export default function QueryLog() {
   const pageIn = usePageInClass()
@@ -40,10 +41,16 @@ export default function QueryLog() {
   const nav = useNavigate()
 
   const [searchParams, setSearchParams] = useSearchParams()
-  // ?q= pre-fills the search (entered from the client detail page's "view queries" jump)
-  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
-  const [debounced, setDebounced] = useState(() => searchParams.get('q') ?? '')
-  const urlFilter = searchParams.get('filter') ?? 'all'
+  // Drill handoff from the mobile analytics sub-page: read during render so the
+  // initializers below already start from the drilled value, then cleared after
+  // commit (the URL catch-up runs in the effect under syncUrl)
+  const drill = peekLogDrill()
+  // ?q= pre-fills the search (entered from the client detail page's "view
+  // queries" jump or from an analytics drill-down)
+  const initialQ = drill?.q ?? searchParams.get('q') ?? ''
+  const [search, setSearch] = useState(initialQ)
+  const [debounced, setDebounced] = useState(initialQ)
+  const urlFilter = drill?.filter ?? searchParams.get('filter') ?? 'all'
   const [filterKey, setFilterKey] = useState(LOG_FILTERS.some((f) => f.key === urlFilter) ? urlFilter : 'all')
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>('current')
   const [live, setLive] = useState(true)
@@ -79,6 +86,19 @@ export default function QueryLog() {
     setFilterKey(key)
     syncUrl({ filter: key })
   }
+
+  // Consume the drill handoff: the state above already started from it, only the
+  // URL has to catch up (replace, no history entry) — same net effect as the
+  // desktop sheet's in-place drill
+  useEffect(() => {
+    if (!drill) return
+    consumeLogDrill()
+    const next: { filter?: string; q?: string } = {}
+    if (drill.q !== undefined) next.q = drill.q
+    if (drill.filter !== undefined) next.filter = drill.filter
+    syncUrl(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const reasons = LOG_FILTERS.find((f) => f.key === filterKey)?.reasons
 
@@ -293,23 +313,28 @@ export default function QueryLog() {
     }
   }
 
+  /** Drill-down: apply the metric to the log's own search / filter, syncing the
+   *  URL. On mobile the analytics view is a sub-page, so its drill arrives as a
+   *  handoff consumed below instead of a callback */
+  const applyDrill = (type: 'domain' | 'client' | 'filter', value: string) => {
+    if (type === 'domain' || type === 'client') {
+      setSearch(value)
+      setDebounced(value.trim())
+      syncUrl({ q: value })
+    } else {
+      setFilterKey(value)
+      syncUrl({ filter: value })
+    }
+  }
+
   const openAnalytics = () => {
-    sheet.open(
-      <QueryLogAnalyticsSheet
-        items={items}
-        onDrillDown={(type, value) => {
-          if (type === 'domain' || type === 'client') {
-            setSearch(value)
-            setDebounced(value.trim())
-            syncUrl({ q: value })
-          } else if (type === 'filter') {
-            setFilterKey(value)
-            syncUrl({ filter: value })
-          }
-        }}
-        onClose={() => sheet.close()}
-      />
-    )
+    if (isDesktop) {
+      sheet.open(
+        <QueryLogAnalyticsSheet items={items} onDrillDown={applyDrill} onClose={() => sheet.close()} />
+      )
+    } else {
+      nav('/logs/analytics', { state: { items } })
+    }
   }
 
   async function saveRule(rule: string, block: boolean) {

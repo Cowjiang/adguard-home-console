@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard'
 import TopListPage from './pages/TopListPage'
 import QueryLog from './pages/QueryLog'
 import LogDetailPage from './pages/LogDetailPage'
+import LogAnalyticsPage from './pages/LogAnalyticsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
 import ClientFormPage from './pages/ClientFormPage'
 import Protection from './pages/Protection'
@@ -111,6 +112,7 @@ export default function App() {
                 <Route path="/top/:kind" element={<TopListPage />} />
                 <Route path="/logs" element={<QueryLog />} />
                 <Route path="/logs/detail" element={<LogDetailPage />} />
+                <Route path="/logs/analytics" element={<LogAnalyticsPage />} />
                 <Route path="/protection" element={<Protection />} />
                 <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
                 <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />

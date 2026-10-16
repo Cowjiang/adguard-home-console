@@ -44,6 +44,8 @@ const zhQuerylog = {
   analytics: '透视分析',
   analyticsTitle: '查询日志下钻透视分析',
   analyticsSub: '基于当前采集日志样本的多维指标透视与慢查询诊断',
+  analyticsNoSample: '分析样本不存在',
+  analyticsNoSampleSub: '请从查询日志列表重新进入透视分析',
   instanceFilter: '节点范围',
   allInstances: '🌐 全部在线节点 (跨节点聚合)',
   cacheHitRate: '缓存命中率',

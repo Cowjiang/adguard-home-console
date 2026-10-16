@@ -45,6 +45,8 @@ const enQuerylog = {
   analytics: 'Analytics',
   analyticsTitle: 'Query Log Analytics',
   analyticsSub: 'Multidimensional metrics and slow-query diagnostics from sampled log entries',
+  analyticsNoSample: 'Analytics sample unavailable',
+  analyticsNoSampleSub: 'Reopen analytics from the query log list',
   instanceFilter: 'Node scope',
   allInstances: '🌐 All Online Nodes (Aggregated)',
   cacheHitRate: 'Cache hit rate',
