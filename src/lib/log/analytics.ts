@@ -1,11 +1,6 @@
-/** Query log analytics: aggregation, slow queries, caching, and distribution stats */
+/** Query log analytics: slow queries, caching, and distribution stats */
 import type { QueryLogItem } from '../api'
 import { REASON_META } from '../constants'
-
-export interface AggregatedQueryLogItem extends QueryLogItem {
-  _instanceId?: string
-  _instanceLabel?: string
-}
 
 export interface SlowQueryItem {
   domain: string
@@ -15,7 +10,6 @@ export interface SlowQueryItem {
   upstream?: string
   reason: string
   time: string
-  instanceLabel?: string
 }
 
 export interface ReasonStat {
@@ -51,47 +45,15 @@ export interface QueryLogAnalyticsResult {
   topUpstreams: UpstreamStat[]
 }
 
-/** Generates a collision-resistant unique key for query log item including qtype */
-export function keyOfAggregated(item: AggregatedQueryLogItem): string {
-  return `${item.time}|${item.question?.name ?? ''}|${item.question?.type ?? ''}|${item.client ?? ''}|${item._instanceId ?? ''}`
-}
-
-/** Merges multiple query log lists from different instances into a unified, time-sorted list */
-export function mergeQueryLogLists(
-  lists: { instanceId: string; instanceLabel: string; items: QueryLogItem[] }[],
-  maxItems = 500
-): AggregatedQueryLogItem[] {
-  const merged: AggregatedQueryLogItem[] = []
-  const seen = new Set<string>()
-
-  for (const list of lists) {
-    for (const item of list.items) {
-      const aggItem: AggregatedQueryLogItem = {
-        ...item,
-        _instanceId: list.instanceId,
-        _instanceLabel: list.instanceLabel,
-      }
-      const k = keyOfAggregated(aggItem)
-      if (!seen.has(k)) {
-        seen.add(k)
-        merged.push(aggItem)
-      }
-    }
-  }
-
-  // Sort descending by time
-  merged.sort((a, b) => {
-    const ta = new Date(a.time).getTime() || 0
-    const tb = new Date(b.time).getTime() || 0
-    return tb - ta
-  })
-
-  return merged.length > maxItems ? merged.slice(0, maxItems) : merged
+/** Row identity key for the log list: qtype is part of it, so concurrent A and
+ *  AAAA queries at the same time / domain / client stay distinct */
+export function keyOf(item: QueryLogItem): string {
+  return `${item.time}|${item.question?.name ?? ''}|${item.question?.type ?? ''}|${item.client ?? ''}`
 }
 
 /** Computes multidimensional analytics from query log items */
 export function analyzeQueryLogs(
-  items: AggregatedQueryLogItem[],
+  items: QueryLogItem[],
   maxTop = 10
 ): QueryLogAnalyticsResult {
   const totalCount = items.length
@@ -165,7 +127,6 @@ export function analyzeQueryLogs(
       upstream: item.upstream,
       reason,
       time: item.time,
-      instanceLabel: item._instanceLabel,
     })
   }
 

@@ -36,17 +36,6 @@ const zhDashboard = {
   stopped: '停止',
   dnsPort: 'DNS 端口',
   uptime: '已运行',
-  aggregateNote: '总量与榜单为 {{n}} 台实例的合并结果;曲线按所选实例单独展示。',
-  clusterHealthTitle: '集群健康度',
-  clusterHealthyBadge: '全节点正常',
-  clusterDegradedBadge: '部分异常',
-  activeInstance: '当前',
-  switchInstance: '切换至该节点',
-  protectionOn: '已保护',
-  protectionOff: '未保护',
-  probeAll: '刷新探测',
-  probing: '探测中…',
-  offline: '离线',
 }
 
 export default zhDashboard

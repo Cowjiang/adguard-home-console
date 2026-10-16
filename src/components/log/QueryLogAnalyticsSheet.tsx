@@ -5,10 +5,10 @@
 import { useTranslation } from 'react-i18next'
 import { Activity, X } from 'lucide-react'
 import { QueryLogAnalytics } from './QueryLogAnalytics'
-import type { AggregatedQueryLogItem } from '../../lib/log/analytics'
+import type { QueryLogItem } from '../../lib/api'
 
 interface QueryLogAnalyticsSheetProps {
-  items: AggregatedQueryLogItem[]
+  items: QueryLogItem[]
   onDrillDown: (type: 'domain' | 'client' | 'filter', value: string) => void
   onClose: () => void
 }

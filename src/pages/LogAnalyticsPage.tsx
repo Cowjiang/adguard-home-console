@@ -8,14 +8,14 @@ import { EmptyState } from '../components/ui/atoms'
 import { QueryLogAnalytics } from '../components/log/QueryLogAnalytics'
 import { markLogDrill } from '../lib/log/drillIntent'
 import { navBack } from '../lib/nav/backNav'
-import type { AggregatedQueryLogItem } from '../lib/log/analytics'
+import type { QueryLogItem } from '../lib/api'
 
 export default function LogAnalyticsPage() {
   const pageIn = usePageInClass()
   const { t } = useTranslation()
   const nav = useNavigate()
   const { state, pathname } = useLocation() as {
-    state?: { items?: AggregatedQueryLogItem[] }
+    state?: { items?: QueryLogItem[] }
     pathname: string
   }
   const items = state?.items

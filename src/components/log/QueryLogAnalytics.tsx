@@ -16,14 +16,12 @@ import {
 import { Card } from '../ui/primitives'
 import { Badge } from '../ui/atoms'
 import { fmtMs } from '../../lib/format'
-import {
-  analyzeQueryLogs,
-  type AggregatedQueryLogItem,
-} from '../../lib/log/analytics'
+import { analyzeQueryLogs } from '../../lib/log/analytics'
+import type { QueryLogItem } from '../../lib/api'
 import { reasonMeta } from './LogDetail'
 
 interface QueryLogAnalyticsProps {
-  items: AggregatedQueryLogItem[]
+  items: QueryLogItem[]
   onDrillDown: (type: 'domain' | 'client' | 'filter', value: string) => void
 }
 
@@ -95,11 +93,6 @@ export function QueryLogAnalytics({ items, onDrillDown }: QueryLogAnalyticsProps
                   <div className="min-w-0 flex-1 pr-2">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[13px] font-medium text-t1">{sq.domain}</span>
-                      {sq.instanceLabel && (
-                        <span className="flex-none rounded bg-white/10 px-1 py-0.5 text-[9.5px] text-t3">
-                          {sq.instanceLabel}
-                        </span>
-                      )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-t3">
                       <span>{sq.clientName || sq.client}</span>

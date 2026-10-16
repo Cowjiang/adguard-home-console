@@ -43,7 +43,7 @@
 
 | 页面 | 职责 | 主要接口 |
 | --- | --- | --- |
-| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行；桌面（≥lg）另带统计分析区块。多实例时总量求和、榜单合并重排、`avg_processing_time` 按查询量加权，曲线不聚合、用分段选择器按实例查看 | `/stats`（活动实例 5s + 非活动实例 30s）、`/clients`、`POST /protection` |
+| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行；桌面（≥lg）另带统计分析区块。全部数据来自活动实例 | `/stats`（5s）、`/clients`、`POST /protection` |
 | `src/pages/TopListPage.tsx` | 榜单全量 | `/stats` |
 | `src/pages/QueryLog.tsx`、`src/pages/LogDetailPage.tsx`、`src/pages/LogAnalyticsPage.tsx` | 实时日志、翻页、单条详情与透视分析下钻、一键加规则 | `/querylog`、`/filtering/status`、`POST /filtering/set_rules` |
 | `src/pages/Protection.tsx` | 过滤功能总览：开关、刷新、重写与服务拦截入口 | `/filtering/status`、`POST /filtering/config`、`POST /filtering/refresh` |

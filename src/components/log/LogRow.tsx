@@ -1,4 +1,4 @@
-/** Mobile log row card + the row-identity key shared by the log list */
+/** Mobile log row card */
 import { useTranslation } from 'react-i18next'
 import type { QueryLogItem } from '../../lib/api'
 import { qtypeColor } from '../../lib/constants'
@@ -6,22 +6,17 @@ import { fmtTime, fmtMs } from '../../lib/format'
 import { Card } from '../ui/primitives'
 import { Badge } from '../ui/atoms'
 import { reasonMeta } from './LogDetail'
-import type { AggregatedQueryLogItem } from '../../lib/log/analytics'
-
-export const keyOf = (i: QueryLogItem | AggregatedQueryLogItem) =>
-  `${i.time}|${i.question.name}|${i.client}|${i.question.type}|${(i as AggregatedQueryLogItem)._instanceId || ''}`
 
 export function LogRow({
   item,
   onClick,
 }: {
-  item: QueryLogItem | AggregatedQueryLogItem
+  item: QueryLogItem
   onClick: () => void
 }) {
   const { t } = useTranslation()
   const meta = reasonMeta(item.reason, t)
   const cname = item.client_info?.name || item.client
-  const instanceLabel = (item as AggregatedQueryLogItem)._instanceLabel
 
   return (
     <Card onClick={onClick} className="!rounded-2xl px-3.5 py-2.5">
@@ -39,11 +34,6 @@ export function LogRow({
             >
               {item.question.type}
             </span>
-            {instanceLabel && (
-              <span className="flex-none rounded bg-white/10 px-1.5 py-0.5 text-[9.5px] text-t3">
-                {instanceLabel}
-              </span>
-            )}
             {item.cached && (
               <span className="flex-none text-[10px] text-t3" title={t('querylog.cachedTitle')}>
                 {t('querylog.cached')}

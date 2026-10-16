@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import {
-  analyzeQueryLogs,
-  mergeQueryLogLists,
-  keyOfAggregated,
-  type AggregatedQueryLogItem,
-} from './analytics'
+import { analyzeQueryLogs, keyOf } from './analytics'
 import type { QueryLogItem } from '../api'
 
-function mockItem(partial: Partial<AggregatedQueryLogItem>): AggregatedQueryLogItem {
+function mockItem(partial: Partial<QueryLogItem>): QueryLogItem {
   return {
     time: '2026-10-13T10:00:00.000Z',
     question: { name: 'example.com', type: 'A', class: 'IN' },
@@ -39,7 +34,7 @@ describe('query log analytics', () => {
   })
 
   it('computes cache hit rate and average latency accurately', () => {
-    const items: AggregatedQueryLogItem[] = [
+    const items: QueryLogItem[] = [
       mockItem({ time: '2026-10-13T10:00:01Z', cached: true, elapsedMs: '1.0' }),
       mockItem({ time: '2026-10-13T10:00:02Z', cached: false, elapsedMs: '20.0' }),
       mockItem({ time: '2026-10-13T10:00:03Z', cached: false, elapsedMs: '30.0' }),
@@ -53,7 +48,7 @@ describe('query log analytics', () => {
   })
 
   it('sorts and extracts slow queries descending by elapsedMs', () => {
-    const items: AggregatedQueryLogItem[] = [
+    const items: QueryLogItem[] = [
       mockItem({ question: { name: 'fast.com', type: 'A', class: 'IN' }, elapsedMs: '5' }),
       mockItem({ question: { name: 'very-slow.com', type: 'A', class: 'IN' }, elapsedMs: '120.5' }),
       mockItem({ question: { name: 'slow.com', type: 'A', class: 'IN' }, elapsedMs: '65.2' }),
@@ -67,7 +62,7 @@ describe('query log analytics', () => {
   })
 
   it('aggregates reasons distribution with kinds and percentages', () => {
-    const items: AggregatedQueryLogItem[] = [
+    const items: QueryLogItem[] = [
       mockItem({ reason: 'FilteredBlackList' }),
       mockItem({ reason: 'FilteredBlackList' }),
       mockItem({ reason: 'NotFilteredNotFound' }),
@@ -86,7 +81,7 @@ describe('query log analytics', () => {
   })
 
   it('aggregates top domains and clients ranking', () => {
-    const items: AggregatedQueryLogItem[] = [
+    const items: QueryLogItem[] = [
       mockItem({ question: { name: 'github.com', type: 'A', class: 'IN' }, client: '192.168.1.5' }),
       mockItem({ question: { name: 'google.com', type: 'A', class: 'IN' }, client: '192.168.1.5' }),
       mockItem({ question: { name: 'github.com', type: 'A', class: 'IN' }, client: '192.168.1.6' }),
@@ -101,31 +96,7 @@ describe('query log analytics', () => {
     expect(res.topClients[0].count).toBe(3)
   })
 
-  it('merges multiple instance query log lists, deduplicates, and sorts by time descending', () => {
-    const list1: QueryLogItem[] = [
-      mockItem({ time: '2026-10-13T10:00:10Z', question: { name: 'a.com', type: 'A', class: 'IN' } }),
-      mockItem({ time: '2026-10-13T10:00:05Z', question: { name: 'b.com', type: 'A', class: 'IN' } }),
-    ]
-    const list2: QueryLogItem[] = [
-      mockItem({ time: '2026-10-13T10:00:15Z', question: { name: 'c.com', type: 'A', class: 'IN' } }),
-      // duplicate on list2 with same time & domain & type & client & instance
-      mockItem({ time: '2026-10-13T10:00:15Z', question: { name: 'c.com', type: 'A', class: 'IN' } }),
-    ]
-
-    const merged = mergeQueryLogLists([
-      { instanceId: 'inst-1', instanceLabel: 'Primary Node', items: list1 },
-      { instanceId: 'inst-2', instanceLabel: 'Backup Node', items: list2 },
-    ])
-
-    expect(merged.length).toBe(3)
-    expect(merged[0].question.name).toBe('c.com')
-    expect(merged[0]._instanceId).toBe('inst-2')
-    expect(merged[0]._instanceLabel).toBe('Backup Node')
-    expect(merged[1].question.name).toBe('a.com')
-    expect(merged[2].question.name).toBe('b.com')
-  })
-
-  it('preserves concurrent A and AAAA queries with the same timestamp and domain', () => {
+  it('keeps concurrent A and AAAA queries at the same timestamp and domain apart in the row key', () => {
     const aQuery = mockItem({
       time: '2026-10-13T10:00:00.123Z',
       question: { name: 'dualstack.com', type: 'A', class: 'IN' },
@@ -137,21 +108,12 @@ describe('query log analytics', () => {
       client: '192.168.1.50',
     })
 
-    const k1 = keyOfAggregated(aQuery)
-    const k2 = keyOfAggregated(aaaaQuery)
-    expect(k1).not.toBe(k2)
-
-    const merged = mergeQueryLogLists([
-      { instanceId: 'inst-1', instanceLabel: 'Node 1', items: [aQuery, aaaaQuery] },
-    ])
-    expect(merged.length).toBe(2)
+    expect(keyOf(aQuery)).not.toBe(keyOf(aaaaQuery))
   })
 
-  it('generates consistent keyOfAggregated keys', () => {
-    const itm = mockItem({ _instanceId: 'inst-a' })
-    const k1 = keyOfAggregated(itm)
-    const k2 = keyOfAggregated(itm)
-    expect(k1).toBe(k2)
-    expect(k1).toContain('inst-a')
+  it('generates a stable row key for the same entry', () => {
+    const itm = mockItem({})
+    expect(keyOf(itm)).toBe(keyOf(itm))
+    expect(keyOf(itm)).toContain('example.com')
   })
 })
