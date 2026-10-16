@@ -107,6 +107,25 @@ const enSettings = {
   compatibility: 'Compatibility',
   compatibilitySub: 'AdGuard Home v0.107.79+ new API',
 
+  // App / Console updates
+  appVersion: 'App version',
+  checkAppUpdate: 'Check for Console Updates',
+  checkingAppUpdate: 'Checking...',
+  appUpToDate: 'Console is up to date',
+  appNewVersionAvailable: 'New version {{v}} is available',
+  appUpdateFailed: 'Failed to check updates: {{msg}}',
+  appCheckFailed: 'Check failed',
+  updateDetails: 'Update Details',
+  releaseNotes: 'Release Notes',
+  publishedAt: 'Released on {{date}}',
+  upgradeGuide: 'Upgrade Instructions',
+  copyCommand: 'Copy Command',
+  copied: 'Copied',
+  downloadIpa: 'Download IPA',
+  openInAltStore: 'Install with AltStore',
+  downloadTarball: 'Download Tarball',
+  viewOnGitHub: 'View on GitHub',
+
   // Snapshots
   snapshotsTitle: 'Configuration Snapshots',
   snapshotsDesc: 'Manage configuration snapshots for your instances, inspect diffs, and safely roll back.',

@@ -31,6 +31,7 @@ RUN pnpm build
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+ENV AGH_RUNTIME=docker
 # The server only needs express at runtime; frontend deps are already bundled
 # into dist by Vite but stay installed via the shared root package.json.
 # pnpm-workspace.yaml again: same frozen-install rule as the build stage.
