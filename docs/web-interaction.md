@@ -38,6 +38,7 @@
 - SWR 数据在 tab 切换时随页面重挂自动重验证（`revalidate()` 入口不检查在线状态）；status 不归 SWR 管，落地 tab 根页（`TAB_ROOT_ROUTES`）时由 Layout 调一次 `refreshStatus()`。
 - 断网自愈（`.agents/pipelines/proposals/feature/2026-09-25-refresh-triggers.md`）：SWR 的在线状态不读 `navigator.onLine`、只认 `offline`/`online` 事件，iOS WKWebView/PWA 里事件可能丢失，丢失后轮询/focus/reconnect/错误重试被同一标志全部门死。全局 `SWRConfig` 设 `refreshWhenOffline: true` 让轮询不停摆；auth 以 15s 重探 `/status`（外加 `visibilitychange`/`online` 即时探），从失败恢复成功时全局 `mutate` 一次解救冻结的 key——15s 是恢复上界，事件可靠时仍是即时。
 - body 的 `overscroll-behavior-y: none` 压掉浏览器原生下拉刷新（整页 reload）与橡皮筋，是自研下拉接管的前提；删除它会导致双重刷新。
+- 浏览器/PWA 里的左滑返回是**平台手势**，应用既不接管也不压制（曾用 `overscroll-behavior-x: none` 收掉手势的方案已否决并从历史移除）。原因：同文档（pushState）条目下，WebKit 用来「揭示」的那一层是它自己画的空白快照层，页面画不进去（与 iOS 壳关闭 `allowsBackForwardNavigationGestures` 的结论同源，只是浏览器端没有开关）；揭不出正确内容时也不要替平台改行为，返回走应用内胶囊即可。分析与仍在桌面上的选项见 `.agents/pipelines/rejected/bug-fix/2026-10-16-pwa-back-swipe-blank.md`。
 
 ## 路由与转场
 
