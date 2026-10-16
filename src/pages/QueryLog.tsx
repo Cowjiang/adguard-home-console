@@ -189,10 +189,11 @@ export default function QueryLog() {
           }
 
           const data = await api<{ data: QueryLogItem[] }>(single.cfg, path)
+          // Single-node scope carries no node label: the row would just repeat
+          // what the scope selector already says (only aggregating labels rows)
           const list: AggregatedQueryLogItem[] = (data?.data ?? []).map((i) => ({
             ...i,
             _instanceId: single.id !== 'current' ? single.id : undefined,
-            _instanceLabel: single.label,
           }))
 
           if (mode === 'reset') {
@@ -274,7 +275,6 @@ export default function QueryLog() {
           const fresh: AggregatedQueryLogItem[] = (data?.data ?? []).map((i) => ({
             ...i,
             _instanceId: single.id !== 'current' ? single.id : undefined,
-            _instanceLabel: single.label,
           }))
 
           if (!liveRef.current) return
