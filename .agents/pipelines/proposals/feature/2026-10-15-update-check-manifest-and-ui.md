@@ -1,7 +1,7 @@
 # 阶段一：统一版本清单（Manifest）与应用内检查更新闭环
 
 **Class:** feature
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-15
 **Source:** 基于 [多渠道分发的检查更新与自动更新路线图](2026-10-15-update-check-and-distribution-roadmap.md)，推进阶段一「统一版本清单与应用内检查更新」的落地提案
 **Updated:** 2026-10-15
@@ -93,18 +93,18 @@
 
 ## Accept
 
-- [ ] **CI 与清单发布**：
-  - [ ] 发布脚本生成符合规范的 `version.json`，并通过 `release.yml` 随 Release 资产一同上传；
-  - [ ] GitHub 静态下载链接直通可用，免除 API 限流。
-- [ ] **服务端接口与环境检测**：
-  - [ ] `GET /api/system/version` 正常返回 `currentVersion`、`channel`、`runtime` 及 `latest` 信息；
-  - [ ] 服务端 12 小时防刷缓存生效，`force=1` 时穿透缓存；
-  - [ ] 断网或上游超时 5 秒内优雅降级，返回 `checkFailed: true` 且不报错中断。
-- [ ] **前端关于页与更新详情交互**：
-  - [ ] `AboutSettings.tsx` 接入检查更新功能，展示最新版本状态 Badge；
-  - [ ] 发现新版时成功打开 `AppUpdateSheet`，正确渲染 Release Notes；
-  - [ ] 对应不同环境（Docker / npm / iOS / standalone）准确展示对应升级指引与快捷复制/跳转操作；
-  - [ ] 中英双语词条完备。
-- [ ] **全量工程门禁**：
-  - [ ] `pnpm check` 与 `pnpm test` 保持全绿；
-  - [ ] `node scripts/verify-proposals.mjs --links` 校验通过。
+- [x] **CI 与清单发布**：
+  - [x] 发布脚本生成符合规范的 `version.json`，并通过 `release.yml` 随 Release 资产一同上传；
+  - [x] GitHub 静态下载链接直通可用，免除 API 限流。
+- [x] **服务端接口与环境检测**：
+  - [x] `GET /api/system/version` 正常返回 `currentVersion`、`channel`、`runtime` 及 `latest` 信息；
+  - [x] 服务端 12 小时防刷缓存生效，`force=1` 时穿透缓存；
+  - [x] 断网或上游超时 5 秒内优雅降级，返回 `checkFailed: true` 且不报错中断。
+- [x] **前端关于页与更新详情交互**：
+  - [x] `AboutSettings.tsx` 接入检查更新功能，展示最新版本状态 Badge；
+  - [x] 发现新版时成功打开 `AppUpdateSheet`，正确渲染 Release Notes；
+  - [x] 对应不同环境（Docker / npm / iOS / standalone）准确展示对应升级指引与快捷复制/跳转操作；
+  - [x] 中英双语词条完备。
+- [x] **全量工程门禁**：
+  - [x] `pnpm check` 与 `pnpm test` 保持全绿；
+  - [x] `node scripts/verify-proposals.mjs --links` 校验通过。
