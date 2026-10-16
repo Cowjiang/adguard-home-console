@@ -40,10 +40,12 @@ export function peekBackTap(): boolean {
  * nothing".
  */
 export function navBack(nav: NavigateFunction, pathname: string) {
-  const idx = (window.history.state as { idx?: number } | null)?.idx
+  const idx = typeof window !== 'undefined'
+    ? (window.history?.state as { idx?: number } | null)?.idx
+    : undefined
   if (idx !== undefined && idx <= 0) {
     const seg = pathname.split('/').filter(Boolean)
-    nav(seg.length > 1 ? `/${seg[0]}` : '/', { replace: true })
+    nav(seg.length > 1 ? `/${seg.slice(0, -1).join('/')}` : '/', { replace: true })
     return
   }
   markBackTap()

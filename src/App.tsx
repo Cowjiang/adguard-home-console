@@ -17,7 +17,7 @@ import ClientDetailPage from './pages/ClientDetailPage'
 import ClientFormPage from './pages/ClientFormPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
-import Settings from './pages/Settings'
+import SettingsLayout, { SettingsIndexRoute } from './components/settings/SettingsLayout'
 import { GeneralSettings } from './pages/settings/GeneralSettings'
 import { SystemPage } from './pages/settings/SystemSettings'
 import { AppearanceSettings } from './pages/settings/AppearanceSettings'
@@ -121,19 +121,21 @@ export default function App() {
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/clients/detail" element={<ClientDetailPage />} />
                 <Route path="/clients/form" element={<ClientFormPage />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/settings/general" element={<GeneralSettings />} />
-                <Route path="/settings/dns" element={<DnsSettings />} />
-                <Route path="/settings/access" element={<AccessSettings />} />
-                <Route path="/settings/encryption" element={<EncryptionSettings />} />
-                <Route path="/settings/dhcp" element={<DhcpSettings />} />
-                <Route path="/settings/system" element={<SystemPage />} />
-                <Route path="/settings/snapshots" element={<SnapshotSettings />} />
-                <Route path="/settings/appearance" element={<AppearanceSettings />} />
-                <Route path="/settings/server" element={<ServerSettings />} />
-                <Route path="/settings/server/edit" element={<InstanceEdit />} />
-                <Route path="/settings/about" element={<AboutSettings />} />
-                <Route path="/settings/app" element={<Navigate to="/settings" replace />} />
+                <Route path="/settings" element={<SettingsLayout />}>
+                  <Route index element={<SettingsIndexRoute />} />
+                  <Route path="general" element={<GeneralSettings />} />
+                  <Route path="dns" element={<DnsSettings />} />
+                  <Route path="access" element={<AccessSettings />} />
+                  <Route path="encryption" element={<EncryptionSettings />} />
+                  <Route path="dhcp" element={<DhcpSettings />} />
+                  <Route path="system" element={<SystemPage />} />
+                  <Route path="snapshots" element={<SnapshotSettings />} />
+                  <Route path="appearance" element={<AppearanceSettings />} />
+                  <Route path="server" element={<ServerSettings />} />
+                  <Route path="server/edit" element={<InstanceEdit />} />
+                  <Route path="about" element={<AboutSettings />} />
+                  <Route path="app" element={<Navigate to="/settings" replace />} />
+                </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

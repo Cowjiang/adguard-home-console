@@ -119,6 +119,7 @@ const zhSettings = {
   checkingAppUpdate: '正在检查更新...',
   appUpToDate: '控制台已是最新版本',
   appNewVersionAvailable: '发现新版本 {{v}}',
+  updateAvailable: '发现新版本',
   appUpdateFailed: '检查更新失败：{{msg}}',
   appCheckFailed: '检查更新失败',
   updateDetails: '更新详情',

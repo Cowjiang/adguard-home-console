@@ -119,6 +119,7 @@ const enSettings = {
   checkingAppUpdate: 'Checking...',
   appUpToDate: 'Console is up to date',
   appNewVersionAvailable: 'New version {{v}} is available',
+  updateAvailable: 'Update available',
   appUpdateFailed: 'Failed to check updates: {{msg}}',
   appCheckFailed: 'Check failed',
   updateDetails: 'Update Details',
