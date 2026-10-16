@@ -324,6 +324,15 @@ jobs:
             echo "$TAG is not there yet — the release creates it"
           fi
 
+      - name: Generate release manifest
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+          NOTES_FILE: release-notes.md
+          OUTPUT: version.json
+        run: node scripts/generate-manifest.mjs
+
       # Upserts by tag: the nightly release is updated in place, and an asset
       # with the same name is replaced instead of piling up.
       - name: Create release
@@ -335,7 +344,9 @@ jobs:
           target_commitish: ${{ needs.prepare.outputs.sha }}
           name: ${{ needs.prepare.outputs.release_name }}
           body_path: release-notes.md
-          files: agh-console.tar.gz
+          files: |
+            agh-console.tar.gz
+            version.json
           prerelease: ${{ needs.prepare.outputs.prerelease }}
 
       # The IPA rides along only when the macOS job produced one. A step of its

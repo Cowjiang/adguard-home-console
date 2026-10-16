@@ -107,6 +107,25 @@ const zhSettings = {
   compatibility: '兼容性',
   compatibilitySub: 'AdGuard Home v0.107.79+ 全新 API',
 
+  // App / Console updates
+  appVersion: '客户端版本',
+  checkAppUpdate: '检查控制台更新',
+  checkingAppUpdate: '正在检查更新...',
+  appUpToDate: '控制台已是最新版本',
+  appNewVersionAvailable: '发现新版本 {{v}}',
+  appUpdateFailed: '检查更新失败：{{msg}}',
+  appCheckFailed: '检查更新失败',
+  updateDetails: '更新详情',
+  releaseNotes: '更新说明',
+  publishedAt: '发布于 {{date}}',
+  upgradeGuide: '升级指引',
+  copyCommand: '复制命令',
+  copied: '已复制',
+  downloadIpa: '下载 IPA',
+  openInAltStore: '通过 AltStore 安装',
+  downloadTarball: '下载安装包',
+  viewOnGitHub: '查看 GitHub Release',
+
   // Snapshots
   snapshotsTitle: '配置快照与备份',
   snapshotsDesc: '管理当前实例的配置快照，并在需要时安全比对与回退。',

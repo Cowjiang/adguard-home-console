@@ -30,7 +30,7 @@
 - **prepare**：`.github/scripts/release-plan.mjs` 按 ref 算出渠道、版本与各处 tag（`pnpm test:release` 钉住这张映射表）。
 - **build**（ubuntu）：`pnpm install --frozen-lockfile` → 把版本写回 `package.json` → `pnpm build` → `scripts/check-npm-pack.mjs` 打包并校验 npm 产物 → 打包 `agh-console.tar.gz`（含 `dist/`、`server/`、`package.json`）→ 两个产物一起上传。
 - **ios**（macos）：`brew install xcodegen` 与 `rustup target add aarch64-apple-ios` → 由仓库变量落盘 `.env.signing` → `--set-version` 写发版版本（前端与 iOS 工程）→ `./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` → ipa 改名为 `agh-console.ipa` 上传。它不消费 `build` 的产物：前端由 tauri-cli 的 `beforeBuildCommand`（`pnpm build`）自己构建并编进 Rust 二进制。
-- **release / npm / docker**：只消费上述产物，不再各自安装依赖或重新构建；`release` 额外把 ipa 挂到同一条 Release 上。
+- **release / npm / docker**：只消费上述产物，不再各自安装依赖或重新构建；`release` 额外生成 Schema 1.0 的 `version.json` 清单（供客户端与应用内检查更新直接消费，免受 GitHub API 速率限制）并把 ipa 挂到同一条 Release 上。
 
 stable 的 tag 不由手推产生：`.github/workflows/cut-release.yml`（仅 `workflow_dispatch`）在你选定的分支上跑提案校验与 `pnpm check`/`pnpm test`，再用 `.github/scripts/bump-version.mjs` 补版本（按 conventional commits 推断 patch/minor，major 需显式选；`custom` 可指定任意版本），同时写 `package.json`、`src-tauri/tauri.conf.json`、iOS 工程与 `CHANGELOG.md`，然后提交 `chore(release): vX.Y.Z`、打 annotated tag、推分支与 tag。tag 由 `GITHUB_TOKEN` 推送时不会触发其他工作流，因此 workflow 在未配置 `RELEASE_PAT` 时会显式 `gh workflow run release.yml --ref <tag> -f publish=true` 兜底（该兜底带 `|| true`，失败不会让 `cut-release` 变红）。
 
