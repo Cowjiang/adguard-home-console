@@ -67,19 +67,29 @@ export function ServerSettings() {
               title={it.label}
               subtitle={it.url}
               value={
-                !manage && it.id === activeId ? (
-                  <Badge kind="ok">{t('settings.instancesActive')}</Badge>
-                ) : undefined
+                it.id === activeId ? <Badge kind="ok">{t('settings.instancesActive')}</Badge> : undefined
               }
               right={
                 manage ? (
                   <div className="flex flex-none items-center gap-1.5">
-                    <Button variant="glass" size="sm" onClick={() => nav(`/settings/server/edit?id=${it.id}`)}>
-                      <Pencil size={13} /> {t('common.edit')}
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      label={t('common.edit')}
+                      className="!w-8 !px-0"
+                      onClick={() => nav(`/settings/server/edit?id=${it.id}`)}
+                    >
+                      <Pencil size={14} />
                     </Button>
-                    <Button variant="glass" size="sm" onClick={() => remove(it.id)}>
-                      <Trash size={13} /> {t('common.delete')}
-                    </Button>
+                    <button
+                      type="button"
+                      aria-label={t('common.delete')}
+                      onClick={() => remove(it.id)}
+                      className="press flex h-8 w-8 flex-none items-center justify-center rounded-full"
+                      style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                    >
+                      <Trash size={14} />
+                    </button>
                   </div>
                 ) : null
               }
