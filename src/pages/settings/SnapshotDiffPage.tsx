@@ -10,6 +10,7 @@ import { Layers } from 'lucide-react'
 import { PageHeader, Screen } from '../../components/ui/primitives'
 import { EmptyState, Loading } from '../../components/ui/atoms'
 import { SnapshotDiff } from '../../components/snapshot/SnapshotDiff'
+import { SnapshotActions } from '../../components/snapshot/SnapshotActions'
 import { getSnapshot } from '../../lib/snapshot/snapshotStorage'
 import type { AghConfigSnapshot } from '../../lib/snapshot/types'
 import { navBack } from '../../lib/nav/backNav'
@@ -43,7 +44,15 @@ export function SnapshotDiffPage() {
 
   return (
     <Screen>
-      <PageHeader back title={t('settings.snapshotDiffTitle')} />
+      <PageHeader
+        back
+        title={t('settings.snapshotDiffPageTitle')}
+        right={
+          snapshot ? (
+            <SnapshotActions snapshot={snapshot} onDeleted={() => navBack(nav, pathname)} />
+          ) : undefined
+        }
+      />
       {snapshot === undefined ? (
         <Loading />
       ) : !snapshot ? (
@@ -54,11 +63,9 @@ export function SnapshotDiffPage() {
       ) : (
         <SnapshotDiff
           snapshot={snapshot}
-          onClose={() => navBack(nav, pathname)}
-          // Restore / delete land back on the snapshots list (the confirm is a
-          // small sheet on top of this page; the list refreshes on mount)
+          // Restore lands back on the snapshots list (the confirm is a small
+          // sheet on top of this page; the list refreshes on mount)
           onDone={() => navBack(nav, pathname)}
-          onDeleted={() => navBack(nav, pathname)}
         />
       )}
     </Screen>

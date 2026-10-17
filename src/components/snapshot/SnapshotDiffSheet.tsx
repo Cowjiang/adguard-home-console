@@ -8,16 +8,13 @@ interface SnapshotDiffSheetProps {
   snapshot: AghConfigSnapshot
   onClose: () => void
   onRestored?: () => void
-  onDeleted?: () => void
 }
 
-export function SnapshotDiffSheet({ snapshot, onClose, onRestored, onDeleted }: SnapshotDiffSheetProps) {
+export function SnapshotDiffSheet({ snapshot, onClose, onRestored }: SnapshotDiffSheetProps) {
   return (
     <div className="max-h-[80vh] overflow-y-auto pr-1">
       <SnapshotDiff
         snapshot={snapshot}
-        onClose={onClose}
-        onDeleted={onDeleted}
         onDone={() => {
           // Desktop: refresh the list behind and close the sheet
           onRestored?.()

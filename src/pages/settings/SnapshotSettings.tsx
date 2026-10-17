@@ -18,6 +18,7 @@ import {
 } from '../../lib/snapshot/snapshotStorage'
 import type { AghConfigSnapshot, SnapshotTrigger } from '../../lib/snapshot/types'
 import { SnapshotDiffSheet } from '../../components/snapshot/SnapshotDiffSheet'
+import { SnapshotActions } from '../../components/snapshot/SnapshotActions'
 import { SnapshotCreateForm } from '../../components/snapshot/SnapshotCreateForm'
 import { isAppleMobile } from '../../lib/native/shell'
 import { useIsDesktop } from '../../lib/useIsDesktop'
@@ -122,12 +123,21 @@ export function SnapshotSettings() {
           snapshot={snapshot}
           onClose={sheet.close}
           onRestored={refreshSnapshots}
-          onDeleted={() => {
-            refreshSnapshots()
-            sheet.close()
-          }}
         />,
-        { title: t('settings.snapshotDiffTitle') }
+        {
+          title: t('settings.snapshotDiffTitle'),
+          // Snapshot actions live in the title bar (same place on mobile)
+          right: (
+            <SnapshotActions
+              compact
+              snapshot={snapshot}
+              onDeleted={() => {
+                refreshSnapshots()
+                sheet.close()
+              }}
+            />
+          ),
+        }
       )
     } else {
       // Diff & rollback is browsing content: a sub-page on mobile
