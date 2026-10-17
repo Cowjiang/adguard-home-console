@@ -99,7 +99,6 @@ const zhSettings = {
   instancesDeleteTitle: '删除实例?',
   instancesDeleteMsg: '「{{name}}」的连接配置将从本机移除。',
   instancesDeleteLastMsg: '这是最后一台实例,删除后将回到连接引导页。',
-  instancesListNote: '在线状态来自对每台实例的 /status 探测;点按一行切换当前实例,右上角「管理」里可编辑或删除连接信息。',
   instancesSwitch: '切换实例',
   instancesManage: '管理实例',
   aboutTitle: '关于',

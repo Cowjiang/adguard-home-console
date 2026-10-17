@@ -2,8 +2,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Server, Plus, Check, Pencil, Trash } from 'lucide-react'
-import { IconBubble } from '../../components/ui/atoms'
+import { Server, Plus, Pencil, Trash } from 'lucide-react'
+import { IconBubble, Badge } from '../../components/ui/atoms'
 import { useAuth } from '../../lib/session/auth'
 import { PageHeader, Screen, Group, GroupTitle, Rows, Row, Button } from '../../components/ui/primitives'
 import { useConfirm } from '../../components/ui/sheet'
@@ -43,8 +43,9 @@ export function ServerSettings() {
           instances.length > 0 ? (
             <Button
               size="header"
+              variant={manage ? 'primary' : 'glass'}
               onClick={() => setManage((v) => !v)}
-              native={{ label: manage ? t('common.done') : t('common.manage'), foreground: 'accent' }}
+              native={manage ? { label: t('common.done'), foreground: 'accent' } : { label: t('common.manage') }}
             >
               {manage ? t('common.done') : t('common.manage')}
             </Button>
@@ -63,16 +64,13 @@ export function ServerSettings() {
                   <Server size={17} />
                 </IconBubble>
               }
-              title={
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{it.label}</span>
-                  {it.id === activeId && (
-                    <Check size={15} className="flex-none" style={{ color: 'var(--accent)' }} />
-                  )}
-                </span>
-              }
+              title={it.label}
               subtitle={it.url}
-              value={!manage && it.id === activeId ? t('settings.instancesActive') : undefined}
+              value={
+                !manage && it.id === activeId ? (
+                  <Badge kind="ok">{t('settings.instancesActive')}</Badge>
+                ) : undefined
+              }
               right={
                 manage ? (
                   <div className="flex flex-none items-center gap-1.5">
@@ -95,8 +93,6 @@ export function ServerSettings() {
       <Button variant="glass" className="mt-4 w-full" onClick={() => nav('/settings/server/edit')}>
         <Plus size={15} /> {t('settings.instancesAdd')}
       </Button>
-
-      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">{t('settings.instancesListNote')}</p>
     </Screen>
   )
 }

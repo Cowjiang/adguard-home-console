@@ -99,7 +99,6 @@ const enSettings = {
   instancesDeleteTitle: 'Delete this instance?',
   instancesDeleteMsg: 'The connection to "{{name}}" will be removed from this device.',
   instancesDeleteLastMsg: 'This is the last instance; deleting it returns to the setup screen.',
-  instancesListNote: 'Online state comes from a /status probe per instance; tap a row to switch the current instance, or use "Manage" in the header to edit or delete a connection.',
   instancesSwitch: 'Switch instance',
   instancesManage: 'Manage instances',
   aboutTitle: 'About',
