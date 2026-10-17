@@ -5,19 +5,22 @@ import { ChevronDown } from 'lucide-react'
 import { usePick, PickSelect } from '../ui/menu'
 import { isAppleMobile } from '../../lib/native/shell'
 
+// Values are bucket counts; AGH's `time_units` decides whether a bucket is an
+// hour or a day, so the label follows the unit while the key stays fixed
 const RANGE_OPTS = [
-  { value: '6h', labelKey: 'dashboard.range6h' },
-  { value: '12h', labelKey: 'dashboard.range12h' },
-  { value: '24h', labelKey: 'dashboard.range24h' },
+  { value: '6h', labelKey: 'dashboard.range6h', dayLabelKey: 'dashboard.range6d' },
+  { value: '12h', labelKey: 'dashboard.range12h', dayLabelKey: 'dashboard.range12d' },
+  { value: '24h', labelKey: 'dashboard.range24h', dayLabelKey: 'dashboard.range24d' },
 ] as const
 export type RangeKey = (typeof RANGE_OPTS)[number]['value']
 
-export function RangePicker({ value, onChange }: { value: RangeKey; onChange: (v: RangeKey) => void }) {
+export function RangePicker({ value, onChange, units }: { value: RangeKey; onChange: (v: RangeKey) => void; units?: 'hours' | 'days' }) {
   const { t } = useTranslation()
   const pick = usePick()
-  const options = RANGE_OPTS.map((o) => ({ label: t(o.labelKey), value: o.value }))
+  const keyOf = (o: (typeof RANGE_OPTS)[number]) => (units === 'days' ? o.dayLabelKey : o.labelKey)
+  const options = RANGE_OPTS.map((o) => ({ label: t(keyOf(o)), value: o.value }))
   const opt = RANGE_OPTS.find((o) => o.value === value)
-  const label = opt ? t(opt.labelKey) : ''
+  const label = opt ? t(keyOf(opt)) : ''
   const open = (e: React.MouseEvent<HTMLElement>) => {
     pick({
       title: t('dashboard.rangeTitle'),

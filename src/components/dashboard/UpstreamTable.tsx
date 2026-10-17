@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Database, Timer } from 'lucide-react'
 import type { Stats } from '../../lib/api'
 import { toMap, topEntries } from '../../lib/stats'
-import { fmtCompact, fmtMs } from '../../lib/format'
+import { fmtCompact, fmtMsFromSeconds } from '../../lib/format'
 
 export function UpstreamTable({ stats }: { stats: Stats }) {
   const { t } = useTranslation()
@@ -47,7 +47,7 @@ export function UpstreamTable({ stats }: { stats: Stats }) {
                 }}
               >
                 {avg <= fastest + 0.01 && <Timer size={11} />}
-                {fmtMs(avg)}
+                {fmtMsFromSeconds(avg)}
               </span>
             )}
           </span>

@@ -1,15 +1,16 @@
 # AdGuard Home v0.107.79 API 契约
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-18
 
 本项目按 AGH v0.107.79 的 `/control/*` 契约实现。类型与调用点在 `src/lib/api.ts`；可执行模拟在 `scripts/mock-agh.mjs`。`_probe/` 中的 OpenAPI 与真实响应样本是本机探查材料，被 Git 忽略，克隆后不能假定存在。
 
 | 领域 | 当前契约 |
 | --- | --- |
-| 时间单位 | `querylog` / `stats` 配置的 `interval`、`/protection` 的 `duration`、`status.protection_disabled_duration` 均为毫秒 |
-| 统计 | `GET /stats` 包含 `dns_queries` 时间序列及排行；`top_*` 是单键对象数组，读取前需归一。前端类型 `KVMap` 同时兼容字典形式；`avg_processing_time` 与 `top_upstreams_avg_time` 是秒（浮点），显示为毫秒时需要换算 |
-| 查询日志 | 响应为 `{data: [...]}`；查询支持 `search`、可重复的 `reason[]`、`older_than`、`offset`、`limit` |
+| 时间单位 | `querylog` / `stats` 配置的 `interval`、`/protection` 的 `duration`、`status.protection_disabled_duration`、`status.start_time`（epoch 毫秒）均为毫秒 |
+| 非毫秒单位 | `filtering` 的 `interval` 是**小时**（`GET /filtering/status` 与 `POST /filtering/config` 同字段，AGH 上限 365 天，超出返回 400 `Unsupported interval`）；`upstream_timeout`、`blocked_response_ttl`、`cache_ttl_min` / `cache_ttl_max`、DHCP `lease_duration`、查询日志 `answer[].ttl` 是**秒**；`cache_size` 与客户端 `upstreams_cache_size` 是**字节**；`blocked_services` 的 `schedule` 各时段是**当日零点起的毫秒**（相对量，不是 epoch） |
+| 统计 | `GET /stats` 包含 `dns_queries` 时间序列及排行；`top_*` 是单键对象数组，读取前需归一。前端类型 `KVMap` 同时兼容字典形式；`avg_processing_time` 与 `top_upstreams_avg_time` 是秒（浮点），显示为毫秒时需要换算；`time_units` 声明序列的桶宽——保留期超过 7 天时 AGH 改按天分桶，横轴与区间文案须跟随该字段 |
+| 查询日志 | 响应为 `{data: [...]}`；查询支持 `search`、可重复的 `reason[]`、`older_than`（RFC3339 时间戳，不是时长）、`offset`、`limit`；条目 `time` 为 RFC3339 字符串，`elapsedMs` 为毫秒但以字符串下发，消费前须 `Number()` |
 | 防护 | `POST /protection` 使用 `{enabled, duration}`，其中 `duration` 为毫秒 |
 | 配置 | 查询日志为 `GET /querylog/config` 与 `PUT /querylog/config/update`；统计配置同构；两者均含 `ignored[]` 与 `ignored_enabled`（被忽略的域名：匹配名单的查询不写入日志/不计入统计，PUT 须随完整配置体下发） |
 | 拦截服务 | `GET /blocked_services/all` 返回目录（含 Base64 `icon_svg`）；`GET /blocked_services/get` 返回当前 `ids` 和 `schedule`；`PUT /blocked_services/update` 保存 |

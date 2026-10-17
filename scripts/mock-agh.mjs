@@ -19,8 +19,13 @@
  * Auth: any non-empty Basic credentials (missing Authorization → 401);
  * used to exercise the 401 branch.
  * Contract source: src/lib/api.ts + docs/agh-api.md + the official openapi.yaml
- *   - interval/duration in ms; avg_processing_time and top_upstreams_avg_time
+ *   - units per AGH v0.107.79: /querylog|/stats config `interval` and /protection
+ *     `duration` in ms, filtering `interval` in HOURS, `upstream_timeout` and DHCP
+ *     `lease_duration` in seconds, `avg_processing_time`/`top_upstreams_avg_time`
  *     in seconds (float)
+ *   - the two interval endpoints validate like AGH: filtering rejects anything
+ *     over 365 days in hours with 400 `Unsupported interval`, the retention
+ *     endpoints reject anything outside 1 hour–1 year with 422
  *   - stats top_* are single-key object arrays (new format); reason has 12 string enums
  *   - /protection POST {enabled, duration(ms)}; state mutates in memory for UI read-back
  * Node built-ins only, no third-party dependencies.
@@ -37,6 +42,21 @@ const TIME_UNITS = process.env.MOCK_TIME_UNITS === 'days' ? 'days' : 'hours'
 const STATS_INTERVAL = Number(process.env.MOCK_STATS_INTERVAL || 24 * 3600_000)
 const REDIRECT_TO = process.env.MOCK_REDIRECT_TO || ''
 const startedAt = Date.now() - 3 * 3600_000 - 42 * 60_000
+
+// Validation windows copied from AGH v0.107.79: the filter update interval is in
+// hours and capped at a year, the querylog/stats retention interval is in ms and
+// must stay between an hour and a year
+const MAX_FILTERING_INTERVAL_HOURS = 365 * 24
+const MIN_RETENTION_MS = 3600_000
+const MAX_RETENTION_MS = 365 * 86_400_000
+
+function retentionError(ivl) {
+  const ms = Number(ivl)
+  if (!Number.isFinite(ms)) return ''
+  if (ms < MIN_RETENTION_MS) return 'unsupported interval: less than an hour'
+  if (ms > MAX_RETENTION_MS) return 'unsupported interval: more than a year'
+  return ''
+}
 
 // DHCP 默认配置(/dhcp/reset 也恢复到这里);expires 为 RFC3339
 const DHCP_DEFAULT_STATUS = {
@@ -99,7 +119,7 @@ const state = {
     ratelimit_whitelist: [],
     ratelimit_subnet_len_ipv4: 24,
     ratelimit_subnet_len_ipv6: 56,
-    upstream_timeout: 5000,
+    upstream_timeout: 10,
     upstream_mode: 'load_balance',
     blocking_mode: 'default',
     blocking_ipv4: '',
@@ -121,7 +141,7 @@ const state = {
   },
   filtering: {
     enabled: true,
-    interval: 24 * 3600_000,
+    interval: 24,
     filters: [
       { url: 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt', name: 'AdGuard DNS filter', id: 1, enabled: true, rules_count: 50123, last_updated: new Date(Date.now() - 26 * 3600_000).toISOString(), last_checked: new Date(Date.now() - 2 * 3600_000).toISOString() },
       { url: 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_11.txt', name: 'Chinese filter', id: 2, enabled: true, rules_count: 128456, last_updated: new Date(Date.now() - 49 * 3600_000).toISOString(), last_checked: new Date(Date.now() - 5 * 3600_000).toISOString() },
@@ -303,6 +323,14 @@ function json(res, code, body) {
   })
   res.end(text)
 }
+/** AGH answers its validation errors with a plain-text body (http.Error) */
+function text(res, code, body) {
+  res.writeHead(code, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+  })
+  res.end(body + '\n')
+}
 function readBody(req) {
   return new Promise((resolve) => {
     let data = ''
@@ -353,8 +381,14 @@ const server = http.createServer(async (req, res) => {
     case 'GET /filtering/status': return json(res, 200, state.filtering)
     case 'POST /filtering/config':
     case 'PUT /filtering/config': {
+      // AGH takes hours here (max 365 days) and answers with a plain-text 400
+      // otherwise — see internal/filtering/http.go in the v0.107.79 source
+      const hours = Number(body.interval)
+      if (Number.isFinite(hours) && hours > MAX_FILTERING_INTERVAL_HOURS) {
+        return text(res, 400, 'Unsupported interval')
+      }
       if (typeof body.enabled === 'boolean') state.filtering.enabled = body.enabled
-      if (Number.isFinite(Number(body.interval))) state.filtering.interval = Number(body.interval)
+      if (Number.isFinite(hours)) state.filtering.interval = hours
       return json(res, 200, {})
     }
     case 'POST /filtering/set_rules': return json(res, 200, {})
@@ -418,9 +452,19 @@ const server = http.createServer(async (req, res) => {
     case 'GET /blocked_services/get': return json(res, 200, { ids: state.blockedServiceIds, schedule: { time_zone: 'Local', entries: [] } })
     case 'PUT /blocked_services/update': state.blockedServiceIds = body.ids || []; return json(res, 200, {})
     case 'GET /querylog/config': return json(res, 200, state.querylogConfig)
-    case 'PUT /querylog/config/update': state.querylogConfig = { ...state.querylogConfig, ...body }; return json(res, 200, {})
+    case 'PUT /querylog/config/update': {
+      const err = retentionError(body.interval)
+      if (err) return text(res, 422, err)
+      state.querylogConfig = { ...state.querylogConfig, ...body }
+      return json(res, 200, {})
+    }
     case 'GET /stats/config': return json(res, 200, state.statsConfig)
-    case 'PUT /stats/config/update': state.statsConfig = { ...state.statsConfig, ...body }; return json(res, 200, {})
+    case 'PUT /stats/config/update': {
+      const err = retentionError(body.interval)
+      if (err) return text(res, 422, err)
+      state.statsConfig = { ...state.statsConfig, ...body }
+      return json(res, 200, {})
+    }
     case 'GET /dns_info':
     case 'GET /dns/info': return json(res, 200, state.dnsInfo)
     case 'POST /dns_config':

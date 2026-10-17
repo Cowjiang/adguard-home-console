@@ -196,6 +196,7 @@ export interface Stats {
   num_replaced_safebrowsing: number
   num_replaced_safesearch: number
   num_replaced_parental: number
+  /** Seconds (float), unlike every other latency field in the API */
   avg_processing_time: number
   dns_queries: number[]
   blocked_filtering: number[]
@@ -205,6 +206,7 @@ export interface Stats {
   top_blocked_domains: KVMap
   top_clients: KVMap
   top_upstreams_responses: KVMap
+  /** Seconds (float) per upstream, same exception as avg_processing_time */
   top_upstreams_avg_time: KVMap
 }
 
@@ -245,6 +247,7 @@ export interface Filter {
 
 export interface FilteringStatus {
   enabled: boolean
+  /** Update interval in hours (AGH caps it at 365 days = 8760; 0 disables auto-update) */
   interval: number
   filters: Filter[]
   whitelist_filters: Filter[]
@@ -261,11 +264,13 @@ export interface DnsInfo {
   ratelimit_whitelist: string[]
   ratelimit_subnet_len_ipv4: number
   ratelimit_subnet_len_ipv6: number
+  /** Seconds, not milliseconds */
   upstream_timeout: number
   upstream_mode: string
   blocking_mode: 'default' | 'refused' | 'nxdomain' | 'null_ip' | 'custom_ip'
   blocking_ipv4: string
   blocking_ipv6: string
+  /** Seconds, used verbatim as the DNS TTL of generated answers */
   blocked_response_ttl: number
   edns_cs_enabled: boolean
   edns_cs_use_custom: boolean
@@ -273,7 +278,9 @@ export interface DnsInfo {
   disable_ipv6: boolean
   dnssec_enabled: boolean
   cache_enabled: boolean
+  /** Bytes */
   cache_size: number
+  /** DNS TTL in seconds */
   cache_ttl_min: number
   cache_ttl_max: number
   cache_optimistic: boolean
@@ -359,6 +366,7 @@ export interface BlockedService {
 export interface DhcpStatus {
   enabled: boolean
   interface_name: string
+  /** `lease_duration` is seconds (0 keeps AGH's default of one day) */
   v4: { gateway_ip: string; subnet_mask: string; range_start: string; range_end: string; lease_duration: number }
   v6: { range_start: string; lease_duration: number }
   leases: { mac: string; ip: string; hostname: string; expires: string }[]
@@ -367,6 +375,7 @@ export interface DhcpStatus {
 
 export interface QueryLogConfig {
   enabled: boolean
+  /** Rotation interval in milliseconds (AGH accepts 1 hour to 365 days) */
   interval: number
   anonymize_client_ip: boolean
   ignored: string[]
@@ -375,6 +384,7 @@ export interface QueryLogConfig {
 
 export interface StatsConfig {
   enabled: boolean
+  /** Rotation interval in milliseconds (AGH accepts 1 hour to 365 days) */
   interval: number
   ignored: string[]
   ignored_enabled: boolean

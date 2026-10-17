@@ -19,12 +19,16 @@ import { RangePicker, type RangeKey } from '../components/dashboard/RangePicker'
 import { ServerInfoCard } from '../components/dashboard/ServerInfoCard'
 import { UpstreamTable } from '../components/dashboard/UpstreamTable'
 import { InfoCell } from '../components/dashboard/InfoCell'
-import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
+import { fmtCompact, fmtNum, fmtPct, fmtMsFromSeconds } from '../lib/format'
 import { toMap, topEntries } from '../lib/stats'
 
 
-const hourLabel = (hoursAgo: number) => {
-  const dte = new Date(Date.now() - hoursAgo * 3600_000)
+/** AGH buckets the series per hour, or per day once the retention passes 7 days
+ *  (`time_units` in the /stats response); axis labels follow the declared unit */
+const bucketLabel = (units: string | undefined, bucketsAgo: number) => {
+  const days = units === 'days'
+  const dte = new Date(Date.now() - bucketsAgo * (days ? 86_400_000 : 3_600_000))
+  if (days) return `${dte.getMonth() + 1}/${dte.getDate()}`
   return `${String(dte.getHours()).padStart(2, '0')}:00`
 }
 
@@ -71,7 +75,7 @@ export default function Dashboard() {
       // Raw 24h filter-block series; each consumer slices to its own range
       safe: stats?.replaced_safebrowsing ?? [],
       parental: stats?.replaced_parental ?? [],
-      labels: Array.from({ length: len }, (_, i) => hourLabel(len - 1 - i)),
+      labels: Array.from({ length: len }, (_, i) => bucketLabel(stats?.time_units, len - 1 - i)),
     }
   }, [range, stats])
 
@@ -79,8 +83,8 @@ export default function Dashboard() {
   const [filterRange, setFilterRange] = useState<RangeKey>('24h')
   const filterLen = filterRange === '6h' ? 6 : filterRange === '12h' ? 12 : 24
   const filterLabels = useMemo(
-    () => Array.from({ length: filterLen }, (_, i) => hourLabel(filterLen - 1 - i)),
-    [filterLen]
+    () => Array.from({ length: filterLen }, (_, i) => bucketLabel(stats?.time_units, filterLen - 1 - i)),
+    [filterLen, stats?.time_units]
   )
 
   // All three branches share the same root div structure, so React reuses the node and
@@ -129,7 +133,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-3">
           <StatTile label={t('dashboard.queriesToday')} value={fmtCompact(stats.num_dns_queries)} sub={t('dashboard.queriesSub', { n: fmtNum(stats.num_dns_queries) })} onClick={() => jump('/logs?filter=all')} />
           <StatTile label={t('dashboard.blocked')} value={fmtCompact(stats.num_blocked_filtering)} sub={t('dashboard.blockRateSub', { pct: blockedPct })} accent="var(--danger)" onClick={() => jump('/logs?filter=blocked')} />
-          <StatTile label={t('dashboard.avgLatency')} value={fmtMs(stats.avg_processing_time)} sub={t('dashboard.perQuery')} accent="var(--accent-2)" />
+          <StatTile label={t('dashboard.avgLatency')} value={fmtMsFromSeconds(stats.avg_processing_time)} sub={t('dashboard.perQuery')} accent="var(--accent-2)" />
           <StatTile
             label={t('dashboard.clients')}
             value={fmtCompact((clients?.clients?.length ?? 0) + (clients?.auto_clients?.length ?? 0))}
@@ -156,7 +160,7 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <RangePicker value={range} onChange={setRange} />
+          <RangePicker value={range} onChange={setRange} units={stats.time_units} />
         </div>
         {/* Blocked is remapped to the danger color: the chart tokens are
             generic, but a red blocked band matches the donut and the lists */}
@@ -254,7 +258,7 @@ export default function Dashboard() {
                     <Globe size={15} />
                   </div>
                   <span className="w-0 min-w-0 flex-1 truncate text-[13.5px] text-t1">{up}</span>
-                  <Badge kind="info">{fmtMs(avg)}</Badge>
+                  <Badge kind="info">{fmtMsFromSeconds(avg)}</Badge>
                   <span className="w-14 flex-none text-right text-[12.5px] num text-t2">{fmtNum(count)}</span>
                 </div>
               )
@@ -298,7 +302,7 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <RangePicker value={filterRange} onChange={setFilterRange} />
+            <RangePicker value={filterRange} onChange={setFilterRange} units={stats.time_units} />
           </div>
           <div style={{ '--chart-1': 'var(--warn)', '--chart-2': 'var(--violet)' } as React.CSSProperties}>
             <AreaChart

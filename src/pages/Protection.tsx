@@ -19,12 +19,9 @@ import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { hoursLabel, relTimeShort, fmtNum, fmtDate } from '../lib/format'
+import { FILTER_INTERVAL_HOURS } from '../lib/aghUnits'
 import { runMutation } from '../lib/mutation'
 
-
-
-// AGH /filtering interval is milliseconds; labels and picker options work in hours
-const HOUR_MS = 3_600_000
 
 export default function Protection() {
   const pageIn = usePageInClass()
@@ -37,10 +34,11 @@ export default function Protection() {
   const [refreshing, setRefreshing] = useState(false)
   const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
+  /** AGH's /filtering/config takes the update interval in hours, as status returns it */
   async function saveInterval(hours: number) {
     if (!cfg || !filtering) return
     await runMutation({
-      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours * HOUR_MS } }),
+      action: () => api(cfg, '/filtering/config', { method: 'POST', body: { enabled: filtering.enabled, interval: hours } }),
       invalidate: mFiltering,
       okKey: 'filters.intervalSaved',
     })
@@ -196,7 +194,7 @@ export default function Protection() {
           <div className="min-w-0">
             <div className="text-[12px] text-t2">{t('protection.lastUpdated')}</div>
             <div className="text-[20px] font-bold leading-tight num text-t1">{lastUpdated ? relTimeShort(lastUpdated) : '—'}</div>
-            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? intervalBareLabel(filtering.interval / HOUR_MS) : '…' })}</div>
+            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? intervalBareLabel(filtering.interval) : '…' })}</div>
           </div>
           <div className="ml-auto">
             <Button variant="glass" loading={refreshing} onClick={refreshAllFilters}>
@@ -291,13 +289,13 @@ export default function Protection() {
           <Row
             icon={<IconBubble color="var(--t2)" bg="var(--glass)"><Timer size={17} /></IconBubble>}
             title={t('protection.intervalRow')}
-            value={isAppleMobile() ? undefined : (filtering ? hoursLabel(filtering.interval / HOUR_MS) : '…')}
+            value={isAppleMobile() ? undefined : (filtering ? hoursLabel(filtering.interval) : '…')}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
                 <PickSelect
                   className="field num !py-1.5 !pr-8 text-right"
-                  value={filtering ? filtering.interval / HOUR_MS : undefined}
-                  options={[1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h }))}
+                  value={filtering ? filtering.interval : undefined}
+                  options={FILTER_INTERVAL_HOURS.map((h) => ({ label: hoursLabel(h), value: h }))}
                   onPick={(v) => saveInterval(v)}
                 />
               </div>
@@ -307,8 +305,8 @@ export default function Protection() {
                 title: t('protection.intervalRow'),
                 anchor: e.currentTarget,
                 align: 'right',
-                value: filtering ? filtering.interval / HOUR_MS : undefined,
-                options: [1, 12, 24, 72].map((h) => ({ label: hoursLabel(h), value: h })),
+                value: filtering ? filtering.interval : undefined,
+                options: FILTER_INTERVAL_HOURS.map((h) => ({ label: hoursLabel(h), value: h })),
                 onPick: (v) => saveInterval(v),
               })
             }}

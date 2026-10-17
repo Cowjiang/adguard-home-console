@@ -9,6 +9,7 @@ import { Loading } from '../../components/ui/atoms'
 import { usePick, PickSelect } from '../../components/ui/menu'
 import { isAppleMobile } from '../../lib/native/shell'
 import { hoursLabel } from '../../lib/format'
+import { HOUR_MS, QUERYLOG_RETENTION_HOURS, STATS_RETENTION_HOURS, retentionMs } from '../../lib/aghUnits'
 import { runMutation } from '../../lib/mutation'
 import { useDraftForm } from '../../lib/useDraftForm'
 
@@ -31,12 +32,10 @@ export function GeneralSettings() {
   const normList = (s: string) => [...new Set(s.split('\n').map((x) => x.trim()).filter(Boolean))]
 
   // Newer v0.107.79 API: interval is in ms (GET returns 604800000 = 7 days)
-  const HOUR = 3_600_000
-  const DAY = 86_400_000
   // Retention labels use hoursLabel directly (units dictionary), consistent with the
-  // formatted output
-  const QL_RETENTIONS = [6, 24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * HOUR }))
-  const STAT_RETENTIONS = [24, 168, 720, 2160].map((h) => ({ label: hoursLabel(h), value: h * DAY }))
+  // formatted output; both rows keep their option values in milliseconds
+  const QL_RETENTIONS = QUERYLOG_RETENTION_HOURS.map((h) => ({ label: hoursLabel(h), value: retentionMs(h) }))
+  const STAT_RETENTIONS = STATS_RETENTION_HOURS.map((h) => ({ label: hoursLabel(h), value: retentionMs(h) }))
 
   async function save() {
     if (!cfg) return
@@ -80,7 +79,7 @@ export function GeneralSettings() {
           />
           <Row
             title={t('settings.logRetention')}
-            value={isAppleMobile() ? undefined : hoursLabel(qlDraft.interval / HOUR)}
+            value={isAppleMobile() ? undefined : hoursLabel(qlDraft.interval / HOUR_MS)}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
                 <PickSelect
@@ -136,7 +135,7 @@ export function GeneralSettings() {
           />
           <Row
             title={t('settings.statsRetention')}
-            value={isAppleMobile() ? undefined : hoursLabel(scDraft.interval / HOUR)}
+            value={isAppleMobile() ? undefined : hoursLabel(scDraft.interval / HOUR_MS)}
             right={isAppleMobile() ? (
               <div className="w-28 flex-none">
                 <PickSelect

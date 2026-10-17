@@ -28,11 +28,17 @@ export function fmtPct(part: number, total: number, digits = 1): string {
   return ((part / total) * 100).toFixed(digits) + '%'
 }
 
-export function fmtMs(sec: number | undefined | null): string {
-  if (sec == null || Number.isNaN(sec)) return '—'
-  const ms = sec < 1 ? sec * 1000 : sec
+/** Latency values are milliseconds, like `elapsedMs` in the query log */
+export function fmtMs(ms: number | undefined | null): string {
+  if (ms == null || Number.isNaN(ms)) return '—'
   if (ms < 1000) return ms.toFixed(ms < 10 ? 2 : 0) + ' ms'
   return (ms / 1000).toFixed(2) + ' s'
+}
+
+/** AGH reports `avg_processing_time` and `top_upstreams_avg_time` in seconds
+ *  (floats); every other latency field is milliseconds */
+export function fmtMsFromSeconds(sec: number | undefined | null): string {
+  return fmtMs(sec == null || Number.isNaN(sec) ? sec : sec * 1000)
 }
 
 export function fmtBytes(bytes: number): string {
