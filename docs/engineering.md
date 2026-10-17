@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-10-15
+**Updated:** 2026-10-18（设置页草稿在未被编辑时跟随服务端副本：判据表 `draftFollow` 带单测，消掉后台校验落地后页面停在旧值并挂假未保存标记的问题）
 
 ## 实现约束
 
@@ -42,7 +42,7 @@
 
 - 常规 mutation（请求 → 成功后 scoped revalidate → toast）一律走 `src/lib/mutation.ts` 的 `runMutation`：成功 toast 的插值经 `okVars(action 结果)` 取；失败只 toast 不抛，渲染 `ApiError.message`（适配器 kind 已在 `api.ts` 本地化），`failKey` 默认 `common.saveFailed`，返回布尔值供调用方决定后续（关 Sheet、跳转）。`invalidate` 不 await，与它所替换的逐页副本一致。
 - **不**走 `runMutation` 的三类：乐观更新（见下）；带结果状态的纯查询（`check_host`、`find_active_dhcp`、`test_upstreams`、日志分页拉取、版本检查——结果要落到页面状态或另有条件文案）；两阶段的 TLS validate/configure（校验驳回有独立文案，且不得下发配置）。
-- 设置页的「草稿 + 保存」统一用 `src/lib/useDraftForm.ts`：服务端副本是 dirty 基线；保存成功后必须**先 await refetch 再回填草稿**——先置 `null` 会被 effect 立即用旧数据重填，其后的数据更新不再同步，dirty 永远清不掉。需要服务端规范化的字段（被忽略域名、访问控制名单）以返回值回填，否则 trim/去重后的差异会把 dirty 挂在页面上。
+- 设置页的「草稿 + 保存」统一用 `src/lib/useDraftForm.ts`：服务端副本是 dirty 基线，**未编辑过的草稿跟随服务端副本**——SWR 先用缓存渲染、再后台校验，挂载瞬间的缓存可能是旧的，落地的刷新必须重投影草稿，否则页面停在旧值并挂出假的未保存标记（判据表 `draftFollow` 在同文件内导出并单测）。草稿被编辑后不再被覆盖，只在它重新与服务端副本一致时交还跟随权。保存成功后必须**先 await refetch 再回填草稿**，让服务端的规范化结果（trim/去重后的被忽略域名、访问控制名单）成为新基线，否则这些差异会把 dirty 挂在页面上。
 - 乐观更新是三种各有适用场景的习语，**不抽公共 helper**（统一成 options-bag 会产出比实现更复杂的浅接口），各自的并发防护要求：
   - **pending 镜像 + 倒计时**（`src/components/protection/ProtectionCard.tsx`）：先本地镜像开关再发请求，失败丢弃镜像回到服务端状态；开关带持续时间，镜像必须能被服务端返回的 `protection_disabled_until` 覆盖。
   - **本地副本 + 回滚**（`src/components/clients/ClientDetail.tsx`）：桌面弹层不随列表重渲染，组件持有配置副本逐字段即时保存，失败回滚到上一份副本；`useEffect([c])` 把刷新结果重灌进副本，正在编辑的字段以本地为准。
