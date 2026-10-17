@@ -7,17 +7,46 @@
  * - Self-upgrade trigger and status API
  * - Direct remote manifest fetch on Tauri (runtime='ios')
  * - Server proxy fetch on Web/PWA (/api/system/version)
+ * - Channel selection: stable vs nightly with local persistence
  * - Semver comparison
  * - Graceful error resilience without crashing the UI
  */
 import { APP_VERSION } from './constants'
 import { isTauriShell } from './native/shell'
 
+export type UpdateChannel = 'stable' | 'nightly'
+export const UPDATE_CHANNEL_KEY = 'agh.console.update_channel'
+
+export function getStoredUpdateChannel(): UpdateChannel {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(UPDATE_CHANNEL_KEY)
+      if (saved === 'stable' || saved === 'nightly') {
+        return saved
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return APP_VERSION.includes('nightly') ? 'nightly' : 'stable'
+}
+
+export function setStoredUpdateChannel(channel: UpdateChannel): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(UPDATE_CHANNEL_KEY, channel)
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export interface VersionManifestDownloads {
   tarball?: string
   ipa?: string
   docker?: string
   npm?: string
+  altstoreSource?: string
 }
 
 export interface VersionManifest {
@@ -57,6 +86,12 @@ export interface UpgradeStatusResponse {
 
 export const DEFAULT_UPDATE_MANIFEST_URL =
   'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/refs/heads/main/version.json'
+export const DEFAULT_RELEASE_LATEST_URL =
+  'https://github.com/Cowjiang/adguard-home-console/releases/latest/download/version.json'
+export const DEFAULT_RELEASE_NIGHTLY_URL =
+  'https://github.com/Cowjiang/adguard-home-console/releases/download/nightly/version.json'
+export const DEFAULT_ALTSTORE_SOURCE_URL =
+  'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json'
 export const DEFAULT_TIMEOUT_MS = 5000
 
 export interface SemverParts {
@@ -130,6 +165,7 @@ export function isNewerVersion(currentVersion: string, latestVersion: string): b
 
 export interface FetchSystemVersionOptions {
   force?: boolean
+  channel?: UpdateChannel
   fetch?: typeof fetch
   updateUrl?: string
   timeoutMs?: number
@@ -145,13 +181,14 @@ export async function fetchSystemVersion(
 ): Promise<SystemVersionResponse> {
   const isTauri = isTauriShell()
   const currentVersion = APP_VERSION
-  const channel = currentVersion.includes('nightly') ? 'nightly' : 'stable'
+  const channel = opts?.channel ?? getStoredUpdateChannel()
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const fetchFn = opts?.fetch ?? globalThis.fetch
 
   if (isTauri) {
     try {
-      const updateUrl = opts?.updateUrl ?? DEFAULT_UPDATE_MANIFEST_URL
+      const defaultUrl = channel === 'nightly' ? DEFAULT_RELEASE_NIGHTLY_URL : DEFAULT_RELEASE_LATEST_URL
+      const updateUrl = opts?.updateUrl ?? defaultUrl
       const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
       const response = await fetchFn(updateUrl, { signal })
       if (!response.ok) {
@@ -187,7 +224,11 @@ export async function fetchSystemVersion(
 
   // Web / PWA / Standalone Node
   try {
-    const url = `/api/system/version${opts?.force ? '?force=1' : ''}`
+    const params = new URLSearchParams()
+    if (opts?.force) params.set('force', '1')
+    if (channel) params.set('channel', channel)
+    const qs = params.toString() ? `?${params.toString()}` : ''
+    const url = `/api/system/version${qs}`
     const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
     const response = await fetchFn(url, { signal })
     if (!response.ok) {

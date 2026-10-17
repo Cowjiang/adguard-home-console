@@ -1,13 +1,21 @@
 /** About: app info, compatibility, and version updates */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Info, Network, RotateCw, ChevronRight } from 'lucide-react'
+import { Info, Network, RotateCw, ChevronRight, GitBranch } from 'lucide-react'
 import { IconBubble, Badge, Spinner } from '../../components/ui/atoms'
 import { PageHeader, Screen, Group, GroupTitle, Rows, Row } from '../../components/ui/primitives'
+import { usePick, PickSelect } from '../../components/ui/menu'
 import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
+import { isAppleMobile } from '../../lib/native/shell'
 import { APP_NAME, APP_VERSION } from '../../lib/constants'
-import { fetchSystemVersion, type SystemVersionResponse } from '../../lib/version'
+import {
+  fetchSystemVersion,
+  getStoredUpdateChannel,
+  setStoredUpdateChannel,
+  type UpdateChannel,
+  type SystemVersionResponse,
+} from '../../lib/version'
 import { AppUpdateSheet } from '../../components/settings/AppUpdateSheet'
 
 /* ================= About ================= */
@@ -15,8 +23,16 @@ import { AppUpdateSheet } from '../../components/settings/AppUpdateSheet'
 export function AboutSettings() {
   const { t } = useTranslation()
   const sheet = useSheet()
+  const pick = usePick()
+  const apple = isAppleMobile()
   const [checking, setChecking] = useState(false)
   const [versionData, setVersionData] = useState<SystemVersionResponse | null>(null)
+  const [channel, setChannel] = useState<UpdateChannel>(getStoredUpdateChannel)
+
+  const channelOptions: { label: string; value: UpdateChannel }[] = [
+    { value: 'stable', label: t('settings.channelStable') },
+    { value: 'nightly', label: t('settings.channelNightly') },
+  ]
 
   function openUpdateSheet(data: SystemVersionResponse) {
     if (!data.latest) return
@@ -32,11 +48,11 @@ export function AboutSettings() {
     )
   }
 
-  async function handleCheckUpdate(force = false) {
+  async function handleCheckUpdate(force = false, targetChannel: UpdateChannel = channel) {
     if (checking) return
     setChecking(true)
     try {
-      const res = await fetchSystemVersion({ force })
+      const res = await fetchSystemVersion({ force, channel: targetChannel })
       setVersionData(res)
       if (force) {
         if (res.checkFailed) {
@@ -58,9 +74,18 @@ export function AboutSettings() {
     }
   }
 
+  function handleChannelChange(newChannel: UpdateChannel) {
+    if (newChannel === channel) return
+    setStoredUpdateChannel(newChannel)
+    setChannel(newChannel)
+    const label = newChannel === 'nightly' ? t('settings.channelNightly') : t('settings.channelStable')
+    toast(t('settings.channelChanged', { channel: label }), 'ok')
+    handleCheckUpdate(true, newChannel)
+  }
+
   useEffect(() => {
     let active = true
-    fetchSystemVersion()
+    fetchSystemVersion({ channel })
       .then((res) => {
         if (active) setVersionData(res)
       })
@@ -115,6 +140,49 @@ export function AboutSettings() {
                 : undefined
             }
           />
+
+          {/* Update Channel selection row */}
+          <Row
+            icon={
+              <IconBubble
+                color="var(--warn)"
+                bg="color-mix(in srgb, var(--warn) 15%, transparent)"
+              >
+                <GitBranch size={17} />
+              </IconBubble>
+            }
+            title={t('settings.updateChannel')}
+            subtitle={channel === 'nightly' ? t('settings.channelNightlyDesc') : t('settings.channelStableDesc')}
+            value={apple ? undefined : (channelOptions.find((o) => o.value === channel)?.label || channel)}
+            right={
+              apple ? (
+                <div className="w-36 flex-none">
+                  <PickSelect
+                    className="field num !py-1.5 !pr-8 text-right"
+                    ariaLabel={t('settings.updateChannel')}
+                    value={channel}
+                    options={channelOptions}
+                    onPick={handleChannelChange}
+                  />
+                </div>
+              ) : undefined
+            }
+            onClick={
+              apple
+                ? undefined
+                : (e) => {
+                    pick({
+                      title: t('settings.updateChannel'),
+                      anchor: e.currentTarget,
+                      align: 'right',
+                      value: channel,
+                      options: channelOptions,
+                      onPick: handleChannelChange,
+                    })
+                  }
+            }
+          />
+
           {/* Check for updates action */}
           <Row
             icon={
@@ -130,6 +198,7 @@ export function AboutSettings() {
             right={checking ? <Spinner size={16} /> : undefined}
             onClick={() => handleCheckUpdate(true)}
           />
+
           <Row
             icon={
               <IconBubble color="var(--violet)" bg="var(--violet-soft)">

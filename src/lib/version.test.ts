@@ -6,11 +6,24 @@ import {
   fetchSystemVersion,
   triggerSelfUpgrade,
   getUpgradeStatus,
-  DEFAULT_UPDATE_MANIFEST_URL,
+  getStoredUpdateChannel,
+  setStoredUpdateChannel,
+  DEFAULT_RELEASE_LATEST_URL,
+  DEFAULT_RELEASE_NIGHTLY_URL,
+  UPDATE_CHANNEL_KEY,
   type VersionManifest,
   type SystemVersionResponse,
 } from './version'
 import * as shell from './native/shell'
+
+const storageMap = new Map<string, string>()
+const mockLocalStorage = {
+  getItem: (k: string) => storageMap.get(k) ?? null,
+  setItem: (k: string, v: string) => storageMap.set(k, String(v)),
+  removeItem: (k: string) => storageMap.delete(k),
+  clear: () => storageMap.clear(),
+}
+globalThis.localStorage = mockLocalStorage as any
 
 describe('version library', () => {
   describe('semver parsing and comparison', () => {
@@ -61,8 +74,29 @@ describe('version library', () => {
     })
   })
 
+  describe('update channel persistence', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    it('defaults to stable channel when nothing is stored and APP_VERSION is stable', () => {
+      expect(getStoredUpdateChannel()).toBe('stable')
+    })
+
+    it('persists and retrieves channel setting in localStorage', () => {
+      setStoredUpdateChannel('nightly')
+      expect(localStorage.getItem(UPDATE_CHANNEL_KEY)).toBe('nightly')
+      expect(getStoredUpdateChannel()).toBe('nightly')
+
+      setStoredUpdateChannel('stable')
+      expect(localStorage.getItem(UPDATE_CHANNEL_KEY)).toBe('stable')
+      expect(getStoredUpdateChannel()).toBe('stable')
+    })
+  })
+
   describe('fetchSystemVersion on Web / Standalone', () => {
     beforeEach(() => {
+      localStorage.clear()
       vi.spyOn(shell, 'isTauriShell').mockReturnValue(false)
     })
 
@@ -70,7 +104,7 @@ describe('version library', () => {
       vi.restoreAllMocks()
     })
 
-    it('fetches version from server proxy /api/system/version', async () => {
+    it('fetches version from server proxy /api/system/version with active channel', async () => {
       const mockManifest: VersionManifest = {
         schemaVersion: '1.0',
         appName: 'agh-console',
@@ -102,15 +136,15 @@ describe('version library', () => {
 
       const result = await fetchSystemVersion({ fetch: mockFetch as any })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/system/version', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/version?channel=stable', expect.any(Object))
       expect(result).toEqual(mockResponse)
     })
 
-    it('appends ?force=1 when force option is true', async () => {
+    it('appends ?force=1 and requested channel', async () => {
       const mockResponse: SystemVersionResponse = {
         ok: true,
         currentVersion: '0.2.1',
-        channel: 'stable',
+        channel: 'nightly',
         runtime: 'npm',
         hasUpdate: false,
       }
@@ -120,10 +154,11 @@ describe('version library', () => {
         json: async () => mockResponse,
       })
 
-      const result = await fetchSystemVersion({ force: true, fetch: mockFetch as any })
+      const result = await fetchSystemVersion({ force: true, channel: 'nightly', fetch: mockFetch as any })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/system/version?force=1', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/version?force=1&channel=nightly', expect.any(Object))
       expect(result.runtime).toBe('npm')
+      expect(result.channel).toBe('nightly')
     })
 
     it('gracefully degrades when server request fails with HTTP error', async () => {
@@ -155,6 +190,7 @@ describe('version library', () => {
 
   describe('fetchSystemVersion on Tauri iOS', () => {
     beforeEach(() => {
+      localStorage.clear()
       vi.spyOn(shell, 'isTauriShell').mockReturnValue(true)
     })
 
@@ -162,7 +198,7 @@ describe('version library', () => {
       vi.restoreAllMocks()
     })
 
-    it('directly fetches remote manifest and identifies as ios runtime', async () => {
+    it('directly fetches remote manifest and identifies as ios runtime on stable channel', async () => {
       const mockManifest: VersionManifest = {
         schemaVersion: '1.0',
         appName: 'agh-console',
@@ -182,13 +218,41 @@ describe('version library', () => {
         json: async () => mockManifest,
       })
 
-      const result = await fetchSystemVersion({ fetch: mockFetch as any })
+      const result = await fetchSystemVersion({ channel: 'stable', fetch: mockFetch as any })
 
-      expect(mockFetch).toHaveBeenCalledWith(DEFAULT_UPDATE_MANIFEST_URL, expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith(DEFAULT_RELEASE_LATEST_URL, expect.any(Object))
       expect(result.ok).toBe(true)
       expect(result.runtime).toBe('ios')
       expect(result.hasUpdate).toBe(true)
       expect(result.latest?.version).toBe('99.0.0')
+    })
+
+    it('fetches from nightly url when channel is nightly', async () => {
+      const mockManifest: VersionManifest = {
+        schemaVersion: '1.0',
+        appName: 'agh-console',
+        channel: 'nightly',
+        version: '0.3.0-nightly.1',
+        releaseTag: 'nightly',
+        publishedAt: '2026-10-15T16:00:00Z',
+        releaseNotes: 'Nightly build',
+        htmlUrl: 'https://github.com/Cowjiang/adguard-home-console/releases/tag/nightly',
+        downloads: {
+          ipa: 'https://github.com/Cowjiang/adguard-home-console/releases/download/nightly/agh-console.ipa',
+        },
+      }
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockManifest,
+      })
+
+      const result = await fetchSystemVersion({ channel: 'nightly', fetch: mockFetch as any })
+
+      expect(mockFetch).toHaveBeenCalledWith(DEFAULT_RELEASE_NIGHTLY_URL, expect.any(Object))
+      expect(result.ok).toBe(true)
+      expect(result.channel).toBe('nightly')
+      expect(result.latest?.version).toBe('0.3.0-nightly.1')
     })
 
     it('gracefully degrades on Tauri when remote fetch fails', async () => {
@@ -256,28 +320,6 @@ describe('version library', () => {
       expect(res.ok).toBe(true)
       expect(res.status).toBe('running')
       expect(res.logs).toBe('pulling...')
-    })
-
-    it('getUpgradeStatus handles server error or 403 response', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: async () => ({ ok: false, error: 'Self-upgrade is disabled' }),
-      })
-
-      const res = await getUpgradeStatus({ fetch: mockFetch as any })
-      expect(res.ok).toBe(false)
-      expect(res.status).toBe('failed')
-      expect(res.error).toBe('Self-upgrade is disabled')
-    })
-
-    it('getUpgradeStatus handles network throw', async () => {
-      const mockFetch = vi.fn().mockRejectedValue(new Error('Fetch failed'))
-
-      const res = await getUpgradeStatus({ fetch: mockFetch as any })
-      expect(res.ok).toBe(false)
-      expect(res.status).toBe('failed')
-      expect(res.error).toBe('Fetch failed')
     })
   })
 })

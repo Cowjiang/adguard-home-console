@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../../lib/useIsDesktop'
-import { TOP_LEVEL_ROUTES } from '../../lib/nav/routes'
+import { TOP_LEVEL_ROUTES, isDesktopSettingsTopLevel } from '../../lib/nav/routes'
 import { useRouteTransition, useEnterSkip } from '../../lib/routeTransition'
 import { useNativeBackShown } from '../../lib/native/nativeBackButton'
 import { useNativeHeaderAction, type NativeHeaderSpec } from '../../lib/native/nativeHeaderAction'
@@ -60,8 +60,10 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   const nativeBack = useNativeBackShown()
   const transition = useRouteTransition()
   // Top-level pages (sidebar/TabBar direct) need no back button on desktop;
-  // back belongs to secondary pages only
-  const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname)
+  // back belongs to secondary pages only.
+  // In the desktop split layout, settings sub-pages (except /settings/server/edit)
+  // have top-level semantics where the secondary sidebar handles navigation.
+  const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname) || isDesktopSettingsTopLevel(pathname, isDesktop)
   const showBack = back && !(isDesktop && isTopLevel)
   // Mobile secondary page: back pill + centered title pinned top-left, content
   // scrolls beneath (matches the iOS 26 liquid-glass nav bar)

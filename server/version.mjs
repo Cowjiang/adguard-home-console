@@ -4,8 +4,9 @@
  * Implements GET /api/system/version with:
  * - Runtime environment detection (docker, systemd, npm, standalone)
  * - Self-upgrade capability flag (canSelfUpgrade)
- * - Remote version.json manifest check with 12h in-memory caching
+ * - Remote version.json manifest check with 12h in-memory caching per channel
  * - ?force=1 cache bypass
+ * - ?channel=stable|nightly channel selection
  * - 5-second fetch timeout with AbortSignal.timeout(5000)
  * - Graceful degradation on offline or network failure
  */
@@ -129,7 +130,7 @@ export function isNewerVersion(currentVersion, latestVersion) {
 
 export function resolveUpdateUrl(options = {}, channel = 'stable') {
   if (options.updateUrl) return options.updateUrl;
-  if (process.env.AGH_UPDATE_URL) return process.env.AGH_UPDATE_URL;
+  if (process.env.AGH_UPDATE_URL) return process.env.AGH_UPDATE_URL.replace('{channel}', channel);
   if (channel === 'nightly') {
     return DEFAULT_RELEASE_NIGHTLY_URL;
   }
@@ -146,21 +147,28 @@ export function createVersionHandler(options = {}) {
   const nowFn = options.now ?? Date.now;
   const detectRuntimeFn = options.detectRuntime ?? detectRuntime;
 
-  let cache = { manifest: null, cachedAt: 0 };
+  const cache = {
+    stable: { manifest: null, cachedAt: 0 },
+    nightly: { manifest: null, cachedAt: 0 },
+  };
 
   return async function versionHandler(req, res) {
     const env = options.env || process.env;
     const currentVersion = options.currentVersion || env.APP_VERSION || getPackageVersion();
-    const channel = options.channel || (currentVersion.includes('nightly') ? 'nightly' : 'stable');
+    const queryChannel = req?.query?.channel;
+    const channel = (queryChannel === 'nightly' || queryChannel === 'stable')
+      ? queryChannel
+      : (options.channel || (currentVersion.includes('nightly') ? 'nightly' : 'stable'));
     const runtime = detectRuntimeFn(env, fs);
     const updateUrl = resolveUpdateUrl(options, channel);
     const canSelfUpgrade = Boolean(env.AGH_ENABLE_SELF_UPGRADE === '1' || env.AGH_ENABLE_SELF_UPGRADE === 'true');
 
     const isForce = req?.query?.force === '1' || req?.query?.force === 'true';
-    const isCacheValid = !isForce && cache.manifest && (nowFn() - cache.cachedAt < cacheTtlMs);
+    const channelCache = cache[channel] || { manifest: null, cachedAt: 0 };
+    const isCacheValid = !isForce && channelCache.manifest && (nowFn() - channelCache.cachedAt < cacheTtlMs);
 
     if (isCacheValid) {
-      const hasUpdate = isNewerVersion(currentVersion, cache.manifest.version);
+      const hasUpdate = isNewerVersion(currentVersion, channelCache.manifest.version);
       return res.json({
         ok: true,
         currentVersion,
@@ -168,7 +176,7 @@ export function createVersionHandler(options = {}) {
         runtime,
         canSelfUpgrade,
         hasUpdate,
-        latest: cache.manifest,
+        latest: channelCache.manifest,
       });
     }
 
@@ -183,7 +191,7 @@ export function createVersionHandler(options = {}) {
         throw new Error('Invalid manifest received from upstream');
       }
 
-      cache = { manifest, cachedAt: nowFn() };
+      cache[channel] = { manifest, cachedAt: nowFn() };
       const hasUpdate = isNewerVersion(currentVersion, manifest.version);
       return res.json({
         ok: true,

@@ -109,10 +109,17 @@ const enSettings = {
 
   // App / Console updates
   appVersion: 'App version',
+  updateChannel: 'Update Channel',
+  channelStable: 'Stable',
+  channelNightly: 'Nightly',
+  channelStableDesc: 'Official releases, recommended for daily use',
+  channelNightlyDesc: 'Early access to the latest features and fixes',
+  channelChanged: 'Switched to {{channel}} channel',
   checkAppUpdate: 'Check for Console Updates',
   checkingAppUpdate: 'Checking...',
   appUpToDate: 'Console is up to date',
   appNewVersionAvailable: 'New version {{v}} is available',
+  updateAvailable: 'Update available',
   appUpdateFailed: 'Failed to check updates: {{msg}}',
   appCheckFailed: 'Check failed',
   updateDetails: 'Update Details',
@@ -123,6 +130,10 @@ const enSettings = {
   copied: 'Copied',
   downloadIpa: 'Download IPA',
   openInAltStore: 'Install with AltStore',
+  addAltStoreSource: 'Add AltStore Source',
+  addSideStoreSource: 'Add SideStore Source',
+  copyAltStoreSource: 'Copy Source URL',
+  altStoreSourceDesc: 'Subscribe to this source in AltStore or SideStore for automatic version alerts and background refresh.',
   downloadTarball: 'Download Tarball',
   viewOnGitHub: 'View on GitHub',
 

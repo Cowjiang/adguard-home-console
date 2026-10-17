@@ -10,7 +10,10 @@
 - 深色主题以 `--bg:#060608` 为底，卡片使用实色 `--glass:#121419`；大面积 `backdrop-filter` 会使 iOS 发热，只在小面积导航、弹层等处使用模糊。浅色主题保留玻璃效果。
 - Tab 透镜由 `.tab-lens-track` 承担位移过渡，`.tab-lens` 承担形变；动画幅度见 `src/components/layout/Layout.tsx` 与 `src/index.css`，修改时保持克制。
 - 再点当前 Tab 返回页面顶部；子页回点所属 Tab 会回到根页。顶级页面没有返回按钮；子页必须有返回入口，移动端返回按钮固定在顶部栏。
-- 设置入口分服务器设置与应用设置两组；`/settings/appearance`、`/settings/server`、`/settings/about` 是应用设置子页。
+- 设置页采用双模响应式架构（方案 A）：
+  - 桌面端（≥1024px）：采用内嵌二级侧栏布局（`SettingsNav` 固定粘性吸顶 + 右侧 `<Outlet />` 自适应内容区），访问 `/settings` 自动分流重定向至 `/settings/general`（离线时分流至 `/settings/appearance`）；子页 `PageHeader` 自动隐藏冗余的桌面返回按钮，仅深层表单（如 `/settings/server/edit`）保留桌面返回。
+  - 移动端（<1024px）：保持 100% 原生 Hub-and-Spoke 体验，`/settings` 渲染分类大卡片列表，进入子页时保留浮动毛玻璃返回胶囊与边缘滑动手势返回。
+  - 离线联动：当服务离线（`useAuth().offline`）时，桌面侧栏与移动端 Hub 同步折叠隐藏依赖 AGH 服务的设置项，仅展示控制台与服务器连接项。
 
 ## 弹层与选择器
 

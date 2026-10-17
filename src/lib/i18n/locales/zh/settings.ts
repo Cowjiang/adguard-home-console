@@ -109,10 +109,17 @@ const zhSettings = {
 
   // App / Console updates
   appVersion: '客户端版本',
+  updateChannel: '更新通道',
+  channelStable: '稳定版 (Stable)',
+  channelNightly: '开发版 (Nightly)',
+  channelStableDesc: '官方正式发布，推荐日常使用',
+  channelNightlyDesc: '抢先体验最新特性与实验性改动',
+  channelChanged: '已切换至{{channel}}通道',
   checkAppUpdate: '检查控制台更新',
   checkingAppUpdate: '正在检查更新...',
   appUpToDate: '控制台已是最新版本',
   appNewVersionAvailable: '发现新版本 {{v}}',
+  updateAvailable: '发现新版本',
   appUpdateFailed: '检查更新失败：{{msg}}',
   appCheckFailed: '检查更新失败',
   updateDetails: '更新详情',
@@ -123,6 +130,10 @@ const zhSettings = {
   copied: '已复制',
   downloadIpa: '下载 IPA',
   openInAltStore: '通过 AltStore 安装',
+  addAltStoreSource: '添加 AltStore 订阅源',
+  addSideStoreSource: '添加 SideStore 订阅源',
+  copyAltStoreSource: '复制源地址',
+  altStoreSourceDesc: '在 AltStore 或 SideStore 中订阅此源后，后续新版本即可在手机端收到通知并一键后台更新重签。',
   downloadTarball: '下载安装包',
   viewOnGitHub: '查看 GitHub Release',
 

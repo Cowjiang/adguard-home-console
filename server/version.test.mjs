@@ -6,6 +6,8 @@ import {
   isNewerVersion,
   createVersionHandler,
   CACHE_TTL_MS,
+  DEFAULT_RELEASE_LATEST_URL,
+  DEFAULT_RELEASE_NIGHTLY_URL,
 } from './version.mjs';
 
 function mockReqRes(query = {}) {
@@ -183,6 +185,48 @@ test('versionHandler: caches manifest for 12 hours', async () => {
   await handler(call4.req, call4.res);
   assert.equal(fetchCount, 3);
   assert.equal(call4.response.latest.version, '0.3.3');
+});
+
+test('versionHandler: allows selecting channel via req.query.channel and isolates cache', async () => {
+  const fetchedUrls = [];
+  const mockFetch = async (url) => {
+    fetchedUrls.push(url);
+    const isNightly = url.includes('nightly');
+    return {
+      ok: true,
+      json: async () => ({
+        ...mockManifest,
+        channel: isNightly ? 'nightly' : 'stable',
+        version: isNightly ? '0.3.0-nightly.1' : '0.3.0',
+      }),
+    };
+  };
+
+  const handler = createVersionHandler({
+    currentVersion: '0.2.1',
+    fetch: mockFetch,
+  });
+
+  // 1. Request stable channel
+  const stableCall = mockReqRes({ channel: 'stable' });
+  await handler(stableCall.req, stableCall.res);
+  assert.equal(stableCall.response.channel, 'stable');
+  assert.equal(stableCall.response.latest.version, '0.3.0');
+  assert.equal(fetchedUrls[0], DEFAULT_RELEASE_LATEST_URL);
+
+  // 2. Request nightly channel (should fetch nightly URL and not use stable cache)
+  const nightlyCall = mockReqRes({ channel: 'nightly' });
+  await handler(nightlyCall.req, nightlyCall.res);
+  assert.equal(nightlyCall.response.channel, 'nightly');
+  assert.equal(nightlyCall.response.latest.version, '0.3.0-nightly.1');
+  assert.equal(fetchedUrls[1], DEFAULT_RELEASE_NIGHTLY_URL);
+
+  // 3. Request stable again (should hit stable cache, not fetch again)
+  const stableCall2 = mockReqRes({ channel: 'stable' });
+  await handler(stableCall2.req, stableCall2.res);
+  assert.equal(stableCall2.response.channel, 'stable');
+  assert.equal(stableCall2.response.latest.version, '0.3.0');
+  assert.equal(fetchedUrls.length, 2);
 });
 
 test('versionHandler: error resilience when remote is unreachable', async () => {

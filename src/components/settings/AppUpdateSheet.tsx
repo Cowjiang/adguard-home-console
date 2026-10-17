@@ -142,6 +142,11 @@ export function AppUpdateSheet({
   const altStoreUrl = manifest.downloads?.ipa
     ? `altstore://install?url=${encodeURIComponent(manifest.downloads.ipa)}`
     : undefined
+  const sourceUrl =
+    manifest.downloads?.altstoreSource ||
+    'https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json'
+  const altStoreSourceScheme = `altstore://source?url=${encodeURIComponent(sourceUrl)}`
+  const sideStoreSourceScheme = `sidestore://source?url=${encodeURIComponent(sourceUrl)}`
 
   return (
     <div className="flex flex-col gap-4 text-left">
@@ -326,11 +331,12 @@ export function AppUpdateSheet({
             )}
 
             {runtime === 'ios' && (
-              <div className="flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-black/5 p-3 dark:bg-white/5">
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-black/5 p-3 dark:bg-white/5">
                 <div className="flex items-center gap-1.5 text-[12px] font-medium text-t2">
                   <Smartphone size={14} />
                   <span>iOS Sideload</span>
                 </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {altStoreUrl && (
                     <a
@@ -352,6 +358,52 @@ export function AppUpdateSheet({
                       <span>{t('settings.downloadIpa')}</span>
                     </a>
                   )}
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-xl border border-border/40 bg-card/60 p-2.5">
+                  <div className="text-[11.5px] font-semibold text-t1">
+                    <span>AltStore / SideStore 社区源</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-t3">
+                    {t('settings.altStoreSourceDesc')}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-0.5">
+                    <a
+                      href={altStoreSourceScheme}
+                      className="press flex items-center gap-1.5 rounded-lg bg-accent/15 px-2.5 py-1.5 text-[11.5px] font-semibold text-accent transition-colors hover:bg-accent/25"
+                    >
+                      <Smartphone size={13} />
+                      <span>{t('settings.addAltStoreSource')}</span>
+                    </a>
+                    <a
+                      href={sideStoreSourceScheme}
+                      className="press flex items-center gap-1.5 rounded-lg bg-accent/15 px-2.5 py-1.5 text-[11.5px] font-semibold text-accent transition-colors hover:bg-accent/25"
+                    >
+                      <Smartphone size={13} />
+                      <span>{t('settings.addSideStoreSource')}</span>
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-border/50 bg-black/5 p-2 font-mono text-[11px] text-t1 dark:bg-white/5">
+                    <span className="select-all break-all">{sourceUrl}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('altstore-source', sourceUrl)}
+                      className="press ml-2 flex flex-none items-center gap-1 rounded-md bg-accent/15 px-2 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/25"
+                      title={t('settings.copyAltStoreSource')}
+                    >
+                      {copiedKey === 'altstore-source' ? (
+                        <>
+                          <Check size={12} className="text-ok" />
+                          <span className="text-ok">{t('settings.copied')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={12} />
+                          <span>{t('settings.copyAltStoreSource')}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
