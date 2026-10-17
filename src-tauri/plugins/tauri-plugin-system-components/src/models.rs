@@ -217,6 +217,10 @@ pub enum ComponentAnchor {
 pub struct ComponentProps {
     /// Text: button title, switch/slider accessibility label.
     pub label: Option<String>,
+    /// Spoken label for a control that has no visible text (icon-only button):
+    /// UIKit otherwise announces the SF Symbol's own name, which can be
+    /// misleading (`arrow.up.doc` reads as "Previous Page"). iOS only.
+    pub accessibility_label: Option<String>,
     /// Switch state.
     pub on: Option<bool>,
     /// Slider/progress value (progress is 0..1).

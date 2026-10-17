@@ -289,6 +289,8 @@ export default function Clients() {
                 }}
                 label={t('filters.syncAction')}
                 className="w-11 text-t2 hover:text-accent lg:w-10"
+                // Slot 1: the add button owns the trailing slot here
+                native={{ sfSymbol: 'arrow.triangle.2.circlepath', iconOnly: true, slot: 1 }}
               >
                 <ArrowLeftRight size={17} />
               </HeaderAction>

@@ -1,7 +1,8 @@
 /** Create a manual configuration snapshot of the active instance: label +
  *  optional note, captured through the shared snapshot pipeline. Shared by the
- *  desktop centered sheet and the mobile /settings/snapshots/new sub-page
- *  (mobile shows no floating panels at all, see docs/web-interaction.md). */
+ *  desktop centered sheet and the mobile one: the form is small enough to stay
+ *  a centred panel on both (the browser-style diff/rollback view is what turns
+ *  into a mobile sub-page, see docs/web-interaction.md). */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Camera } from 'lucide-react'

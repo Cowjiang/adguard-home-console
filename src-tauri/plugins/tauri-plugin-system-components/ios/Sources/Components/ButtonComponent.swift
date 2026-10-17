@@ -75,12 +75,14 @@ enum ButtonComponent: ComponentBuilder {
                 config.baseForegroundColor = fg
             }
             let control = UIButton(configuration: config)
+            control.accessibilityLabel = props?.accessibilityLabel
             control.addAction(
                 UIAction { _ in emit(id, "click", nil, nil, nil) }, for: .touchUpInside)
             return control
         } else {
             let control = UIButton(type: .system)
             control.setTitle(props?.label, for: .normal)
+            control.accessibilityLabel = props?.accessibilityLabel
             if let b64 = props?.image, let decoded = ImageUtil.decode(b64) {
                 control.setImage(
                     ImageUtil.icon(decoded, side: 20, circular: props?.circular ?? false),
@@ -120,5 +122,6 @@ enum ButtonComponent: ComponentBuilder {
                     for: .normal)
             }
         }
+        if let a11y = props.accessibilityLabel { button.accessibilityLabel = a11y }
     }
 }

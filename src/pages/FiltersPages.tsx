@@ -145,13 +145,18 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
               }}
               label={t('filters.syncAction')}
               className="w-11 text-t2 hover:text-accent lg:w-10"
+              // Slot 1: the refresh action owns the trailing slot here
+              native={{ sfSymbol: 'arrow.triangle.2.circlepath', iconOnly: true, slot: 1 }}
             >
               <ArrowLeftRight size={17} />
             </HeaderAction>
           )}
           {/* Icon-only on mobile: a text pill here would squeeze the centered
-              title next to the sync action (see PageHeader's measured clamp) */}
-          <HeaderAction onClick={refreshAll} label={t('filters.refresh')} className="w-11 font-semibold text-t1 lg:w-auto lg:px-4" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
+              title next to the sync action (see PageHeader's measured clamp).
+              The native button has to stay icon-only as well — a labelled
+              native pill lays out at its text width and, anchored trailing,
+              covers the sync capsule on its left */}
+          <HeaderAction onClick={refreshAll} label={t('filters.refresh')} className="w-11 font-semibold text-t1 lg:w-auto lg:px-4" native={{ sfSymbol: 'arrow.clockwise', iconOnly: true }}>
             <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} />
             <span className="hidden lg:inline">{t('filters.refresh')}</span>
           </HeaderAction>
@@ -287,7 +292,7 @@ export function RulesPage() {
             }}
             label={t('filters.syncAction')}
             className="w-11 text-accent lg:w-auto lg:px-2.5"
-            native={{ sfSymbol: 'arrow.triangle.2.circlepath', foreground: 'accent' }}
+            native={{ sfSymbol: 'arrow.triangle.2.circlepath', foreground: 'accent', iconOnly: true }}
           >
             <ArrowLeftRight size={17} />
           </HeaderAction>
@@ -568,7 +573,8 @@ export function RewritesPage() {
               }}
               label={t('filters.syncAction')}
               className="w-11 text-t2 hover:text-accent lg:w-auto lg:px-2.5"
-              native={{ sfSymbol: 'arrow.triangle.2.circlepath' }}
+              // Slot 1: the add button owns the trailing slot on this page
+              native={{ sfSymbol: 'arrow.triangle.2.circlepath', iconOnly: true, slot: 1 }}
             >
               <ArrowLeftRight size={17} />
             </HeaderAction>

@@ -185,7 +185,9 @@ export function HeaderAction({ onClick, label, className = '', native, children 
   native?: NativeHeaderSpec
   children: ReactNode
 }) {
-  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), true)
+  // The CSS button's aria-label doubles as the native control's spoken label
+  // (icon-only native buttons would otherwise announce the SF Symbol's name)
+  const nativeHandled = useNativeHeaderAction(native && { a11yLabel: label, ...native }, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), true)
   return (
     <button
       type="button"
@@ -299,8 +301,9 @@ export function Button({
   native?: NativeHeaderSpec
 }) {
   // With size="header" (the header-right slot), the Apple shell hands off to
-  // the native liquid-glass button; the CSS side keeps only a placeholder
-  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
+  // the native liquid-glass button; the CSS side keeps only a placeholder.
+  // `label` (the button's aria-label) becomes the native control's spoken label
+  const nativeHandled = useNativeHeaderAction(native && { a11yLabel: label, ...native }, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
   const base = 'press inline-flex items-center justify-center gap-2 rounded-full font-semibold select-none'
   // header: header-right slot only; mobile matches the back pill height (h-11),
   // desktop matches sm

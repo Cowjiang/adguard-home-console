@@ -187,14 +187,21 @@ export function SnapshotSettings() {
               onClick={() => fileInputRef.current?.click()}
               label={t('settings.snapshotImport')}
               className="w-11 text-t2 hover:text-accent lg:w-10"
+              // Slot 1: the create button owns the trailing slot, so this one
+              // gets its own native component one capsule to the left
+              native={{ sfSymbol: 'arrow.up.doc', iconOnly: true, slot: 1 }}
             >
               <FileUp size={17} />
             </HeaderAction>
             <HeaderAction
               onClick={openCreateSheet}
               label={t('settings.snapshotCreate')}
-              className="w-11 font-semibold text-t1 lg:w-auto lg:px-4"
-              native={{ label: t('settings.snapshotCreate'), foreground: 'accent' }}
+              className="w-11 font-semibold text-accent lg:w-auto lg:px-4"
+              // Icon-only native button: the CSS placeholder is 44pt on mobile,
+              // and a native text pill would grow leftwards over the import
+              // capsule next to it (see .agents/pipelines/proposals/bug-fix/
+              // 2026-10-18-native-header-button-overflow.md)
+              native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
             >
               <Plus size={17} />
               <span className="hidden lg:inline">{t('settings.snapshotCreate')}</span>
@@ -302,10 +309,10 @@ export function SnapshotSettings() {
                     <span className="flex-none">·</span>
                     <span className="truncate">{item.meta.sourceInstance.label}</span>
                   </div>
+                  {/* Index card only: one truncated line, the full note lives
+                      in the detail view (docs/web-interaction.md) */}
                   {item.meta.description && (
-                    <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-t3">
-                      {item.meta.description}
-                    </p>
+                    <p className="mt-1 truncate text-[12px] text-t3">{item.meta.description}</p>
                   )}
                 </div>
                 <ChevronRight size={17} className="flex-none text-t3" />
