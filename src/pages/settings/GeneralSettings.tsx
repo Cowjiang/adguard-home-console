@@ -70,10 +70,8 @@ export function GeneralSettings() {
         dirty ? <Button size="header" loading={saving} onClick={save} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button> : undefined
       } />
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>{t('settings.queryLogGroup')}</GroupTitle>
-          <Group>
+      <GroupTitle>{t('settings.queryLogGroup')}</GroupTitle>
+      <Group>
         <Rows>
           <Row
             title={t('settings.enableQueryLog')}
@@ -127,10 +125,9 @@ export function GeneralSettings() {
           </div>
         </Rows>
       </Group>
-        </div>
-        <div>
-          <GroupTitle>{t('settings.statsGroupTitle')}</GroupTitle>
-          <Group>
+
+      <GroupTitle>{t('settings.statsGroupTitle')}</GroupTitle>
+      <Group>
         <Rows>
           <Row
             title={t('settings.enableStats')}
@@ -179,8 +176,6 @@ export function GeneralSettings() {
           </div>
         </Rows>
       </Group>
-        </div>
-      </div>
 
       <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">
         {t('settings.retentionHint')}
@@ -188,4 +183,3 @@ export function GeneralSettings() {
     </Screen>
   )
 }
-

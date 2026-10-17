@@ -99,9 +99,7 @@ export function DnsSettings() {
         dirty ? <Button size="header" loading={saving} onClick={save} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button> : undefined
       } />
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>{t('advanced.upstreamGroup')}</GroupTitle>
+      <GroupTitle>{t('advanced.upstreamGroup')}</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
             <Field
               label={t('advanced.upstreamsLabel')}
@@ -190,9 +188,8 @@ export function DnsSettings() {
               </div>
             )}
           </Card>
-        </div>
-        <div>
-          <GroupTitle>{t('advanced.serviceGroup')}</GroupTitle>
+
+      <GroupTitle>{t('advanced.serviceGroup')}</GroupTitle>
           <Group>
             <Rows>
               <Row title={t('advanced.ratelimit')} subtitle={t('advanced.ratelimitSub')} right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={d.ratelimit} onChange={(e) => set('ratelimit', Number(e.target.value))} /></div>} />
@@ -260,14 +257,12 @@ export function DnsSettings() {
             </div>
           </Group>
 
-          <GroupTitle>{t('advanced.accessEntry')}</GroupTitle>
-          <Group>
-            <Rows>
-              <Row title={t('advanced.accessEntryRow')} subtitle={t('advanced.accessEntrySub')} onClick={() => nav('/settings/access')} last />
-            </Rows>
-          </Group>
-        </div>
-      </div>
+      <GroupTitle>{t('advanced.accessEntry')}</GroupTitle>
+      <Group>
+        <Rows>
+          <Row title={t('advanced.accessEntryRow')} subtitle={t('advanced.accessEntrySub')} onClick={() => nav('/settings/access')} last />
+        </Rows>
+      </Group>
 
       {dirty && (
         <div className="mt-4 flex gap-2.5">
