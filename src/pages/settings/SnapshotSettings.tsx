@@ -3,25 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  ArrowDownToLine,
-  Clock,
-  Download,
-  FileUp,
-  Layers,
-  Plus,
-  RotateCcw,
-  Trash,
-} from 'lucide-react'
+import { ChevronDown, ChevronRight, Clock, Download, FileUp, Layers, Plus } from 'lucide-react'
 import { Badge, IconBubble, Loading } from '../../components/ui/atoms'
 import { Button, Card, HeaderAction, PageHeader, Screen, Segmented } from '../../components/ui/primitives'
-import { useConfirm, useSheet } from '../../components/ui/sheet'
+import { PickSelect, usePick } from '../../components/ui/menu'
+import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
 import { useAuth } from '../../lib/session/auth'
 import {
-  deleteSnapshot,
   exportClusterBundleJson,
-  exportSnapshotJson,
   listSnapshots,
   parseSnapshotImport,
   saveSnapshot,
@@ -29,6 +19,7 @@ import {
 import type { AghConfigSnapshot, SnapshotTrigger } from '../../lib/snapshot/types'
 import { SnapshotDiffSheet } from '../../components/snapshot/SnapshotDiffSheet'
 import { SnapshotCreateForm } from '../../components/snapshot/SnapshotCreateForm'
+import { isAppleMobile } from '../../lib/native/shell'
 import { useIsDesktop } from '../../lib/useIsDesktop'
 
 export function SnapshotSettings() {
@@ -37,8 +28,9 @@ export function SnapshotSettings() {
   const { t } = useTranslation()
   const nav = useNavigate()
   const sheet = useSheet()
-  const confirm = useConfirm()
+  const pick = usePick()
   const isDesktop = useIsDesktop()
+  const apple = isAppleMobile()
 
   const [snapshots, setSnapshots] = useState<AghConfigSnapshot[]>([])
   const [loading, setLoading] = useState(true)
@@ -78,17 +70,6 @@ export function SnapshotSettings() {
       <SnapshotCreateForm onCreated={refreshSnapshots} onClose={sheet.close} />,
       { title: t('settings.snapshotCreate') }
     )
-  }
-
-  function handleExportSingle(snapshot: AghConfigSnapshot) {
-    const jsonStr = exportSnapshotJson(snapshot)
-    const blob = new Blob([jsonStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `agh-snapshot-${snapshot.meta.sourceInstance.label}-${snapshot.meta.id.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   function handleExportClusterBundle() {
@@ -134,24 +115,6 @@ export function SnapshotSettings() {
     reader.readAsText(file)
   }
 
-  function handleDelete(snapshot: AghConfigSnapshot) {
-    confirm({
-      title: t('settings.snapshotDeleteConfirmTitle'),
-      message: t('settings.snapshotDeleteConfirmMsg'),
-      confirmText: t('common.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        try {
-          await deleteSnapshot(snapshot.meta.id)
-          toast(t('settings.snapshotDeleted'))
-          await refreshSnapshots()
-        } catch (e: any) {
-          toast(t('settings.snapshotDeleteFailed', { msg: e?.message || String(e) }), 'err')
-        }
-      },
-    })
-  }
-
   function openDiffSheet(snapshot: AghConfigSnapshot) {
     if (isDesktop) {
       sheet.open(
@@ -159,6 +122,10 @@ export function SnapshotSettings() {
           snapshot={snapshot}
           onClose={sheet.close}
           onRestored={refreshSnapshots}
+          onDeleted={() => {
+            refreshSnapshots()
+            sheet.close()
+          }}
         />,
         { title: t('settings.snapshotDiffTitle') }
       )
@@ -179,6 +146,24 @@ export function SnapshotSettings() {
       case 'scheduled':
         return <Badge kind="ok">{t('settings.snapshotTriggerScheduled')}</Badge>
     }
+  }
+
+  const filterOptions = [
+    { value: 'all' as const, label: `${t('settings.snapshotFilterAll')} (${snapshots.length})` },
+    { value: 'manual' as const, label: t('settings.snapshotFilterManual') },
+    { value: 'auto' as const, label: t('settings.snapshotFilterAuto') },
+  ]
+  const filterLabel = filterOptions.find((o) => o.value === filterType)?.label ?? ''
+
+  function pickFilter(e: React.MouseEvent<HTMLButtonElement>) {
+    pick({
+      title: t('settings.snapshotsTitle'),
+      anchor: e.currentTarget,
+      align: 'left',
+      value: filterType,
+      options: filterOptions,
+      onPick: setFilterType,
+    })
   }
 
   return (
@@ -217,19 +202,39 @@ export function SnapshotSettings() {
         className="hidden"
       />
 
-      {/* Filter tabs + cluster bundle export */}
+      {/* Filter by category: dropdown on mobile (same picker idiom as the
+          other pages), segmented control on desktop */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <Segmented
-          size="sm"
-          fit
-          value={filterType}
-          onChange={setFilterType}
-          options={[
-            { value: 'all', label: `${t('settings.snapshotFilterAll')} (${snapshots.length})` },
-            { value: 'manual', label: t('settings.snapshotFilterManual') },
-            { value: 'auto', label: t('settings.snapshotFilterAuto') },
-          ]}
-        />
+        {isDesktop ? (
+          <Segmented
+            size="sm"
+            fit
+            value={filterType}
+            onChange={setFilterType}
+            options={filterOptions}
+          />
+        ) : apple ? (
+          <span className="press glass relative flex flex-none items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-t1">
+            {filterLabel}
+            <ChevronDown size={14} className="pointer-events-none text-t3" />
+            <PickSelect
+              ariaLabel={t('settings.snapshotsTitle')}
+              className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-transparent"
+              value={filterType}
+              options={filterOptions}
+              onPick={setFilterType}
+            />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={pickFilter}
+            className="press glass flex flex-none items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-t1"
+          >
+            {filterLabel}
+            <ChevronDown size={14} className="text-t3" />
+          </button>
+        )}
         {snapshots.length > 0 && (
           <Button variant="glass" size="sm" onClick={handleExportClusterBundle}>
             <Download size={13} /> {t('settings.snapshotExportBundle')}
@@ -268,9 +273,12 @@ export function SnapshotSettings() {
       ) : (
         <div className="flex flex-col gap-3">
           {filteredSnapshots.map((item) => (
-            <Card key={item.meta.id} className="flex flex-col gap-2.5 p-4">
-              {/* Header: label + trigger badge, actions on the right */}
-              <div className="flex items-start justify-between gap-2">
+            <Card key={item.meta.id} className="p-0">
+              <button
+                type="button"
+                onClick={() => openDiffSheet(item)}
+                className="press flex w-full items-start justify-between gap-2 p-4 text-left"
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[15px] font-bold text-t1">{item.meta.label}</span>
@@ -284,69 +292,14 @@ export function SnapshotSettings() {
                     <span className="flex-none">·</span>
                     <span className="truncate">{item.meta.sourceInstance.label}</span>
                   </div>
+                  {item.meta.description && (
+                    <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-t3">
+                      {item.meta.description}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-none items-center gap-2">
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    label={t('settings.snapshotExportJson')}
-                    className="!h-9 !w-9 !rounded-[10px] !px-0"
-                    onClick={() => handleExportSingle(item)}
-                  >
-                    <ArrowDownToLine size={16} />
-                  </Button>
-                  <button
-                    type="button"
-                    aria-label={t('common.delete')}
-                    onClick={() => handleDelete(item)}
-                    className="press flex h-9 w-9 flex-none items-center justify-center rounded-[10px]"
-                    style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
-                  >
-                    <Trash size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Read-only note: a quote rule, not an input-like well */}
-              {item.meta.description && (
-                <p
-                  className="border-l-2 pl-3 text-[12.5px] leading-relaxed text-t2"
-                  style={{ borderColor: 'var(--glass-border-strong)' }}
-                >
-                  {item.meta.description}
-                </p>
-              )}
-
-              {/* Modules + compare/restore */}
-              <div
-                className="flex flex-wrap items-center justify-between gap-2 pt-2"
-                style={{ borderTop: '1px solid var(--glass-border)' }}
-              >
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {item.meta.modules.map((m) => (
-                    <span
-                      key={m}
-                      className="rounded-full px-2 py-0.5 font-mono text-[10.5px] uppercase"
-                      style={{
-                        background: 'var(--glass)',
-                        border: '1px solid var(--glass-border)',
-                        color: 'var(--t2)',
-                      }}
-                    >
-                      {m}
-                    </span>
-                  ))}
-                </div>
-                <Button
-                  variant="glass"
-                  size="sm"
-                  className="ml-auto"
-                  onClick={() => openDiffSheet(item)}
-                >
-                  <RotateCcw size={14} />
-                  {t('settings.snapshotCompareRestore')}
-                </Button>
-              </div>
+                <ChevronRight size={17} className="mt-0.5 flex-none text-t3" />
+              </button>
             </Card>
           ))}
         </div>

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  ArrowDownToLine,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -13,11 +14,13 @@ import {
   Layers,
   RotateCcw,
   ShieldAlert,
+  Trash,
 } from 'lucide-react'
 import { useAuth, mutateInstanceData } from '../../lib/session/auth'
 import { captureInstanceSnapshot } from '../../lib/snapshot/snapshotCapture'
 import { computeSnapshotDiff } from '../../lib/snapshot/snapshotDiff'
 import { restoreSnapshot, validateSnapshot } from '../../lib/snapshot/snapshotRestore'
+import { deleteSnapshot, exportSnapshotJson } from '../../lib/snapshot/snapshotStorage'
 import type {
   AghConfigSnapshot,
   DiffItem,
@@ -51,11 +54,14 @@ function diffKindMeta(type: DiffItem['type']): {
 export function SnapshotDiff({
   snapshot,
   onDone,
+  onDeleted,
   onClose,
 }: {
   snapshot: AghConfigSnapshot
   /** Successful restore landing: sheet closes / mobile page returns to the list */
   onDone?: () => void
+  /** Snapshot removed: sheet closes / mobile page returns to the list */
+  onDeleted?: () => void
   onClose: () => void
 }) {
   const { cfg, activeId, status, instances } = useAuth()
@@ -202,32 +208,81 @@ export function SnapshotDiff({
     })
   }
 
+  function handleExport() {
+    const blob = new Blob([exportSnapshotJson(snapshot)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `agh-snapshot-${snapshot.meta.sourceInstance.label}-${snapshot.meta.id.slice(0, 8)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleDelete() {
+    confirm({
+      title: t('settings.snapshotDeleteConfirmTitle'),
+      message: t('settings.snapshotDeleteConfirmMsg'),
+      confirmText: t('common.delete'),
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteSnapshot(snapshot.meta.id)
+          toast(t('settings.snapshotDeleted'))
+          onDeleted?.()
+        } catch (e: any) {
+          toast(t('settings.snapshotDeleteFailed', { msg: e?.message || String(e) }), 'err')
+        }
+      },
+    })
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Header Info */}
       <div className="border-b border-[var(--glass-border)] pb-3">
-        <div className="flex items-center gap-2">
-          <Layers size={18} style={{ color: 'var(--accent)' }} className="flex-none" />
-          <h2 className="text-[17px] font-bold text-t1">{snapshot.meta.label}</h2>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Layers size={18} style={{ color: 'var(--accent)' }} className="flex-none" />
+              <h2 className="truncate text-[17px] font-bold text-t1">{snapshot.meta.label}</h2>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-t3">
+              <span className="flex items-center gap-1">
+                <Clock size={13} />
+                {new Date(snapshot.meta.createdAt).toLocaleString()}
+              </span>
+              <span>·</span>
+              <span>{snapshot.meta.sourceInstance.label}</span>
+              <span>·</span>
+              <Badge kind="info">{snapshot.meta.sourceInstance.aghVersion}</Badge>
+            </div>
+            {snapshot.meta.description && (
+              <p className="mt-2 text-[12.5px] leading-relaxed text-t2">
+                {snapshot.meta.description}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-none items-center gap-2">
+            <Button
+              variant="glass"
+              size="sm"
+              label={t('settings.snapshotExportJson')}
+              className="!h-9 !w-9 !rounded-[10px] !px-0"
+              onClick={handleExport}
+            >
+              <ArrowDownToLine size={16} />
+            </Button>
+            <button
+              type="button"
+              aria-label={t('common.delete')}
+              onClick={handleDelete}
+              className="press flex h-9 w-9 flex-none items-center justify-center rounded-[10px]"
+              style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+            >
+              <Trash size={16} />
+            </button>
+          </div>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-t3">
-          <span className="flex items-center gap-1">
-            <Clock size={13} />
-            {new Date(snapshot.meta.createdAt).toLocaleString()}
-          </span>
-          <span>·</span>
-          <span>{snapshot.meta.sourceInstance.label}</span>
-          <span>·</span>
-          <Badge kind="info">{snapshot.meta.sourceInstance.aghVersion}</Badge>
-        </div>
-        {snapshot.meta.description && (
-          <p
-            className="mt-2 border-l-2 pl-3 text-[12.5px] leading-relaxed text-t2"
-            style={{ borderColor: 'var(--glass-border-strong)' }}
-          >
-            {snapshot.meta.description}
-          </p>
-        )}
       </div>
 
       {/* Tampering Warning */}

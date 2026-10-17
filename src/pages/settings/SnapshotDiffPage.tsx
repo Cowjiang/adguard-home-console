@@ -55,9 +55,10 @@ export function SnapshotDiffPage() {
         <SnapshotDiff
           snapshot={snapshot}
           onClose={() => navBack(nav, pathname)}
-          // Restore lands on the snapshots list (the confirm page sits on top
-          // of this route, so pop once would just reveal this page again)
-          onDone={() => nav('/settings/snapshots', { replace: true })}
+          // Restore / delete land back on the snapshots list (the confirm is a
+          // small sheet on top of this page; the list refreshes on mount)
+          onDone={() => navBack(nav, pathname)}
+          onDeleted={() => navBack(nav, pathname)}
         />
       )}
     </Screen>

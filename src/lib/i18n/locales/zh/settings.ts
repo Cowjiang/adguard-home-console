@@ -150,7 +150,7 @@ const zhSettings = {
   snapshotsDesc: '管理当前实例的配置快照，并在需要时安全比对与回退。',
   snapshotCreate: '创建快照',
   snapshotImport: '导入快照',
-  snapshotExportBundle: '导出集群包',
+  snapshotExportBundle: '导出',
   snapshotFilterAll: '全部',
   snapshotFilterManual: '手动快照',
   snapshotFilterAuto: '自动备份',

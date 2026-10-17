@@ -150,7 +150,7 @@ const enSettings = {
   snapshotsDesc: 'Manage configuration snapshots for your instances, inspect diffs, and safely roll back.',
   snapshotCreate: 'Create Snapshot',
   snapshotImport: 'Import Snapshot',
-  snapshotExportBundle: 'Export Cluster Bundle',
+  snapshotExportBundle: 'Export',
   snapshotFilterAll: 'All',
   snapshotFilterManual: 'Manual',
   snapshotFilterAuto: 'Auto Backups',
