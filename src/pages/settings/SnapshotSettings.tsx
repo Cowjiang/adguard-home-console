@@ -277,7 +277,7 @@ export function SnapshotSettings() {
               <button
                 type="button"
                 onClick={() => openDiffSheet(item)}
-                className="press flex w-full items-start justify-between gap-2 p-4 text-left"
+                className="press flex w-full items-center justify-between gap-2 p-4 text-left"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -298,7 +298,7 @@ export function SnapshotSettings() {
                     </p>
                   )}
                 </div>
-                <ChevronRight size={17} className="mt-0.5 flex-none text-t3" />
+                <ChevronRight size={17} className="flex-none text-t3" />
               </button>
             </Card>
           ))}
