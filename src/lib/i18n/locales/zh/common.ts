@@ -23,6 +23,8 @@ const zhCommon = {
   loading: '加载中…',
   noData: '暂无数据',
   back: '返回',
+  close: '关闭',
+  unknown: '未知错误',
   clear: '清空',
   searchPlaceholder: '搜索',
   content: '内容',

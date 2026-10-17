@@ -3,6 +3,11 @@
 | 2026-10-15 | feature | [多渠道分发的检查更新与自动更新路线图](proposals/feature/2026-10-15-update-check-and-distribution-roadmap.md) | proposed |
 | 2026-10-15 | feature | [统一版本清单（Manifest）与应用内检查更新闭环](proposals/feature/2026-10-15-update-check-manifest-and-ui.md) | implemented |
 | 2026-10-15 | feature | [支持 CLI 启动更新提示与服务端自升级闭环](proposals/feature/2026-10-15-cli-update-and-self-upgrade.md) | implemented |
+| 2026-10-17 | feature | [实例列表改为「点按切换 + 管理模式下编辑删除」](proposals/feature/2026-10-17-instance-list-manage-mode.md) | implemented |
+| 2026-10-17 | bug-fix | [移动端查询日志透视分析改子页并补回丢失的浮层形态约定](proposals/bug-fix/2026-10-17-mobile-log-analytics-subpage.md) | implemented |
+| 2026-10-17 | bug-fix | [把多实例聚合展示从 dev 撤下、保留在分支](proposals/bug-fix/2026-10-17-withdraw-multi-instance-aggregation.md) | implemented |
+| 2026-10-17 | bug-fix | [修掉同期批次（快照/更新/测速/同步/透视）页面的设计体系失配](proposals/bug-fix/2026-10-17-batch-ui-design-conformance.md) | implemented |
+| 2026-10-17 | bug-fix | [按「小面板可浮窗、超过半屏走子页」校准移动端面板形态](proposals/bug-fix/2026-10-17-mobile-content-sheets-to-subpages.md) | implemented |
 
 ## 与 docs/ 的分工
 

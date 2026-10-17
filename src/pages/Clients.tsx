@@ -24,7 +24,7 @@ import { useSheet, useConfirm } from '../components/ui/sheet'
 import { runMutation } from '../lib/mutation'
 import { Loading, EmptyState, SearchBar, Badge, SourceBadge, Pagination } from '../components/ui/atoms'
 import { usePick, PickSelect } from '../components/ui/menu'
-import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { SyncForm } from '../components/protection/SyncForm'
 import { syncClientsToInstances } from '../lib/session/rulesSync'
 
 
@@ -273,13 +273,18 @@ export default function Clients() {
             {instances.length > 1 && (
               <HeaderAction
                 onClick={() => {
+                  if (!isDesktop) {
+                    nav('/sync/clients')
+                    return
+                  }
                   sheet.open(
-                    <SyncSheetContent
+                    <SyncForm
                       itemCount={clients.length}
                       itemTypeLabel={t('clients.title')}
                       onSync={(targets) => syncClientsToInstances(targets, clients)}
                       onClose={() => sheet.close()}
-                    />
+                    />,
+                    { title: t('filters.syncModalTitle') }
                   )
                 }}
                 label={t('filters.syncAction')}

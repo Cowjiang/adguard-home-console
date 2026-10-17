@@ -1,5 +1,6 @@
 /** About: app info, compatibility, and version updates */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Info, Network, RotateCw, ChevronRight, GitBranch } from 'lucide-react'
 import { IconBubble, Badge, Spinner } from '../../components/ui/atoms'
@@ -8,6 +9,7 @@ import { usePick, PickSelect } from '../../components/ui/menu'
 import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
 import { isAppleMobile } from '../../lib/native/shell'
+import { useIsDesktop } from '../../lib/useIsDesktop'
 import { APP_NAME, APP_VERSION } from '../../lib/constants'
 import {
   fetchSystemVersion,
@@ -22,9 +24,11 @@ import { AppUpdateSheet } from '../../components/settings/AppUpdateSheet'
 
 export function AboutSettings() {
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const pick = usePick()
   const apple = isAppleMobile()
+  const isDesktop = useIsDesktop()
   const [checking, setChecking] = useState(false)
   const [versionData, setVersionData] = useState<SystemVersionResponse | null>(null)
   const [channel, setChannel] = useState<UpdateChannel>(getStoredUpdateChannel)
@@ -36,16 +40,21 @@ export function AboutSettings() {
 
   function openUpdateSheet(data: SystemVersionResponse) {
     if (!data.latest) return
-    sheet.open(
-      <AppUpdateSheet
-        manifest={data.latest}
-        runtime={data.runtime}
-        currentVersion={data.currentVersion}
-        canSelfUpgrade={data.canSelfUpgrade}
-        onClose={sheet.close}
-      />,
-      { title: t('settings.updateDetails') }
-    )
+    if (isDesktop) {
+      sheet.open(
+        <AppUpdateSheet
+          manifest={data.latest}
+          runtime={data.runtime}
+          currentVersion={data.currentVersion}
+          canSelfUpgrade={data.canSelfUpgrade}
+          onClose={sheet.close}
+        />,
+        { title: t('settings.updateDetails') }
+      )
+    } else {
+      // Release notes & instructions are browsing content: a sub-page on mobile
+      nav('/settings/about/update', { state: { data } })
+    }
   }
 
   async function handleCheckUpdate(force = false, targetChannel: UpdateChannel = channel) {

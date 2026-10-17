@@ -1,5 +1,6 @@
 /** Filter management: blacklist/whitelist filters, custom rules, blocked services */
 import { useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Trans, useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
@@ -17,8 +18,9 @@ import { IconBubble } from '../components/ui/atoms'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 import { runMutation } from '../lib/mutation'
-import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { SyncForm } from '../components/protection/SyncForm'
 import { syncUserRulesToInstances, syncRewritesToInstances, syncFilterListsToInstances } from '../lib/session/rulesSync'
+import { useIsDesktop } from '../lib/useIsDesktop'
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -29,9 +31,11 @@ const HOUR_MS = 3_600_000
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const pick = usePick()
   const confirm = useConfirm()
+  const isDesktop = useIsDesktop()
   const [refreshing, setRefreshing] = useState(false)
 
   const { data, mutate, isLoading } = useSWR<FilteringStatus>(
@@ -119,8 +123,12 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
           {instances.length > 1 && (
             <HeaderAction
               onClick={() => {
+                if (!isDesktop) {
+                  nav(whitelist ? '/sync/allowlist' : '/sync/filters')
+                  return
+                }
                 sheet.open(
-                  <SyncSheetContent
+                  <SyncForm
                     itemCount={filters.length}
                     itemTypeLabel={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')}
                     onSync={(targets) =>
@@ -131,7 +139,8 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
                       )
                     }
                     onClose={() => sheet.close()}
-                  />
+                  />,
+                  { title: t('filters.syncModalTitle') }
                 )
               }}
               label={t('filters.syncAction')}
@@ -140,8 +149,11 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
               <ArrowLeftRight size={17} />
             </HeaderAction>
           )}
-          <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
+          {/* Icon-only on mobile: a text pill here would squeeze the centered
+              title next to the sync action (see PageHeader's measured clamp) */}
+          <HeaderAction onClick={refreshAll} label={t('filters.refresh')} className="w-11 font-semibold text-t1 lg:w-auto lg:px-4" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
+            <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} />
+            <span className="hidden lg:inline">{t('filters.refresh')}</span>
           </HeaderAction>
         </div>
       } />
@@ -226,7 +238,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 export function RulesPage() {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
+  const isDesktop = useIsDesktop()
   const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -256,14 +270,19 @@ export function RulesPage() {
         instances.length > 1 ? (
           <HeaderAction
             onClick={() => {
+              if (!isDesktop) {
+                nav('/sync/rules')
+                return
+              }
               const currentRules = (draft ?? (data?.user_rules ?? []).join('\n')).split('\n').map((s) => s.trim()).filter(Boolean)
               sheet.open(
-                <SyncSheetContent
+                <SyncForm
                   itemCount={currentRules.length}
                   itemTypeLabel={t('protection.customRulesRow')}
                   onSync={(targets) => syncUserRulesToInstances(targets, currentRules)}
                   onClose={() => sheet.close()}
-                />
+                />,
+                { title: t('filters.syncModalTitle') }
               )
             }}
             label={t('filters.syncAction')}
@@ -468,8 +487,10 @@ export function ServicesPage() {
 export function RewritesPage() {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const confirm = useConfirm()
+  const isDesktop = useIsDesktop()
   const { data: entries, mutate } = useSWR<any[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
   const { data: settings, mutate: mSettings } = useSWR<any>(cfg ? ['rws', cfg, '/rewrite/settings'] : null, swrFetcher)
 
@@ -530,14 +551,19 @@ export function RewritesPage() {
           {instances.length > 1 && (
             <HeaderAction
               onClick={() => {
+                if (!isDesktop) {
+                  nav('/sync/rewrites')
+                  return
+                }
                 const list = entries ?? []
                 sheet.open(
-                  <SyncSheetContent
+                  <SyncForm
                     itemCount={list.length}
                     itemTypeLabel={t('protection.rewritesRow')}
                     onSync={(targets) => syncRewritesToInstances(targets, list)}
                     onClose={() => sheet.close()}
-                  />
+                  />,
+                  { title: t('filters.syncModalTitle') }
                 )
               }}
               label={t('filters.syncAction')}

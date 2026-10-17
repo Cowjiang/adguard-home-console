@@ -14,23 +14,28 @@ export function InstanceSwitchList({ onClose, onManage }: { onClose: () => void;
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-1">
-      {instances.map((it) => (
-        <button
-          key={it.id}
-          className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left active:bg-white/5"
-          onClick={() => {
-            switchInstance(it.id)
-            onClose()
-          }}
-        >
-          <StatusDot online={it.online} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-semibold text-t1">{it.label}</span>
-            <span className="num block truncate text-[12px] text-t3">{it.url}</span>
-          </span>
-          {it.id === activeId && <Check size={17} className="flex-none text-accent" />}
-        </button>
-      ))}
+      {/* Keep the sheet a small panel: the list scrolls once it approaches
+          half the screen (mobile floating panels must stay small, see
+          docs/web-interaction.md) */}
+      <div className="flex max-h-[45vh] flex-col gap-1 overflow-y-auto">
+        {instances.map((it) => (
+          <button
+            key={it.id}
+            className="flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left active:bg-white/5"
+            onClick={() => {
+              switchInstance(it.id)
+              onClose()
+            }}
+          >
+            <StatusDot online={it.online} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold text-t1">{it.label}</span>
+              <span className="num block truncate text-[12px] text-t3">{it.url}</span>
+            </span>
+            {it.id === activeId && <Check size={17} className="flex-none text-accent" />}
+          </button>
+        ))}
+      </div>
       <Button
         variant="glass"
         className="mt-2 w-full"

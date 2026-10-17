@@ -16,6 +16,8 @@ import LogDetailPage from './pages/LogDetailPage'
 import LogAnalyticsPage from './pages/LogAnalyticsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
 import ClientFormPage from './pages/ClientFormPage'
+import { SyncPage } from './pages/SyncPage'
+import { SafeSearchPage } from './pages/SafeSearchPage'
 import Protection from './pages/Protection'
 import Clients from './pages/Clients'
 import SettingsLayout, { SettingsIndexRoute } from './components/settings/SettingsLayout'
@@ -25,9 +27,12 @@ import { AppearanceSettings } from './pages/settings/AppearanceSettings'
 import { ServerSettings } from './pages/settings/InstanceList'
 import { InstanceEdit } from './pages/settings/InstanceEdit'
 import { AboutSettings } from './pages/settings/AboutSettings'
+import { UpdatePage } from './pages/settings/UpdatePage'
 import { SnapshotSettings } from './pages/settings/SnapshotSettings'
+import { SnapshotDiffPage } from './pages/settings/SnapshotDiffPage'
 import { FiltersPage, RulesPage, ServicesPage, RewritesPage, CheckHostPage } from './pages/FiltersPages'
 import { DnsSettings } from './pages/settings/DnsSettings'
+import { DnsBenchmarkPage } from './pages/settings/DnsBenchmarkPage'
 import { AccessSettings } from './pages/settings/AccessSettings'
 import { EncryptionSettings } from './pages/settings/EncryptionSettings'
 import { DhcpSettings } from './pages/settings/DhcpSettings'
@@ -84,6 +89,8 @@ function DebugAutoLogin() {
   return null
 }
 
+/** Bridges the Router's navigate into the confirm-intent module (mobile
+ *  confirmations render on /confirm instead of a floating dialog) */
 /** SWR global config: refreshWhenOffline keeps polling from being stalled by
  *  the internal online flag. SWR doesn't read navigator.onLine, only the
  *  offline/online window events; in iOS WKWebView/PWA those events can be
@@ -113,7 +120,9 @@ export default function App() {
                 <Route path="/logs" element={<QueryLog />} />
                 <Route path="/logs/detail" element={<LogDetailPage />} />
                 <Route path="/logs/analytics" element={<LogAnalyticsPage />} />
+                <Route path="/sync/:type" element={<SyncPage />} />
                 <Route path="/protection" element={<Protection />} />
+                <Route path="/protection/safesearch" element={<SafeSearchPage />} />
                 <Route path="/protection/filters" element={<FiltersPage whitelist={false} />} />
                 <Route path="/protection/allowlist" element={<FiltersPage whitelist />} />
                 <Route path="/protection/rules" element={<RulesPage />} />
@@ -127,15 +136,18 @@ export default function App() {
                   <Route index element={<SettingsIndexRoute />} />
                   <Route path="general" element={<GeneralSettings />} />
                   <Route path="dns" element={<DnsSettings />} />
+                  <Route path="dns/benchmark" element={<DnsBenchmarkPage />} />
                   <Route path="access" element={<AccessSettings />} />
                   <Route path="encryption" element={<EncryptionSettings />} />
                   <Route path="dhcp" element={<DhcpSettings />} />
                   <Route path="system" element={<SystemPage />} />
                   <Route path="snapshots" element={<SnapshotSettings />} />
+                  <Route path="snapshots/diff" element={<SnapshotDiffPage />} />
                   <Route path="appearance" element={<AppearanceSettings />} />
                   <Route path="server" element={<ServerSettings />} />
                   <Route path="server/edit" element={<InstanceEdit />} />
                   <Route path="about" element={<AboutSettings />} />
+                  <Route path="about/update" element={<UpdatePage />} />
                   <Route path="app" element={<Navigate to="/settings" replace />} />
                 </Route>
               </Route>

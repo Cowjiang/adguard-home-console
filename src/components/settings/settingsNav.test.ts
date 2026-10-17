@@ -19,6 +19,9 @@ describe('Settings desktop navigation semantics', () => {
     expect(isDesktopSettingsTopLevel('/settings/server', true)).toBe(true)
     expect(isDesktopSettingsTopLevel('/settings/about', true)).toBe(true)
     expect(isDesktopSettingsTopLevel('/settings/server/edit', true)).toBe(false)
+    expect(isDesktopSettingsTopLevel('/settings/snapshots/diff', true)).toBe(false)
+    expect(isDesktopSettingsTopLevel('/settings/dns/benchmark', true)).toBe(false)
+    expect(isDesktopSettingsTopLevel('/settings/about/update', true)).toBe(false)
 
     // False on mobile
     expect(isDesktopSettingsTopLevel('/settings/general', false)).toBe(false)
@@ -45,6 +48,9 @@ describe('Settings desktop navigation semantics', () => {
 
   it('preserves back button on desktop for deep sub-pages like /settings/server/edit', () => {
     expect(shouldShowBack('/settings/server/edit', true)).toBe(true)
+    expect(shouldShowBack('/settings/snapshots/diff', true)).toBe(true)
+    expect(shouldShowBack('/settings/dns/benchmark', true)).toBe(true)
+    expect(shouldShowBack('/settings/about/update', true)).toBe(true)
   })
 
   it('preserves floating back button on mobile (< lg) for all sub-pages', () => {
@@ -63,6 +69,11 @@ describe('Settings desktop navigation semantics', () => {
     expect(isSettingsNavActive('/settings/server', '/settings/server/edit')).toBe(true)
     expect(isSettingsNavActive('/settings/server', '/settings/server/edit?id=1')).toBe(true)
     expect(isSettingsNavActive('/settings/server', '/settings/general')).toBe(false)
+    // Pushed sub-pages light up their parent nav item
+    expect(isSettingsNavActive('/settings/dns', '/settings/dns/benchmark')).toBe(true)
+    expect(isSettingsNavActive('/settings/snapshots', '/settings/snapshots/diff')).toBe(true)
+    expect(isSettingsNavActive('/settings/about', '/settings/about/update')).toBe(true)
+    expect(isSettingsNavActive('/settings/dns', '/settings/dnsx')).toBe(false)
   })
 
   it('navBack replaces to immediate parent when history stack is empty', () => {

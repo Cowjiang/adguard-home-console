@@ -17,6 +17,7 @@ import { Badge } from '../components/ui/atoms'
 import { useSheet } from '../components/ui/sheet'
 import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
+import { useIsDesktop } from '../lib/useIsDesktop'
 import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
 import { runMutation } from '../lib/mutation'
 
@@ -32,6 +33,7 @@ export default function Protection() {
   const { cfg } = useAuth()
   const sheet = useSheet()
   const pick = usePick()
+  const isDesktop = useIsDesktop()
   const [refreshing, setRefreshing] = useState(false)
   const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
@@ -113,6 +115,11 @@ export default function Protection() {
 
   function openSafeSearchSheet() {
     if (!sb) return
+    // Mobile: no floating panels — the switches live on a sub-page
+    if (!isDesktop) {
+      nav('/protection/safesearch')
+      return
+    }
     const engines: Record<string, boolean> = {}
     for (const e of SAFE_ENGINES) engines[e.key] = !!sb[e.key]
     let enabled = !!sb.enabled

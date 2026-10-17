@@ -24,6 +24,8 @@ const enCommon = {
   loading: 'Loading…',
   noData: 'No data yet',
   back: 'Back',
+  close: 'Close',
+  unknown: 'Unknown error',
   clear: 'Clear',
   searchPlaceholder: 'Search',
   content: 'content',

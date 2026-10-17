@@ -1,7 +1,7 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-10-17（路由与页面表补 `/logs/analytics`，子页/弹层形态规则对齐交互页）
+**Updated:** 2026-10-17（路由表补移动端大面板子页：日志透视、快照比对、测速、更新、同步、安全搜索；小表单/确认仍为浮层）
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
@@ -16,9 +16,9 @@
 ## 路由
 
 - `/login` 公开（首启引导，无实例时才可见）；其余路由挂在 `<Protected><Layout/></Protected>` 下，未配置任何实例时重定向登录页。
-- 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/logs/analytics`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及十个子页（实例列表 `/settings/server` 与编辑页 `/settings/server/edit`）；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
-- 顶级路由白名单在 `src/lib/nav/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
-- 移动端的「浏览信息」型内容（日志详情、日志透视分析、客户端详情）与客户端表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。浮层只承载确认 / 表单 / 选择类，其他设置页表单仍走弹层，形态规则见 `docs/web-interaction.md`。
+- 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/logs/analytics`、`/protection` 及其子页（含 `/protection/safesearch`）、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/sync/:type`、`/settings` 及十个子页（实例列表 `/settings/server` 与编辑页 `/settings/server/edit`），以及设置内大面板详情子页（快照比对 `/settings/snapshots/diff?id=`、上游测速 `/settings/dns/benchmark`、更新详情 `/settings/about/update`）；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
+- 顶级路由白名单在 `src/lib/nav/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。设置内被 push 的详情子页（`/settings/server/edit`、快照比对、测速、更新详情）在桌面分栏下保留返回语义并点亮父级导航项，其余设置子页由二级侧栏承担导航。
+- **移动端浮层只用于小面板**（自然高度 ≲50% 屏）：确认框、少量字段的表单、实例切换；超过半屏的内容/表单/列表走子页（状态经 `location.state`、`?id=` 或一次性 handoff 传递：`src/lib/log/drillIntent.ts`、`src/lib/dns/benchmarkIntent.ts`），桌面端同一入口渲染居中弹层。缺少 `location.state` 时渲染空态。
 
 ## 多实例会话与配置
 

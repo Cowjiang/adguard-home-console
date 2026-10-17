@@ -34,7 +34,7 @@ export function QueryLogAnalyticsSheet({
         <button
           onClick={onClose}
           className="press glass flex h-7 w-7 items-center justify-center rounded-full text-t3 transition-colors hover:text-t1"
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <X size={15} />
         </button>

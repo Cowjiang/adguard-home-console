@@ -1,7 +1,7 @@
 /** Floating status pill (mobile tab root pages only: secondary pages are headed by the fixed
  *  nav bar, see docs/web-interaction.md). Fades out during pull-to-refresh: the refresh
  *  whitespace band is where the indicator sits, the pill would overlap the circle.
- *  Tapping it opens the instance switcher sheet */
+ *  Tapping it opens the (small) instance switcher sheet */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/session/auth'

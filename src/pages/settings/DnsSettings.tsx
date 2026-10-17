@@ -1,5 +1,5 @@
 /** DNS settings: upstreams, bootstrap, protection mode, cache */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
@@ -13,7 +13,9 @@ import { fmtBytes } from '../../lib/format'
 import { runMutation } from '../../lib/mutation'
 import { useDraftForm } from '../../lib/useDraftForm'
 import { useSheet } from '../../components/ui/sheet'
-import { UpstreamBenchmarkSheet } from '../../components/dns/UpstreamBenchmarkSheet'
+import { UpstreamBenchmark } from '../../components/dns/UpstreamBenchmark'
+import { consumeBenchmarkApply, peekBenchmarkApply } from '../../lib/dns/benchmarkIntent'
+import { useIsDesktop } from '../../lib/useIsDesktop'
 import { Field } from './Field'
 /* ================= DNS settings ================= */
 
@@ -22,6 +24,7 @@ export function DnsSettings() {
   const { t } = useTranslation()
   const nav = useNavigate()
   const sheet = useSheet()
+  const isDesktop = useIsDesktop()
   const { data, mutate, isLoading } = useSWR<DnsInfo>(cfg ? ['dns', cfg, '/dns_info'] : null, swrFetcher)
   const [saving, setSaving] = useState(false)
   const [testResult, setTestResult] = useState<Record<string, string> | null | undefined>(undefined)
@@ -30,6 +33,17 @@ export function DnsSettings() {
   const d = form.draft
   const set = form.patch
   const dirty = form.dirty
+
+  // Consume the handoff from the mobile benchmark sub-page once the draft exists
+  const benchApply = useRef(peekBenchmarkApply())
+  useEffect(() => {
+    const intent = benchApply.current
+    if (!intent || !d) return
+    benchApply.current = null
+    consumeBenchmarkApply()
+    set('upstream_dns', intent)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d])
 
   async function save() {
     if (!cfg || !d) return
@@ -62,16 +76,22 @@ export function DnsSettings() {
 
   function openBenchmark() {
     if (!d) return
-    sheet.open(
-      <UpstreamBenchmarkSheet
-        initialUpstreams={d.upstream_dns ?? []}
-        onApply={(bestUpstreams) => {
-          set('upstream_dns', bestUpstreams)
-        }}
-        onClose={sheet.close}
-      />,
-      { title: t('advanced.benchmarkTitle') }
-    )
+    if (isDesktop) {
+      sheet.open(
+        <UpstreamBenchmark
+          initialUpstreams={d.upstream_dns ?? []}
+          onApply={(bestUpstreams) => {
+            set('upstream_dns', bestUpstreams)
+          }}
+          onClose={sheet.close}
+        />,
+        { title: t('advanced.benchmarkTitle') }
+      )
+    } else {
+      // Browsing content (results) goes to a sub-page on mobile; the applied
+      // list comes back through the one-shot benchmark intent
+      nav('/settings/dns/benchmark')
+    }
   }
 
   async function clearCache() {
@@ -170,7 +190,7 @@ export function DnsSettings() {
                 </Button>
               </div>
               <div className="flex items-end">
-                <Button variant="primary" className="w-full gap-1.5" onClick={openBenchmark}>
+                <Button variant="glass" className="w-full gap-1.5" onClick={openBenchmark}>
                   <Zap size={14} /> {t('advanced.benchmarkTitle')}
                 </Button>
               </div>

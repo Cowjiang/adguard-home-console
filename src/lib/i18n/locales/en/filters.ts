@@ -77,7 +77,7 @@ const enFilters = {
   syncModalTitle: 'Sync rules to other instances',
   syncModalDesc: 'Overwrite selected target instances with the current rules. Note: Existing rules on target instances will be replaced.',
   syncTargetSelect: 'Select target instances',
-  syncButton: 'Confirm & start sync',
+  syncButton: 'Start Sync',
   syncSuccessToast: 'Successfully synced to {{count}} instances',
   syncPartialToast: 'Partial sync: {{success}} succeeded, {{failed}} failed',
   syncNoTargetSelected: 'Please select at least one target instance',

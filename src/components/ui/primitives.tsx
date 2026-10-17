@@ -1,6 +1,6 @@
 /** iOS-style base primitives: page containers, headers, cards, lists, controls */
 import {
-  useEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
+  useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -71,6 +71,33 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
 
   const goBack = () => navBack(nav, pathname)
 
+  // Floating nav: the title is absolutely centered, so it must stay clear of
+  // the back pill and the right-side actions. Only the DOM knows the action
+  // slot's width, so the allowed title width (twice the tighter free side,
+  // capped at 240px) is measured on layout and whenever the slots resize.
+  const barRef = useRef<HTMLDivElement>(null)
+  const rightRef = useRef<HTMLDivElement>(null)
+  const [titleMax, setTitleMax] = useState<number | undefined>(undefined)
+  const hasRight = !!right
+  useLayoutEffect(() => {
+    if (!floating) return
+    const bar = barRef.current
+    if (!bar) return
+    const measure = () => {
+      const w = bar.getBoundingClientRect().width
+      const rw = rightRef.current?.getBoundingClientRect().width ?? 0
+      // 16px bar padding + 44px back pill + 8px gap vs. padding + actions + gap
+      const backSide = w / 2 - (16 + 44 + 8)
+      const rightSide = w / 2 - (16 + (rw ? rw + 8 : 0))
+      setTitleMax(Math.max(64, Math.min(240, Math.min(backSide, rightSide) * 2)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(bar)
+    if (rightRef.current) ro.observe(rightRef.current)
+    return () => ro.disconnect()
+  }, [floating, hasRight, title])
+
   if (floating) {
     // The fixed nav bar translates in sync with the page layer (push/pop),
     // sliding along during transitions. The old page's nav bar slides out
@@ -91,7 +118,7 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
       >
         {/* Scroll-edge gradient mask: see the NavScrim comment */}
         <NavScrim />
-        <div className="relative flex h-12 items-center px-4">
+        <div ref={barRef} className="relative flex h-12 items-center px-4">
           {/* When the native glass button takes over it is only visually
               hidden: the transition snapshot clone of this bar restores the
               button, so the sliding old page doesn't leave a hole at its spot
@@ -106,10 +133,13 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
           >
             <ChevronLeft size={22} />
           </button>
-          <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
+          <div
+            className="pointer-events-none absolute left-1/2 w-full -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1"
+            style={{ maxWidth: titleMax }}
+          >
             {title}
           </div>
-          {right && <div className="pointer-events-auto ml-auto flex flex-none items-center gap-2">{right}</div>}
+          {right && <div ref={rightRef} className="pointer-events-auto ml-auto flex flex-none items-center gap-2">{right}</div>}
         </div>
       </div>,
       document.body

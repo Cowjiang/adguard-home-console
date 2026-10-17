@@ -1,11 +1,13 @@
-/** Centered sheet overlay system + confirm dialog. Project red line (finalized
- *  by the user 2026-09-23): every dialog appears centered on screen, never
- *  rising from the bottom -- the iOS native tabbar would cover a bottom
- *  sheet. Overlays carry confirm dialogs, forms and pickers on both platforms;
- *  "browsing" content (log detail, log analytics, client detail) goes through
- *  here on desktop only -- on mobile it is a sub-page. The sheet portals to
- *  document.body, i.e. outside the Router: components rendered inside need
- *  navigation injected via props (see InstanceSwitchList). */
+/** Centered sheet overlay system + confirm dialog. Project red line (user,
+ *  refined 2026-10-17): on mobile, **small panels may float** — confirmations,
+ *  few-field forms and the instance switcher — while anything whose natural
+ *  height approaches half the screen (content browsing, long forms, lists
+ *  that grow) must be a sub-page; large panels are never floating windows.
+ *  Desktop keeps the centered sheet for all of them. Every dialog appears
+ *  centered on screen, never rising from the bottom -- the iOS native tabbar
+ *  would cover a bottom sheet. The sheet portals to document.body, i.e.
+ *  outside the Router: components rendered inside need navigation injected
+ *  via props (see InstanceSwitchList). */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'

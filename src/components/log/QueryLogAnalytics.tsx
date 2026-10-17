@@ -94,9 +94,9 @@ export function QueryLogAnalytics({ items, onDrillDown }: QueryLogAnalyticsProps
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[13px] font-medium text-t1">{sq.domain}</span>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-t3">
-                      <span>{sq.clientName || sq.client}</span>
-                      {sq.upstream && <span>· {sq.upstream}</span>}
+                    <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[11px] text-t3">
+                      <span className="truncate">{sq.clientName || sq.client}</span>
+                      {sq.upstream && <span className="truncate">· {sq.upstream}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -138,7 +138,7 @@ export function QueryLogAnalytics({ items, onDrillDown }: QueryLogAnalyticsProps
                     {item.count} <span className="text-[10px] text-t3">({item.percentage}%)</span>
                   </span>
                 </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--glass-border)' }}>
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{

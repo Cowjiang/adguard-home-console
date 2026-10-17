@@ -1,7 +1,7 @@
 # Web 端布局与交互约定
 
 **Status:** current
-**Updated:** 2026-10-17（浮层形态约定重述为「浏览信息型内容走子页」，日志透视分析改子页）
+**Updated:** 2026-10-17（红线校准为「小面板可浮窗、超过半屏走子页」：快照比对/测速/更新/同步/安全搜索改移动端子页，小表单与确认保留浮层；同期批次页面统一回设计 token）
 
 ## 视觉与响应式结构
 
@@ -18,7 +18,7 @@
 ## 弹层与选择器
 
 - 浮层统一由 `src/components/ui/sheet.tsx` 的 `SheetProvider` 承载，居中出现。底部浮层会与 iOS 原生 TabBar 冲突。打开动画通过双 `requestAnimationFrame` 确保初始态先绘制。
-- **「浏览信息」型内容不进浮层**：日志详情、日志透视分析、客户端详情在移动端是子页（`/logs/detail`、`/logs/analytics`、`/clients/detail`），桌面端才在同一入口渲染居中弹层；浮层只承载「确认 / 表单输入 / 选择」三类（2026-09-22 用户定稿的浮层盘点结论，按当前结构重述见 `.agents/pipelines/proposals/bug-fix/2026-10-17-mobile-log-analytics-subpage.md`）。新增浏览型面板时先按这条决定形态。
+- **移动端浮层只用于小面板（红线）**：自然高度不超过约半屏（≈50% 屏幕高度）的**确认框、少量字段的表单、实例切换**可以居中浮层；内容浏览与超过半屏的表单/列表一律子页——日志详情/透视（`/logs/detail`、`/logs/analytics`）、客户端详情/表单（`/clients/detail`、`/clients/form`）、快照比对（`/settings/snapshots/diff`）、上游测速（`/settings/dns/benchmark`）、更新详情（`/settings/about/update`）、同步目标选择（`/sync/:type`）、安全搜索（`/protection/safesearch`）。桌面端这些入口同样渲染居中弹层。判定依据是**面板自然高度**，不是内容类型；锚定选择菜单（`usePick` / `PickSelect`）是临时下拉，不受此限。依据：2026-09-22 定稿、2026-10-17 用户两次强调并按「小面板可浮窗、超过半屏不适合浮窗」校准的红线，见 `.agents/pipelines/proposals/bug-fix/2026-10-17-mobile-content-sheets-to-subpages.md`。新增面板先估高度再定形态。
 - 单选项：苹果移动设备渲染真实的 `<select>` 覆盖层（`PickSelect`）；其余设备使用 `usePick` 的锚定菜单。`showPicker()` 不能作为 iOS 的唤起路径。`isAppleMobile()` 同时判断设备 UA 与 Apple vendor，以免桌面设备模拟误判。
 - 防护卡“定时暂停”使用锚定菜单；关闭总开关直接执行，不弹时间选择。
 - 设置页的表单标题不包裹 `<label>`，避免点击说明文字聚焦输入框；登录页保留常规 label 行为。触屏 `<select>` 的焦点环由 `selectAfterChange()` 处理，不在 `change` 中同步 `blur()`。
@@ -30,6 +30,10 @@
 - `/protection` 是过滤功能中心，包含过滤器、允许列表、自定义规则、拦截服务、DNS 重写与规则检测；拦截服务磁贴点击后立即保存。
 - 设置子页的 DNS、访问控制、加密、查询与统计采用「草稿 + 保存」：任一行编辑后出现保存入口（iOS 壳内由原生按钮接管），保存成功以服务端返回值回填草稿并清除未保存标记；被忽略域名等列表写入时按行 trim、去空、去重，回填后即为服务端规范化后的内容。DHCP 无草稿、行内即时下发，加密页保存前先经 `/tls/validate` 校验。
 - 设置 → 服务器连接（实例列表）：点按一行**切换**当前实例，活动实例行尾挂绿色「当前实例」badge（不再有 ✓ 与页脚说明文字）；页头右上「管理」进入管理模式——**「管理」按钮无强调色，进入后变绿色的「完成」**，每行行尾换成两个 36×36 的圆角方块按钮（`rounded-[10px]`，与行内图标同高、不撑高行，无文字、`aria-label` 兜底）：编辑（玻璃底，进 `/settings/server/edit`）与删除（`--danger-soft` 底 + 红色图标，走确认框），此时点行不再切换、当前实例 badge 让位隐藏。页头按钮用 `Button size="header"` + `native` 规格，iOS 壳内由原生玻璃按钮接管。
+- 设置 → 配置快照与备份：页头「导入快照」为玻璃图标胶囊、「创建快照」移动端为图标钮（`lg` 起带文字，iOS 壳内由原生文字按钮接管）；「创建快照」是小面板居中浮层表单（`.field` 输入名称/备注 + 主按钮），筛选用 `Segmented`，快照卡右侧是 36×36 圆角方块图标按钮（导出 JSON 玻璃底、删除 `--danger-soft` 底）。「比对与还原」移动端进 `/settings/snapshots/diff?id=` 子页、桌面为居中浮层（内容组件 `SnapshotDiff` 共用）；还原完成即返回列表。自动保护型快照（同步前 / 还原前）的标签与说明在生成处经 `t()` 输出。
+- 移动端确认类操作（删除、还原、升级、登出等 `useConfirm`）是居中小浮层；实例切换点按状态胶囊打开切换浮层（实例很多时在浮层内滚动）。添加过滤器/重写、DHCP 静态租约等少量字段的表单同样走小浮层。
+- DNS 设置的「上游基准测速」移动端进 `/settings/dns/benchmark` 子页、桌面为居中浮层（内容组件 `UpstreamBenchmark` 共用，含多实例结果页签与轮数 `Segmented`）；子页内「应用到当前配置」经一次性 handoff（`src/lib/dns/benchmarkIntent.ts`）在 POP 回设置页时写回 `upstream_dns` 草稿。
+- 关于页的版本行/「检查控制台更新」在移动端进 `/settings/about/update` 子页（更新详情、发行说明与升级指引），桌面为居中浮层；子页缺 `location.state`（直落/刷新）时自行拉取 `/api/system/version`，无更新则显示空态。
 - 查询日志支持 `?filter=` 初始化筛选及 `?q=` 预填搜索；移动端详情为 `/logs/detail` 子页、透视分析为 `/logs/analytics` 子页，桌面端两者都用居中弹层。子页内的下钻（点击域名/客户端/拦截类型）经一次性 handoff（`src/lib/log/drillIntent.ts`）在 POP 回列表时回填搜索或筛选并 replace 进 URL——与桌面弹层的原地回填等效，且不在历史栈留下重复条目。日志只取活动实例的数据，行内不带节点标签。
 - 客户端移动端列表使用卡片，桌面把持久和自动识别客户端分成两张表。排序、搜索和分页独立于服务器查询；移动端添加/编辑进入 `/clients/form`，桌面使用居中弹层。
 - 图表触摸层使用 `touch-action: pan-y`，让纵向滑动交给页面；横向 scrub 保留。长按 350ms 可以唤出数据预览，移动超过 8px 取消长按。
