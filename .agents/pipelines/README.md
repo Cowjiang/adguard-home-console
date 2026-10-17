@@ -9,6 +9,7 @@
 | 2026-10-17 | bug-fix | [修掉同期批次（快照/更新/测速/同步/透视）页面的设计体系失配](proposals/bug-fix/2026-10-17-batch-ui-design-conformance.md) | implemented |
 | 2026-10-17 | bug-fix | [按「小面板可浮窗、超过半屏走子页」校准移动端面板形态](proposals/bug-fix/2026-10-17-mobile-content-sheets-to-subpages.md) | implemented |
 | 2026-10-17 | bug-fix | [修掉概览页移动端英文文案的两处溢出](proposals/bug-fix/2026-10-17-mobile-overview-en-overflow.md) | implemented |
+| 2026-10-18 | bug-fix | [让移动端趋势卡不再与图例打架，并统一图表的语义配色](proposals/bug-fix/2026-10-18-mobile-trend-legend-and-chart-colors.md) | implemented |
 
 ## 与 docs/ 的分工
 

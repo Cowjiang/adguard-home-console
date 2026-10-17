@@ -343,7 +343,10 @@ export function Donut({
           {centerSub && <span className="text-[11px] text-t3">{centerSub}</span>}
         </div>
       </div>
-      <div className="flex min-w-0 flex-col gap-2">
+      {/* flex-1 so the rows span the leftover width and the counts line up at
+          the card's right edge; on the desktop card (content-sized) the
+          intrinsic width still wins, so nothing moves there */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
         {segments.map((s) => (
           <div key={s.label} className="flex items-center gap-2 text-[12.5px]">
             <span className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: s.color }} />
