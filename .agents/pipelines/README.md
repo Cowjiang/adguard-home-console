@@ -11,6 +11,8 @@
 | 2026-10-17 | bug-fix | [修掉概览页移动端英文文案的两处溢出](proposals/bug-fix/2026-10-17-mobile-overview-en-overflow.md) | implemented |
 | 2026-10-18 | bug-fix | [让移动端趋势卡不再与图例打架，并统一图表的语义配色](proposals/bug-fix/2026-10-18-mobile-trend-legend-and-chart-colors.md) | implemented |
 | 2026-10-18 | bug-fix | [修掉 iOS 原生顶栏按钮按文字固有宽度溢出、压住同槽位按钮与标题的问题](proposals/bug-fix/2026-10-18-native-header-button-overflow.md) | implemented |
+| 2026-10-18 | bug-fix | [把过滤器子页的「同步到其他实例」从页头收进页底行卡片](proposals/bug-fix/2026-10-18-filter-subpage-sync-entry.md) | implemented |
+| 2026-10-18 | bug-fix | [把卡片圆角收敛为两档，消掉并存的 22px 节级圆角](proposals/bug-fix/2026-10-18-card-radius-scale.md) | implemented |
 
 ## 与 docs/ 的分工
 
