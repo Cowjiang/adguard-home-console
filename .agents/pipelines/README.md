@@ -8,6 +8,7 @@
 | 2026-10-17 | bug-fix | [把多实例聚合展示从 dev 撤下、保留在分支](proposals/bug-fix/2026-10-17-withdraw-multi-instance-aggregation.md) | implemented |
 | 2026-10-17 | bug-fix | [修掉同期批次（快照/更新/测速/同步/透视）页面的设计体系失配](proposals/bug-fix/2026-10-17-batch-ui-design-conformance.md) | implemented |
 | 2026-10-17 | bug-fix | [按「小面板可浮窗、超过半屏走子页」校准移动端面板形态](proposals/bug-fix/2026-10-17-mobile-content-sheets-to-subpages.md) | implemented |
+| 2026-10-17 | bug-fix | [修掉概览页移动端英文文案的两处溢出](proposals/bug-fix/2026-10-17-mobile-overview-en-overflow.md) | proposed |
 
 ## 与 docs/ 的分工
 
