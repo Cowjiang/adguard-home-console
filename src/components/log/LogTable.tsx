@@ -7,8 +7,7 @@ import { fmtTime, fmtMs } from '../../lib/format'
 import { Card } from '../ui/primitives'
 import { Badge } from '../ui/atoms'
 import { reasonMeta } from './LogDetail'
-import { keyOf } from './LogRow'
-import type { AggregatedQueryLogItem } from '../../lib/log/analytics'
+import { keyOf } from '../../lib/log/analytics'
 
 const LOG_COLS = 'grid grid-cols-[88px_minmax(0,1fr)_180px_128px_72px] items-center gap-3'
 
@@ -20,8 +19,8 @@ export function LogTable({
   items,
   onRow,
 }: {
-  items: (QueryLogItem | AggregatedQueryLogItem)[]
-  onRow: (i: QueryLogItem | AggregatedQueryLogItem) => void
+  items: QueryLogItem[]
+  onRow: (i: QueryLogItem) => void
 }) {
   const { t } = useTranslation()
   return (
@@ -40,7 +39,6 @@ export function LogTable({
         {items.map((item) => {
           const meta = reasonMeta(item.reason, t)
           const cname = item.client_info?.name || item.client
-          const instanceLabel = (item as AggregatedQueryLogItem)._instanceLabel
           return (
             <button
               key={keyOf(item)}
@@ -58,11 +56,6 @@ export function LogTable({
                 >
                   {item.question.type}
                 </span>
-                {instanceLabel && (
-                  <span className="flex-none rounded bg-white/10 px-1 py-0.5 text-[9.5px] text-t3">
-                    {instanceLabel}
-                  </span>
-                )}
                 {item.cached && <span className="flex-none text-[10px] text-t3">{t('querylog.cached')}</span>}
               </span>
               <span className="truncate text-[12.5px] text-t2">{cname}</span>

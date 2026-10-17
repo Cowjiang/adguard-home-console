@@ -1,7 +1,7 @@
 # React 前端
 
 **Status:** current
-**Updated:** 2026-10-07
+**Updated:** 2026-10-17（路由与页面表补 `/logs/analytics`，子页/弹层形态规则对齐交互页）
 
 `src/` 是 Web 与 Tauri 两条线共用的界面层，只通过 `src/lib/api.ts` 访问 AGH：浏览器里走同源 `/api/agh`，壳内走 Rust 命令 `agh_fetch`，两条路径返回同样的数据与错误形态。
 
@@ -16,9 +16,9 @@
 ## 路由
 
 - `/login` 公开（首启引导，无实例时才可见）；其余路由挂在 `<Protected><Layout/></Protected>` 下，未配置任何实例时重定向登录页。
-- 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及十个子页（实例列表 `/settings/server` 与编辑页 `/settings/server/edit`）；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
+- 顶级页：`/`（概览）、`/top/:kind`、`/logs`、`/logs/detail`、`/logs/analytics`、`/protection` 及其子页、`/rewrites`、`/clients`、`/clients/detail`、`/clients/form`、`/settings` 及十个子页（实例列表 `/settings/server` 与编辑页 `/settings/server/edit`）；`*` 兜底回概览。`/stats` 重定向回概览（原统计分析页已并入概览的桌面区块）。
 - 顶级路由白名单在 `src/lib/nav/routes.ts`；Tab 语义、返回入口与转场见 `docs/web-interaction.md`。
-- 移动端的详情与表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。
+- 移动端的「浏览信息」型内容（日志详情、日志透视分析、客户端详情）与客户端表单是独立子页（状态经 `location.state` 传递），桌面端在同一入口渲染居中弹层；缺少 `location.state` 时渲染空态。浮层只承载确认 / 表单 / 选择类，其他设置页表单仍走弹层，形态规则见 `docs/web-interaction.md`。
 
 ## 多实例会话与配置
 
@@ -43,9 +43,9 @@
 
 | 页面 | 职责 | 主要接口 |
 | --- | --- | --- |
-| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行；桌面（≥lg）另带统计分析区块。多实例时总量求和、榜单合并重排、`avg_processing_time` 按查询量加权，曲线不聚合、用分段选择器按实例查看 | `/stats`（活动实例 5s + 非活动实例 30s）、`/clients`、`POST /protection` |
+| `src/pages/Dashboard.tsx` | 概览：防护卡、指标、趋势、构成、排行；桌面（≥lg）另带统计分析区块。全部数据来自活动实例 | `/stats`（5s）、`/clients`、`POST /protection` |
 | `src/pages/TopListPage.tsx` | 榜单全量 | `/stats` |
-| `src/pages/QueryLog.tsx`、`src/pages/LogDetailPage.tsx` | 实时日志、翻页、单条详情与一键加规则 | `/querylog`、`/filtering/status`、`POST /filtering/set_rules` |
+| `src/pages/QueryLog.tsx`、`src/pages/LogDetailPage.tsx`、`src/pages/LogAnalyticsPage.tsx` | 实时日志、翻页、单条详情与透视分析下钻、一键加规则 | `/querylog`、`/filtering/status`、`POST /filtering/set_rules` |
 | `src/pages/Protection.tsx` | 过滤功能总览：开关、刷新、重写与服务拦截入口 | `/filtering/status`、`POST /filtering/config`、`POST /filtering/refresh` |
 | `src/pages/FiltersPages.tsx` | 过滤器与白名单 CRUD、自定义规则、服务拦截、DNS 重写、规则检测 | `/filtering/*`、`/blocked_services/*`、`/rewrite/*` |
 | `src/pages/Clients.tsx`、`src/pages/ClientDetailPage.tsx`、`src/pages/ClientFormPage.tsx` | 客户端列表、详情与增删改 | `/clients`、`/stats`、`/clients/{add,update,delete}` |

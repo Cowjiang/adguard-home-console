@@ -1,6 +1,6 @@
 /** Master protection switch card (shared by Dashboard / Protection pages) */
 import { useEffect, useMemo, useState } from 'react'
-import { ShieldCheck, ShieldOff, Clock3, Layers } from 'lucide-react'
+import { ShieldCheck, ShieldOff, Clock3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/session/auth'
 import { api } from '../../lib/api'
@@ -8,15 +8,13 @@ import { Button, Switch } from '../ui/primitives'
 import { toast } from '../ui/toast'
 import { usePick } from '../ui/menu'
 import { fmtDuration, fmtTime } from '../../lib/format'
-import { setClusterProtection } from '../../lib/session/cluster'
 
 export function ProtectionCard() {
-  const { cfg, status, refreshStatus, instances, store, probeAll } = useAuth()
+  const { cfg, status, refreshStatus } = useAuth()
   const { t } = useTranslation()
   const pick = usePick()
   const [busy, setBusy] = useState(false)
   const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null)
-  const [clusterMode, setClusterMode] = useState(true)
 
   const serverEnabled = status?.protection_enabled ?? false
   // Optimistic: show the target state immediately while the API runs; aligns with the
@@ -45,12 +43,9 @@ export function ProtectionCard() {
   useEffect(() => {
     if (enabled || !resumeAtMs) return
     const wait = Math.max(1000, resumeAtMs - Date.now() + 1000)
-    const id = setTimeout(() => {
-      refreshStatus()
-      if (instances.length > 1) probeAll()
-    }, wait)
+    const id = setTimeout(() => refreshStatus(), wait)
     return () => clearTimeout(id)
-  }, [enabled, resumeAtMs, refreshStatus, instances.length, probeAll])
+  }, [enabled, resumeAtMs, refreshStatus])
 
   // Tick the countdown every second while paused
   const [nowTick, setNowTick] = useState(() => Date.now())
@@ -62,10 +57,6 @@ export function ProtectionCard() {
   }, [enabled, resumeAtMs])
 
   const remainingMs = Math.max(0, resumeAtMs - nowTick)
-  const onlineCount = useMemo(
-    () => instances.filter((i) => i.online !== 'down').length,
-    [instances]
-  )
 
   async function setProtection(next: boolean, duration?: number) {
     if (!cfg) return
@@ -75,45 +66,11 @@ export function ProtectionCard() {
     const durMs = (duration ?? 0) * 1000
 
     try {
-      if (clusterMode && instances.length > 1 && store) {
-        const clusterRes = await setClusterProtection(store.instances, {
-          enabled: next,
-          durationMs: durMs,
-          isTarget: (it) => {
-            const v = instances.find((x) => x.id === it.id)
-            return v ? v.online !== 'down' : true
-          },
-        })
-
-        // If the active instance itself failed to update, revert optimistic pending state
-        const activeFailed = clusterRes.errors.some((err) => err.instanceId === store.activeId)
-        if (activeFailed || clusterRes.succeeded === 0) {
-          setPendingEnabled(null)
-        }
-
-        if (clusterRes.failed > 0) {
-          toast(
-            t('protection.clusterPartialFail', {
-              count: clusterRes.succeeded,
-              failed: clusterRes.failed,
-            }),
-            'err'
-          )
-        } else {
-          toast(
-            next
-              ? t('protection.clusterToastOn', { count: clusterRes.succeeded })
-              : t('protection.clusterToastOff', { count: clusterRes.succeeded })
-          )
-        }
-        probeAll()
-      } else {
-        await api(cfg, '/protection', {
-          method: 'POST',
-          body: { enabled: next, duration: durMs },
-        })
-        toast(next ? t('protection.on') : t('protection.off'))
-      }
+      await api(cfg, '/protection', {
+        method: 'POST',
+        body: { enabled: next, duration: durMs },
+      })
+      toast(next ? t('protection.on') : t('protection.off'))
       refreshStatus()
     } catch (e: any) {
       setPendingEnabled(null)
@@ -193,19 +150,6 @@ export function ProtectionCard() {
         <Button variant="glass" size="sm" onClick={(e) => openPausePicker(e)}>
           <Clock3 size={14} /> {t('protection.pauseAction')}
         </Button>
-
-        {instances.length > 1 && (
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11.5px] font-medium text-t2 select-none hover:text-t1">
-            <input
-              type="checkbox"
-              checked={clusterMode}
-              onChange={(e) => setClusterMode(e.target.checked)}
-              className="accent-[var(--accent)]"
-            />
-            <Layers size={13} className="text-[var(--accent)]" />
-            <span>{t('protection.clusterToggle', { count: onlineCount })}</span>
-          </label>
-        )}
       </div>
     </div>
   )
