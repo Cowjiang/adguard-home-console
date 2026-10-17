@@ -23,9 +23,11 @@ const enDashboard = {
   safeBrowsing: 'Safe Browsing',
   safeSearch: 'SafeSearch',
   parental: 'Parental',
-  topDomains: 'Top domains',
-  topBlocked: 'Blocked domains',
-  topClients: 'Active clients',
+  // Short tab labels: the mobile top-list Segmented carries three of them and
+  // the longer wording overflows its pill below 400px
+  topDomains: 'Domains',
+  topBlocked: 'Blocked',
+  topClients: 'Clients',
   viewMore: 'View more',
   noBlockedTitle: 'Nothing blocked yet',
   noBlockedSub: 'Your network is very clean',

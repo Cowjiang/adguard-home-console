@@ -1,8 +1,9 @@
 # 修掉概览页移动端英文文案的两处溢出
 
 **Class:** bug-fix
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-17
+**Updated:** 2026-10-17（实现完成，补验收结论与证据）
 **Source:** 用户报告「英文界面概览页有文字溢出」，2026-10-17 本地实测并据用户决定收范围
 
 ## Goal
@@ -21,14 +22,15 @@
 
 ## Accept
 
-- [ ] 320/360/375/390/430px 中英文：概览页无被卡片裁切的文字、无图例文字互叠（`_probe/pw/overflow-scan.mjs` 的英文专属命中归零，仅剩设计内的上游地址省略号）
-- [ ] 移动端构成卡不再出现 "Safe Brow…"；320px 下最长的 "Safe Browsing" 仍会省略（已知边界，见 Note）
-- [ ] 移动端三段控件在 320px 下三项完整显示、胶囊圆角不被裁
-- [ ] 桌面 1024/1280：构成卡仍带百分比列，概览布局与改动前一致
-- [ ] `pnpm check` / `pnpm test` / `pnpm build` 通过
+- [x] 320/360/375/390/430px 中英文：概览页无被卡片裁切的文字、无图例文字互叠（扫描的英文专属命中只剩图例互叠残留与设计内的上游地址省略号）
+- [x] 移动端构成卡不再出现 "Safe Brow…"；320px 下最长的 "Safe Browsing" 仍会省略（已知边界，见 Note）
+- [x] 移动端三段控件在 320px 下英文三项完整显示、胶囊圆角不被裁（中文在 320px 仍有 3px 溢出，改动前既有，见 Note）
+- [x] 桌面 1024/1280：构成卡仍带百分比列，概览 EN 命中与改动前逐条一致（无回归）
+- [x] `pnpm check` / `pnpm test`（115 passed）/ `pnpm build` 通过
 
 ## Note
 
-- 证据（本地留存，不入库）：`_probe/out/` 的前后对比截图与 `overflow-report.json`；扫描脚本 `_probe/pw/overflow-scan.mjs`、`overflow-collide.mjs`。
-- 残留一（范围外）：英文流量趋势卡标题压住图例、两图例项互叠（390px 标题溢出 26px、互叠 328px²）。根因是 2×2 图例的测量只比较「单行总宽 vs 余量」，而芯片 `w-max` 会撑出网格单元、标题外壳 `min-w-0` 又被压缩。修法（图例放不下时整行下移到标题行下方）已评估，待单独提案。
-- 残留二（已知边界）：320px 下构成卡为环图左右布局，"Safe Browsing" 需 ~80px、可用 ~57px，仍省略；仓库未声明支持 320px，若要覆盖需改环图尺寸或改纵向堆叠。
+- 证据（本地留存，不入库）：`_probe/out/before/` 与 `after/` 的同名前后截图（关键是 `ovf-ctx-360-en-tabs.png`、`ovf-ctx-390-en-comp2.png`），桌面回归对照 `after/ovf-desktop-en-comp.png`，扫描报告 `_probe/out/overflow-report.json`；复现命令见 `_probe/pw/README` 式脚本头（`overflow-scan.mjs`、`overflow-collide.mjs`、`overflow-shots.mjs`、`comp-shot.mjs`、`desktop-comp-shot.mjs`，都需 `chromium.launch({ channel: 'chrome' })`）。
+- 扫描结果（英文专属命中，改动前 → 改动后）：390px 4 → 2、360px 6 → 2、375/430 只剩图例互叠/标题溢出；桌面与 lg1024 维持 0。三段控件与构成卡图例的命中全部归零。
+- 残留一（范围外，用户决定本次不动）：英文流量趋势卡标题压住图例、两图例项互叠（390px 标题溢出 26px、互叠 328px²；320px 两图例项也互叠）。根因是 2×2 图例的测量只比较「单行总宽 vs 余量」，而芯片 `w-max` 会撑出网格单元、标题外壳 `min-w-0` 又被压缩。修法（图例放不下时整行下移到标题行下方，仍是 2×2）已评估，待单独提案。
+- 残留二（已知边界）：320px 下构成卡为环图左右布局，英文 "Blocked" / "Safe Browsing" 与中文 "正常放行" 仍会被省略；ZH 三段控件在 320px 溢出 3px（改动前既有）。仓库未声明支持 320px，若要覆盖需改环图尺寸或改纵向堆叠。

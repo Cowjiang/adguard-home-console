@@ -216,7 +216,8 @@ export default function Dashboard() {
       </Card>
 
       {/* Request composition (mobile; the desktop analysis section below has
-          the full-size donut) */}
+          the full-size donut). Narrow card → no percentage column, so the
+          longer English segment names still fit beside the ring */}
       <Card className="mt-4 p-4 lg:hidden">
         <h2 className="mb-3 text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
         <Donut
@@ -225,6 +226,7 @@ export default function Dashboard() {
           centerLabel={fmtCompact(stats.num_dns_queries)}
           centerSub={t('dashboard.totalRequests')}
           segments={compositionSegments}
+          hidePct
         />
       </Card>
 
