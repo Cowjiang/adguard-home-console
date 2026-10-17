@@ -341,7 +341,7 @@ export function SnapshotDiff({
           </div>
 
           {/* Restore: same bottom-of-page danger row as the encryption reset */}
-          <Card className="mt-6">
+          <Card className="mt-3">
             <Rows>
               <Row
                 title={t('settings.snapshotRestoreRow')}
