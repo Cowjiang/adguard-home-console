@@ -293,13 +293,17 @@ export function BarList({ items, color = 'var(--accent)', max: maxProp }: { item
 
 /** Donut chart: request composition as proportional segments, with legend */
 export function Donut({
-  segments, size = 170, thickness = 24, centerLabel, centerSub,
+  segments, size = 170, thickness = 24, centerLabel, centerSub, hidePct = false,
 }: {
   segments: { label: string; value: number; color: string }[]
   size?: number
   thickness?: number
   centerLabel?: string
   centerSub?: string
+  /** Drop the percentage column and let the count sit at the row end; narrow
+   *  cards reserve the width for the label instead (the ring already shows the
+   *  share, so the count is what is left to read) */
+  hidePct?: boolean
 }) {
   const total = segments.reduce((s, x) => s + x.value, 0)
   const r = (size - thickness) / 2
@@ -345,7 +349,9 @@ export function Donut({
             <span className="h-2.5 w-2.5 flex-none rounded-sm" style={{ background: s.color }} />
             <span className="min-w-0 flex-1 truncate text-t2">{s.label}</span>
             <span className="num text-t1">{fmtCompact(s.value)}</span>
-            <span className="w-12 text-right num text-t3">{total ? ((s.value / total) * 100).toFixed(1) : '0.0'}%</span>
+            {!hidePct && (
+              <span className="w-12 text-right num text-t3">{total ? ((s.value / total) * 100).toFixed(1) : '0.0'}%</span>
+            )}
           </div>
         ))}
       </div>
