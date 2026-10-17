@@ -23,6 +23,7 @@
 
 ## UI 实现边界
 
+- 卡片圆角只有两档：**节级表面**（`Card`，以及它的行容器 `Group`）统一 `rounded-3xl`（24px），**行内条目/统计磁贴/提示条**用 `rounded-2xl`（16px）。`Group` 在 2026-10-18 之前覆盖成 22px，是应用里唯一并存的第三档，和其它 24px 卡在设置页、过滤器子页并排时肉眼可见，已删除该覆盖；新增按层级选档，不要再引入第三种节级圆角。
 - `preserveAspectRatio="none"` 会横向拉伸 SVG 的 `<text>` 和 `<circle>`；图表轴标签与 hover 数据点使用 HTML 叠层，线条使用不缩放描边。
 - `.field:focus` 只改变 `background-color`，避免 `background` 简写重置选择框的背景箭头。
 - `Switch` 的 knob 位移由 CSS transition 控制；给同一 `transform` 再加 keyframe animation 会抢占过渡。

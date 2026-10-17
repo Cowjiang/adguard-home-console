@@ -224,7 +224,12 @@ export function GroupTitle({ children, right, className = '' }: { children: Reac
 }
 
 export function Group({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <Card className={`!rounded-[22px] ${className}`}><div>{children}</div></Card>
+  // Row container: the section-surface radius is the Card default (rounded-3xl)
+  // everywhere. The old `!rounded-[22px]` override was the only second section
+  // radius in the app: on pages that mixed grouped rows with standalone cards
+  // (settings forms, the filter/rewrite sub-pages), adjacent 22/24 corners read
+  // as a wobble; inner item cards/tiles keep their own tighter rounded-2xl.
+  return <Card className={className}><div>{children}</div></Card>
 }
 
 export function Row({
