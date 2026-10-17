@@ -1,8 +1,9 @@
 # 让移动端趋势卡不再与图例打架，并统一图表的语义配色
 
 **Class:** bug-fix
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-18
+**Updated:** 2026-10-18（实现完成，补验收结论与扫描数据）
 **Source:** 承接 `2026-10-17-mobile-overview-en-overflow.md` 的 Note（趋势卡图例互叠，当时按用户决定未动）；用户 2026-10-18 连轮预览后定稿
 
 ## Goal
@@ -20,13 +21,14 @@
 
 ## Accept
 
-- [ ] 320–430px 中英文：趋势卡无文字互叠、无被卡片裁切的文字（扫描的英文专属命中只剩已知的 320px 构成卡省略与设计内的上游地址省略号）
-- [ ] 桌面 1024/1280：趋势卡图例仍在标题右侧（两项，拦截圆点为红），构成卡仍带百分比列、卡片宽度与改动前一致
-- [ ] 移动端长按预览显示四项数值与序列色，图例缺省不影响识别
-- [ ] 移动端构成卡数量右对齐、右侧无空白；320px 的截断与改动前一致（既有边界）
-- [ ] `pnpm check` / `pnpm test` / `pnpm build` 通过
+- [x] 320–430px 中英文：趋势卡无文字互叠、无被卡片裁切的文字（英文专属命中 360–1280 全为 0，只剩已知的 320px 构成卡省略与设计内的上游地址省略号）
+- [x] 桌面 1024/1280：趋势卡图例仍在标题右侧（两项，拦截圆点为红），构成卡仍带百分比列、卡片宽度与改动前一致（396.75px）
+- [x] 移动端长按预览显示四项数值与序列色，图例缺省不影响识别
+- [x] 移动端构成卡数量右对齐、右侧无空白；320px 的截断与改动前一致（既有边界）
+- [x] `pnpm check` / `pnpm test`（115 passed）/ `pnpm build` 通过
 
 ## Note
 
-- 证据（本地留存，不入库）：`_probe/out/before/` 与 `_probe/out/after/` 同名前后截图（趋势卡、构成卡），桌面回归 `after/ovf-desktop-en-comp.png`、`legend-desk-en-trend.png`，长按预览 `legend-mobile-tooltip-en.png`，扫描报告 `_probe/out/overflow-report.json`。
+- 证据（本地留存，不入库）：`_probe/out/before/` 与 `_probe/out/after/` 同名前后截图（趋势卡、构成卡），桌面回归 `after/ovf-desktop-en-comp.png`、`legend-desk-en-trend.png`，长按预览 `legend-mobile-tooltip-en.png`，扫描报告 `_probe/out/overflow-report.json`（运行日志 `overflow-run-legend-hidden.log`）。
+- 扫描（英文专属命中，仅概览页）：390px 2 → 0、360px 2 → 0、375/430/560/1024/1280 均为 0；320px 维持既有的构成卡省略（2 处）。
 - 配色事实写入 `docs/web-interaction.md` 的概览段；图例形态事实同步为「移动端不显示图例」。
