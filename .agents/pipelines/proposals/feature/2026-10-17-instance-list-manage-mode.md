@@ -14,7 +14,7 @@
 
 1. **正常态**：点按一行切换活动实例（`switchInstance`）；活动实例行尾挂绿色「当前实例」badge（`Badge kind="ok"`，`var(--ok)` / `var(--ok-soft)`）；行内不再有 ✓，也不再显示右箭头，页脚说明文字删除。
 2. **页头切换按钮**：`Button size="header"`，**「管理」态为 `variant="glass"` 无强调色**（native spec 不带 `foreground`，走系统默认色），**「完成」态为 `variant="primary"` 绿色**（native spec `foreground: 'accent'`）；iOS 壳内由原生玻璃按钮接管（`useNativeHeaderAction` 依赖含 `label`/`foreground`，切换时颜色与文本同步）。
-3. **管理模式**：点行不再切换；行尾换成两个图标小方块（32×32、无文字，`aria-label` 供无障碍）——「编辑」玻璃底（进 `/settings/server/edit?id=`）与「删除」`--danger-soft` 底 + 红色图标（`useConfirm` 确认框 + `removeInstance`，最后一台沿用既有提示语）；当前实例 badge 保留。
+3. **管理模式**：点行不再切换；行尾换成两个 44×44 圆角方块按钮（`rounded-[14px]`、无文字，`aria-label` 供无障碍）——「编辑」玻璃底（进 `/settings/server/edit?id=`）与「删除」`--danger-soft` 底 + 红色图标（`useConfirm` 确认框 + `removeInstance`，最后一台沿用既有提示语）；当前实例 badge 在此模式下隐藏（用户复核确认）。
 4. **文案**：`settings.instancesActive` 由「使用中」改为「当前实例」（en: `Current`）；新增 `common.edit` / `common.manage` / `common.done`，双语对齐（`instancesListNote` 随页脚说明一起删除）。
 
 ## Accept
