@@ -78,19 +78,19 @@ export function ServerSettings() {
                       variant="glass"
                       size="sm"
                       label={t('common.edit')}
-                      className="!h-11 !w-11 !rounded-[14px] !px-0"
+                      className="!h-9 !w-9 !rounded-[10px] !px-0"
                       onClick={() => nav(`/settings/server/edit?id=${it.id}`)}
                     >
-                      <Pencil size={18} />
+                      <Pencil size={16} />
                     </Button>
                     <button
                       type="button"
                       aria-label={t('common.delete')}
                       onClick={() => remove(it.id)}
-                      className="press flex h-11 w-11 flex-none items-center justify-center rounded-[14px]"
+                      className="press flex h-9 w-9 flex-none items-center justify-center rounded-[10px]"
                       style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
                     >
-                      <Trash size={18} />
+                      <Trash size={16} />
                     </button>
                   </div>
                 ) : null
