@@ -222,8 +222,8 @@ export function SnapshotDiff({
         </div>
         {snapshot.meta.description && (
           <p
-            className="mt-2 rounded-xl p-2.5 text-[12.5px] leading-relaxed text-t2"
-            style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)' }}
+            className="mt-2 border-l-2 pl-3 text-[12.5px] leading-relaxed text-t2"
+            style={{ borderColor: 'var(--glass-border-strong)' }}
           >
             {snapshot.meta.description}
           </p>

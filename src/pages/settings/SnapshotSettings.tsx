@@ -237,6 +237,14 @@ export function SnapshotSettings() {
         )}
       </div>
 
+      {/* Auto backups are triggered by sync/restore, not by a setting on this
+          page: say so where the category is selected */}
+      {filterType === 'auto' && (
+        <p className="-mt-1 mb-3 px-1 text-[12px] leading-relaxed text-t3">
+          {t('settings.snapshotAutoHint')}
+        </p>
+      )}
+
       {/* Snapshot list */}
       {loading ? (
         <Loading />
@@ -245,13 +253,17 @@ export function SnapshotSettings() {
           <IconBubble color="var(--accent)" bg="var(--accent-soft)">
             <Layers size={22} />
           </IconBubble>
-          <p className="mt-3 text-[15px] font-bold text-t1">{t('settings.snapshotEmptyTitle')}</p>
-          <p className="mt-1 max-w-[320px] text-[12.5px] text-t3">
-            {t('settings.snapshotEmptyDesc')}
+          <p className="mt-3 text-[15px] font-bold text-t1">
+            {filterType === 'auto' ? t('settings.snapshotEmptyAutoTitle') : t('settings.snapshotEmptyTitle')}
           </p>
-          <Button variant="glass" size="sm" className="mt-4" onClick={openCreateSheet}>
-            <Plus size={14} /> {t('settings.snapshotCreate')}
-          </Button>
+          <p className="mt-1 max-w-[320px] text-[12.5px] text-t3">
+            {filterType === 'auto' ? t('settings.snapshotEmptyAutoSub') : t('settings.snapshotEmptyDesc')}
+          </p>
+          {filterType !== 'auto' && (
+            <Button variant="glass" size="sm" className="mt-4" onClick={openCreateSheet}>
+              <Plus size={14} /> {t('settings.snapshotCreate')}
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
@@ -264,13 +276,13 @@ export function SnapshotSettings() {
                     <span className="text-[15px] font-bold text-t1">{item.meta.label}</span>
                     {getTriggerBadge(item.meta.trigger)}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] text-t3">
-                    <span className="flex items-center gap-1">
+                  <div className="mt-1 flex min-w-0 items-center gap-2 text-[12px] text-t3">
+                    <span className="flex flex-none items-center gap-1 whitespace-nowrap">
                       <Clock size={12} />
                       {new Date(item.meta.createdAt).toLocaleString()}
                     </span>
-                    <span>·</span>
-                    <span>{item.meta.sourceInstance.label}</span>
+                    <span className="flex-none">·</span>
+                    <span className="truncate">{item.meta.sourceInstance.label}</span>
                   </div>
                 </div>
                 <div className="flex flex-none items-center gap-2">
@@ -295,11 +307,11 @@ export function SnapshotSettings() {
                 </div>
               </div>
 
-              {/* Description note */}
+              {/* Read-only note: a quote rule, not an input-like well */}
               {item.meta.description && (
                 <p
-                  className="rounded-xl px-3 py-2 text-[12.5px] leading-relaxed text-t2"
-                  style={{ background: 'var(--glass)', border: '1px solid var(--glass-border)' }}
+                  className="border-l-2 pl-3 text-[12.5px] leading-relaxed text-t2"
+                  style={{ borderColor: 'var(--glass-border-strong)' }}
                 >
                   {item.meta.description}
                 </p>
