@@ -63,9 +63,7 @@ export function SystemPage() {
     <Screen>
       <PageHeader back title={t('settings.systemTitle')} />
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>{t('settings.versionGroup')}</GroupTitle>
+      <GroupTitle>{t('settings.versionGroup')}</GroupTitle>
           <Card className="p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -95,9 +93,8 @@ export function SystemPage() {
           </div>
         )}
       </Card>
-        </div>
-        <div>
-          <GroupTitle>{t('settings.maintenanceGroup')}</GroupTitle>
+
+      <GroupTitle>{t('settings.maintenanceGroup')}</GroupTitle>
           <Group>
         <Rows>
           <Row
@@ -133,8 +130,6 @@ export function SystemPage() {
           />
         </Rows>
       </Group>
-        </div>
-      </div>
 
       {status && (
         <p className="mt-4 px-2 text-center text-[11.5px] text-t3 num">

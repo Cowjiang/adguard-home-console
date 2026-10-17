@@ -132,9 +132,7 @@ export function EncryptionSettings() {
         )}
       </Card>
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>{t('advanced.portsGroup')}</GroupTitle>
+      <GroupTitle>{t('advanced.portsGroup')}</GroupTitle>
           <Group>
         <Rows>
           <Row
@@ -170,9 +168,8 @@ export function EncryptionSettings() {
           />
         </Rows>
       </Group>
-        </div>
-        <div>
-          <GroupTitle>{t('advanced.serverNameGroup')}</GroupTitle>
+
+      <GroupTitle>{t('advanced.serverNameGroup')}</GroupTitle>
           <Card className="p-4 flex flex-col gap-3">
         <div className="block">
           <span className="mb-1 block text-[12.5px] text-t2">{t('advanced.sni')}</span>
@@ -260,8 +257,6 @@ export function EncryptionSettings() {
         </div>
         <p className="text-[11.5px] leading-relaxed text-t3">{t('advanced.encryptionNote')}</p>
       </Card>
-        </div>
-      </div>
 
       {dirty && (
         <div className="mt-4 flex gap-2.5">
