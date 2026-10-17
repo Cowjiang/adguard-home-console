@@ -17,7 +17,9 @@ const enProtection = {
   listCount: 'Filter lists',
   blackWhiteSub: 'Blocklists {{b}} · Allowlists {{w}}',
   lastUpdated: 'Last update',
-  neverUpdated: 'Never updated',
+  // Tile value: the caption above already says "Last update", and the spelled
+  // out "Never updated" overflowed the narrow value column
+  neverUpdated: 'Never',
   refreshNow: 'Refresh now',
   refreshNowLabel: 'Refresh filters now',
   autoUpdateEvery: 'Auto-refresh every {{interval}}',
@@ -43,8 +45,8 @@ const enProtection = {
   safeSearchRowSub: 'Enforce safe results on search engines',
   generalGroup: 'General',
   enableFiltering: 'Enable filtering',
-  enableFilteringSub: 'Master filtering switch; DNS-layer pause/resume lives on Overview',
-  intervalRow: 'Filter update interval',
+  enableFilteringSub: 'Master switch; DNS pause is on Overview',
+  intervalRow: 'Update interval',
   filteringOn: 'Filtering enabled',
   filteringOff: 'Filtering disabled',
   refreshedToast: 'Filters updated, {{n}} rules refreshed',

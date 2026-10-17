@@ -29,6 +29,8 @@
 - 源码里 `backdrop-filter` 只写不带前缀的一条：手写的 `-webkit-backdrop-filter` 会被构建链当同一属性去重、只留前缀那条，而现代 Chromium 已移除该别名，会让标签栏、浮层与 tab 透镜的模糊静默失效；构建产物会自动补出两条。
 - 苹果端的原生 `<select>` 覆盖层（`PickSelect`）必须带 `overflow-hidden`：WebKit 会把 `<option>` 当真实盒子按文字宽度布局，长选项（客户端页的「请求数从多到少」）会溢出被压到 56pt 的控件并**撑宽整个文档**，页面因此能左右拖动。典型症状是文档 `scrollWidth` 大于视口而没有任何元素的 rect 越界。
 - 首屏加载与正常内容共用稳定的根节点，避免数据抵达时重挂载并重播页面入场动画。概览骨架与内容的淡入由 `content-in` 负责。
+- 相对时间按语境分两种写法：统计卡片的值用 `relTimeShort`（en `now`/`45s`/`26h`/`1d`，zh `刚刚`/`45 秒`/`26 小时`/`1 天`，不带 ago，语义由卡片标题「上次更新」承担，绝对时间在 `title` 里），句子里的相对时间用 `relTime`（`1 day ago` / `1 天前`）。英文完整写法在最坏情况下放不进卡片的值列（22px 下 `26 hours` ≈ 92px，360px 屏可用 88px），缩写是修复溢出的关键一半。
+- 时长写进「每 {{interval}} …」这类框架时用不带数量的单位词（`units.hourBare`/`dayBare`）：`every day` / `every hour` 比 `every 1 day` 自然；选择器的选项仍用 `hoursLabel` 的计数写法（`1 day`）。
 - 当前 `server/index.mjs` 的 `express.static` 设置了一小时资源缓存；改动 HTML 缓存策略时需单独检查 `/index.html` 是否被静态中间件先拦截。
 
 - 顶栏原生控件与自定义按钮互斥：原生接管时 CSS 按钮只留 `visibility:hidden` 占位，转场快照克隆里也不补显（否则侧滑揭示的旧页会露出自定义胶囊）。

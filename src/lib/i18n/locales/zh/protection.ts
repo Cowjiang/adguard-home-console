@@ -19,7 +19,7 @@ const zhProtection = {
   neverUpdated: '从未更新',
   refreshNow: '立即更新',
   refreshNowLabel: '立即更新过滤器',
-  autoUpdateEvery: '每 {{interval}} 自动更新',
+  autoUpdateEvery: '每 {{interval}}自动更新',
   funcGroup: '过滤功能',
   blacklistRow: '黑名单过滤器',
   blacklistSub: '广告与跟踪规则库 · {{n}} 个列表',

@@ -21,7 +21,7 @@ const enFilters = {
   deleteTitle: 'Delete “{{name}}”?',
   deleteMsg: 'Rules from this list stop applying immediately.',
   generalGroup: 'General',
-  intervalTitle: 'Filter update interval',
+  intervalTitle: 'Update interval',
   customTitle: 'Custom filtering rules',
   customSub: '{{n}} active rules',
   customPlaceholder: '||example.com^\n@@||allowed.example.com^$important\n! comment line',
