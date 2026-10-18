@@ -15,7 +15,7 @@
 | 2026-10-18 | bug-fix | [把卡片圆角收敛为两档，消掉并存的 22px 节级圆角](proposals/bug-fix/2026-10-18-card-radius-scale.md) | implemented |
 | 2026-10-18 | bug-fix | [修掉设置页草稿在服务端配置变化后停在旧值、并挂出假未保存标记的问题](proposals/bug-fix/2026-10-18-draft-form-follows-server.md) | implemented |
 | 2026-10-18 | feature | [交付 Windows 桌面壳的本地打包路径，并把桌面视口钉在桌面布局宽度](proposals/feature/2026-10-18-windows-desktop-package.md) | implemented |
-| 2026-10-18 | process | [在 release 工作流里构建并附带 Windows 安装包](proposals/process/2026-10-18-release-windows-installers.md) | proposed |
+| 2026-10-18 | process | [在 release 工作流里构建并附带 Windows 安装包](proposals/process/2026-10-18-release-windows-installers.md) | implemented |
 
 ## 与 docs/ 的分工
 

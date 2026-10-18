@@ -1,8 +1,9 @@
 # 在 release 工作流里构建并附带 Windows 安装包
 
 **Class:** process
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-18
+**Updated:** 2026-10-18（实施完成：`windows` job 落地、远端干跑跑通、CI 产物在本机安装复核）
 **Source:** 用户要求「你加入 release 流程」（此前刚在本地打通并验收了 Windows 打包路径，见 `2026-10-18-windows-desktop-package`）
 
 ## Goal
@@ -25,14 +26,21 @@
 
 ## Accept
 
-- [ ] `release.yml` 新增 `windows` job（`windows-latest`），构建命令与本地一致（`pnpm tauri build`），并在构建前用 `release-plan.mjs --set-version` 盖上与其它渠道同源的版本
-- [ ] `release` job 以 `needs: [prepare, build, ios, windows]` + `!cancelled()` 接收安装包，挂载步骤用 `gh release upload --clobber` 单独执行，缺安装包不影响 Release upsert
-- [ ] actionlint（v1.7.12）对 `release.yml` 零告警；`node .github/scripts/release-plan.mjs --self-test` 与 `node scripts/verify-proposals.mjs` 通过
-- [ ] 逐条推演 job 条件：stable 恒为真；private + 定时 nightly 为假；public 为真；`workflow_dispatch` 为真；`skip=true` 的空转 nightly 为假
-- [ ] 真实运行取证：`workflow_dispatch`（`publish=false`）下 `windows` job 跑通并上传 `windows-installers`；产物下载后在本机安装/卸载验证
-- [ ] 合进 `main` 后核对 stable 的 Release 里带 `agh-console-setup.exe` 与 `agh-console.msi`，nightly 亦同
+- [x] `release.yml` 新增 `windows` job（`windows-latest`），构建命令与本地一致（`pnpm tauri build`），并在构建前用 `release-plan.mjs --set-version` 盖上与其它渠道同源的版本
+- [x] `release` job 以 `needs: [prepare, build, ios, windows]` + `!cancelled()` 接收安装包，挂载步骤用 `gh release upload --clobber` 单独执行，缺安装包不影响 Release upsert
+- [x] actionlint（v1.7.12）对 `release.yml` 零告警；`pnpm test:release`（release-plan / manifest / AltStore 三个自测）与 `node scripts/verify-proposals.mjs` 通过
+- [x] 逐条推演 job 条件：闸表达式与 `ios` 逐字同形（stable 恒为真；private + 定时 nightly 为假；public 为真；`workflow_dispatch` 为真；`skip=true` 的空转 nightly 为假），该形状已在 iOS 线上验证过
+- [x] 真实运行取证：干跑 run [39118274987](https://github.com/Cowjiang/adguard-home-console/actions/runs/39118274987)（`workflow_dispatch`、`publish=false`、head `a0c54ca`）整轮 success——`prepare`/`build`/`ios`/`windows`/`docker` 全绿，`release` 与 `npm` 按 `publish=false` 跳过；`windows` job 8.4 min 全 step success，产物 `windows-installers`（7.3 MB）
+- [x] CI 产物本机复核：下载后静默安装 → 启动（视口 1280×800 桌面布局、深色跟随系统）→ About 页报 `v0.2.1-nightly.20261018.a0c54ca`，安装包 `FileVersion`/`ProductVersion` = `0.2.1`（核心版本，符合决策 7）→ 静默卸载干净（安装目录与注册表项均无残留）
+- [ ] 合进 `main` 后核对 stable 的 Release 里带 `agh-console-setup.exe` 与 `agh-console.msi`（需先合并再发版，本轮无法验证）
 
 ## Note
+
+**第一次干跑就翻车的地方（已修，run [39117991067](https://github.com/Cowjiang/adguard-home-console/actions/runs/39117991067)）**：`windows` job 的 `Stamp version` 步以 `release-plan: '' 不是合法 semver` 失败。根因是 Windows runner 的默认 shell 是 PowerShell，`run: node … --set-version "$VERSION" "$BUILD"` 里的 `$VERSION` 是未定义的 PowerShell 变量（环境变量在 PowerShell 里要写 `$env:VERSION`），于是把两个空串传给了脚本。修法：给该步加 `shell: bash`（runner 自带 Git Bash，命令与 ubuntu/macOS 两个 job 逐字一致）。**静态 lint（actionlint 零告警）与本机推演都看不出这一类问题**——平台 job 里凡是带环境变量展开的步骤，都必须真跑一次干跑。
+
+**版本链条一次贯穿取证**：`prepare` 算出 `0.2.1-nightly.20261018.a0c54ca` → `windows` job 盖进 `package.json`（完整串）与 `tauri.conf.json`（核心 `0.2.1`）→ 安装包文件版本 `0.2.1` → 应用 About 页 `v0.2.1-nightly.20261018.a0c54ca`。MSI/NSIS 的版本字段无法携带 nightly 串（与 iOS plist 同因），所以 nightly 安装包彼此只靠 Release 正文与 tag 区分；要更细的区分得等 Windows 端的更新器/构建号方案。
+
+**耗时与成本**：首次干跑 `windows` 8.4 min（无 Rust 缓存，job 结束时已写缓存），`ios` 2.8 min（缓存热）。仓库公开，标准 runner 不记费。
 
 **与本地验收的关系**：安装包本身已在本机验收（`2026-10-18-windows-desktop-package`：MSI/NSIS 产出、NSIS 安装 → 运行 → 卸载干净、Rust 代理五页无错、桌面视口 1280×800）。本提案只负责把它接进 CI，不重复验证应用行为。
 
