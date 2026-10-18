@@ -3,7 +3,7 @@
  * handed to pages stays the flat {url, username, password} of the active
  * instance's active endpoint — that is what keeps src/pages unchanged.
  * MVP: every instance holds exactly one endpoint; the array is reserved for
- * Away Connection.
+ * Away Connection and Managed metadata.
  */
 
 /** Flat runtime connection config — the shape api() and all pages consume */
@@ -18,11 +18,20 @@ export interface Endpoint extends SvrConfig {
   insecure?: boolean
 }
 
+/** Managed mode metadata attached to an instance */
+export interface InstanceManagedMetadata {
+  serverUrl: string
+  salt: string
+  syncedAt?: string
+}
+
 export interface Instance {
   id: string
   /** Human-facing name; derived from host[:port] until a rename UI exists */
   label: string
   endpoints: Endpoint[]
+  /** Present when the instance is enrolled in Console managed mode */
+  managed?: InstanceManagedMetadata
 }
 
 export interface InstanceStoreData {
@@ -79,11 +88,22 @@ export function parseStore(raw: unknown): InstanceStoreData | null {
     const i = it as Partial<Instance>
     const endpoints = (Array.isArray(i.endpoints) ? i.endpoints : []).filter(isEndpoint)
     if (typeof i.id !== 'string' || i.id === '' || endpoints.length === 0) continue
-    instances.push({
+    const inst: Instance = {
       id: i.id,
       label: typeof i.label === 'string' && i.label ? i.label : labelFromUrl(endpoints[0].url),
       endpoints,
-    })
+    }
+    if (i.managed && typeof i.managed === 'object') {
+      const m = i.managed as Partial<InstanceManagedMetadata>
+      if (typeof m.serverUrl === 'string' && typeof m.salt === 'string') {
+        inst.managed = {
+          serverUrl: m.serverUrl,
+          salt: m.salt,
+          ...(typeof m.syncedAt === 'string' ? { syncedAt: m.syncedAt } : {}),
+        }
+      }
+    }
+    instances.push(inst)
   }
   if (instances.length === 0) return null
   const activeId = instances.some((x) => x.id === d.activeId) ? (d.activeId as string) : instances[0].id
