@@ -582,6 +582,18 @@ html::-webkit-scrollbar-thumb {
   background: var(--glass-border-strong);
   border-radius: 4px;
 }
+/* Desktop: keep the page scrollbar present even when the content fits. Wherever the
+   scrollbar does take layout space (custom/classic scrollbars), letting it appear and
+   disappear — a long settings page vs. a short one — shifts the centered content
+   sideways on every tab switch.
+   scrollbar-gutter: stable is no cover here: those platforms still report overlay
+   scrollbars, so it reserves nothing, and only overflow-y reserves the space. The mobile
+   line keeps the platform's overlay scrollbar and stays out of this rule. */
+@media (min-width: 1024px) {
+  html {
+    overflow-y: scroll;
+  }
+}
 
 /* Globally disable the long-press menu and text selection (inputs excepted;
    everything copyable has a copy button) */

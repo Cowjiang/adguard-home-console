@@ -1,13 +1,13 @@
 /** iOS-style base primitives: page containers, headers, cards, lists, controls */
 import {
-  useEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
+  useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useIsDesktop } from '../../lib/useIsDesktop'
-import { TOP_LEVEL_ROUTES } from '../../lib/nav/routes'
+import { TOP_LEVEL_ROUTES, isDesktopSettingsTopLevel } from '../../lib/nav/routes'
 import { useRouteTransition, useEnterSkip } from '../../lib/routeTransition'
 import { useNativeBackShown } from '../../lib/native/nativeBackButton'
 import { useNativeHeaderAction, type NativeHeaderSpec } from '../../lib/native/nativeHeaderAction'
@@ -60,14 +60,43 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
   const nativeBack = useNativeBackShown()
   const transition = useRouteTransition()
   // Top-level pages (sidebar/TabBar direct) need no back button on desktop;
-  // back belongs to secondary pages only
-  const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname)
+  // back belongs to secondary pages only.
+  // In the desktop split layout, settings sub-pages (except /settings/server/edit)
+  // have top-level semantics where the secondary sidebar handles navigation.
+  const isTopLevel = TOP_LEVEL_ROUTES.includes(pathname) || isDesktopSettingsTopLevel(pathname, isDesktop)
   const showBack = back && !(isDesktop && isTopLevel)
   // Mobile secondary page: back pill + centered title pinned top-left, content
   // scrolls beneath (matches the iOS 26 liquid-glass nav bar)
   const floating = showBack && !isDesktop
 
   const goBack = () => navBack(nav, pathname)
+
+  // Floating nav: the title is absolutely centered, so it must stay clear of
+  // the back pill and the right-side actions. Only the DOM knows the action
+  // slot's width, so the allowed title width (twice the tighter free side,
+  // capped at 240px) is measured on layout and whenever the slots resize.
+  const barRef = useRef<HTMLDivElement>(null)
+  const rightRef = useRef<HTMLDivElement>(null)
+  const [titleMax, setTitleMax] = useState<number | undefined>(undefined)
+  const hasRight = !!right
+  useLayoutEffect(() => {
+    if (!floating) return
+    const bar = barRef.current
+    if (!bar) return
+    const measure = () => {
+      const w = bar.getBoundingClientRect().width
+      const rw = rightRef.current?.getBoundingClientRect().width ?? 0
+      // 16px bar padding + 44px back pill + 8px gap vs. padding + actions + gap
+      const backSide = w / 2 - (16 + 44 + 8)
+      const rightSide = w / 2 - (16 + (rw ? rw + 8 : 0))
+      setTitleMax(Math.max(64, Math.min(240, Math.min(backSide, rightSide) * 2)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(bar)
+    if (rightRef.current) ro.observe(rightRef.current)
+    return () => ro.disconnect()
+  }, [floating, hasRight, title])
 
   if (floating) {
     // The fixed nav bar translates in sync with the page layer (push/pop),
@@ -89,7 +118,7 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
       >
         {/* Scroll-edge gradient mask: see the NavScrim comment */}
         <NavScrim />
-        <div className="relative flex h-12 items-center px-4">
+        <div ref={barRef} className="relative flex h-12 items-center px-4">
           {/* When the native glass button takes over it is only visually
               hidden: the transition snapshot clone of this bar restores the
               button, so the sliding old page doesn't leave a hole at its spot
@@ -104,10 +133,13 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
           >
             <ChevronLeft size={22} />
           </button>
-          <div className="pointer-events-none absolute left-1/2 w-full max-w-[min(58vw, 240px)] -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1">
+          <div
+            className="pointer-events-none absolute left-1/2 w-full -translate-x-1/2 truncate text-center text-[17px] font-semibold text-t1"
+            style={{ maxWidth: titleMax }}
+          >
             {title}
           </div>
-          {right && <div className="pointer-events-auto ml-auto flex flex-none items-center gap-2">{right}</div>}
+          {right && <div ref={rightRef} className="pointer-events-auto ml-auto flex flex-none items-center gap-2">{right}</div>}
         </div>
       </div>,
       document.body
@@ -153,7 +185,9 @@ export function HeaderAction({ onClick, label, className = '', native, children 
   native?: NativeHeaderSpec
   children: ReactNode
 }) {
-  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), true)
+  // The CSS button's aria-label doubles as the native control's spoken label
+  // (icon-only native buttons would otherwise announce the SF Symbol's name)
+  const nativeHandled = useNativeHeaderAction(native && { a11yLabel: label, ...native }, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), true)
   return (
     <button
       type="button"
@@ -190,7 +224,12 @@ export function GroupTitle({ children, right, className = '' }: { children: Reac
 }
 
 export function Group({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <Card className={`!rounded-[22px] ${className}`}><div>{children}</div></Card>
+  // Row container: the section-surface radius is the Card default (rounded-3xl)
+  // everywhere. The old `!rounded-[22px]` override was the only second section
+  // radius in the app: on pages that mixed grouped rows with standalone cards
+  // (settings forms, the filter/rewrite sub-pages), adjacent 22/24 corners read
+  // as a wobble; inner item cards/tiles keep their own tighter rounded-2xl.
+  return <Card className={className}><div>{children}</div></Card>
 }
 
 export function Row({
@@ -267,8 +306,9 @@ export function Button({
   native?: NativeHeaderSpec
 }) {
   // With size="header" (the header-right slot), the Apple shell hands off to
-  // the native liquid-glass button; the CSS side keeps only a placeholder
-  const nativeHandled = useNativeHeaderAction(native, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
+  // the native liquid-glass button; the CSS side keeps only a placeholder.
+  // `label` (the button's aria-label) becomes the native control's spoken label
+  const nativeHandled = useNativeHeaderAction(native && { a11yLabel: label, ...native }, () => onClick?.(undefined as unknown as RMouseEvent<HTMLButtonElement>), size === 'header')
   const base = 'press inline-flex items-center justify-center gap-2 rounded-full font-semibold select-none'
   // header: header-right slot only; mobile matches the back pill height (h-11),
   // desktop matches sm

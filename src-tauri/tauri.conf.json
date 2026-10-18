@@ -15,9 +15,9 @@
       {
         "label": "main",
         "title": "AGH Console",
-        "width": 960,
-        "height": 640,
-        "minWidth": 400,
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
         "minHeight": 600
       }
     ],
@@ -35,6 +35,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico"
+      }
+    },
     "iOS": {
       "minimumSystemVersion": "15.0"
     }

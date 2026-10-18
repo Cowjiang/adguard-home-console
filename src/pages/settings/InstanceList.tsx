@@ -1,22 +1,57 @@
 /** Instance list: multi-instance management entries */
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Server, Plus } from 'lucide-react'
-import { IconBubble } from '../../components/ui/atoms'
+import { Server, Plus, Pencil, Trash } from 'lucide-react'
+import { IconBubble, Badge } from '../../components/ui/atoms'
 import { useAuth } from '../../lib/session/auth'
 import { PageHeader, Screen, Group, GroupTitle, Rows, Row, Button } from '../../components/ui/primitives'
+import { useConfirm } from '../../components/ui/sheet'
 
 /* ================= Instances ================= */
 
-/** Instance list: online badge per instance (from /status probes), tap to edit */
+/** Instance list: online badge per instance (from /status probes). Tapping a row
+ *  switches the active instance; the header's manage toggle swaps the rows'
+ *  tap action for per-row edit / delete (header button goes through the native
+ *  glass path inside the iOS shell) */
 export function ServerSettings() {
-  const { instances, activeId } = useAuth()
+  const { instances, activeId, switchInstance, removeInstance } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
+  const confirm = useConfirm()
+  const [manage, setManage] = useState(false)
+
+  function remove(id: string) {
+    const target = instances.find((x) => x.id === id)
+    if (!target) return
+    const isLast = instances.length === 1
+    confirm({
+      title: t('settings.instancesDeleteTitle'),
+      message: isLast ? t('settings.instancesDeleteLastMsg') : t('settings.instancesDeleteMsg', { name: target.label }),
+      destructive: true,
+      confirmText: t('settings.instancesDelete'),
+      onConfirm: () => removeInstance(id),
+    })
+  }
 
   return (
     <Screen>
-      <PageHeader back title={t('settings.serverTitle')} />
+      <PageHeader
+        back
+        title={t('settings.serverTitle')}
+        right={
+          instances.length > 0 ? (
+            <Button
+              size="header"
+              variant={manage ? 'primary' : 'glass'}
+              onClick={() => setManage((v) => !v)}
+              native={manage ? { label: t('common.done'), foreground: 'accent' } : { label: t('common.manage') }}
+            >
+              {manage ? t('common.done') : t('common.manage')}
+            </Button>
+          ) : undefined
+        }
+      />
 
       <GroupTitle>{t('settings.instancesGroup')}</GroupTitle>
       <Group>
@@ -31,8 +66,36 @@ export function ServerSettings() {
               }
               title={it.label}
               subtitle={it.url}
-              value={it.id === activeId ? t('settings.instancesActive') : undefined}
-              onClick={() => nav(`/settings/server/edit?id=${it.id}`)}
+              value={
+                !manage && it.id === activeId ? (
+                  <Badge kind="ok">{t('settings.instancesActive')}</Badge>
+                ) : undefined
+              }
+              right={
+                manage ? (
+                  <div className="flex flex-none items-center gap-2">
+                    <Button
+                      variant="glass"
+                      size="sm"
+                      label={t('common.edit')}
+                      className="!h-9 !w-9 !rounded-[10px] !px-0"
+                      onClick={() => nav(`/settings/server/edit?id=${it.id}`)}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    <button
+                      type="button"
+                      aria-label={t('common.delete')}
+                      onClick={() => remove(it.id)}
+                      className="press flex h-9 w-9 flex-none items-center justify-center rounded-[10px]"
+                      style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                    >
+                      <Trash size={16} />
+                    </button>
+                  </div>
+                ) : null
+              }
+              onClick={manage ? undefined : () => switchInstance(it.id)}
               last={i === instances.length - 1}
             />
           ))}
@@ -42,8 +105,6 @@ export function ServerSettings() {
       <Button variant="glass" className="mt-4 w-full" onClick={() => nav('/settings/server/edit')}>
         <Plus size={15} /> {t('settings.instancesAdd')}
       </Button>
-
-      <p className="mt-4 px-2 text-[12px] leading-relaxed text-t3">{t('settings.instancesListNote')}</p>
     </Screen>
   )
 }

@@ -1,3 +1,6 @@
+/** Sync-to-other-instances content: target selection + pre-sync backup toggle.
+ *  Shared by the desktop centered sheet and the mobile /sync/:type sub-page
+ *  (mobile shows no floating panels at all, see docs/web-interaction.md). */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Server, Check, AlertTriangle, Shield } from 'lucide-react'
@@ -9,19 +12,34 @@ import type { SyncExecutionSummary } from '../../lib/session/rulesSync'
 import { captureInstanceSnapshot } from '../../lib/snapshot/snapshotCapture'
 import { saveSnapshot } from '../../lib/snapshot/snapshotStorage'
 
-interface SyncSheetContentProps {
+interface SyncFormProps {
   itemCount: number
   itemTypeLabel: string
   onSync: (targets: Instance[]) => Promise<SyncExecutionSummary>
   onClose: () => void
 }
 
-export function SyncSheetContent({
+/** Check square used by the target list and the backup toggle */
+function CheckSquare({ checked }: { checked: boolean }) {
+  return (
+    <div
+      className={`flex h-4 w-4 flex-none items-center justify-center rounded border transition-colors ${
+        checked
+          ? 'border-accent bg-accent text-white'
+          : 'border-[var(--glass-border-strong)] text-transparent'
+      }`}
+    >
+      {checked && <Check size={11} strokeWidth={3} />}
+    </div>
+  )
+}
+
+export function SyncForm({
   itemCount,
   itemTypeLabel,
   onSync,
   onClose,
-}: SyncSheetContentProps) {
+}: SyncFormProps) {
   const { store, activeId, instances } = useAuth()
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
@@ -73,8 +91,8 @@ export function SyncSheetContent({
                   aghVersion: view?.version || 'unknown',
                 },
                 {
-                  label: `Pre-Sync Guard: ${itemTypeLabel}`,
-                  description: `Automatic safety snapshot captured before synchronizing ${itemTypeLabel} (${itemCount} items)`,
+                  label: t('settings.snapshotPreSyncLabel', { type: itemTypeLabel }),
+                  description: t('settings.snapshotPreSyncDesc', { type: itemTypeLabel, count: itemCount }),
                   trigger: 'pre_sync',
                 }
               )
@@ -114,14 +132,11 @@ export function SyncSheetContent({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="text-[17px] font-bold text-t1">{t('filters.syncModalTitle')}</p>
-        <p className="mt-1 text-[12.5px] leading-relaxed text-t2">
-          {t('filters.syncModalDesc')}
-        </p>
-      </div>
+      <p className="text-[12.5px] leading-relaxed text-t2">
+        {t('filters.syncModalDesc')}
+      </p>
 
-      <div className="flex items-center gap-2 rounded-xl bg-card p-3 text-[12px] text-t2 border border-border">
+      <div className="glass flex items-center gap-2 rounded-2xl p-3 text-[12px] text-t2">
         <AlertTriangle size={15} className="text-warn flex-none" />
         <span>
           {t('filters.syncSourceDesc', { count: itemCount, type: itemTypeLabel })}
@@ -129,10 +144,10 @@ export function SyncSheetContent({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-[12px] font-semibold text-t3 uppercase tracking-wider">
+        <p className="px-2 text-[12px] font-semibold uppercase tracking-wider text-t3">
           {t('filters.syncTargetSelect')}
         </p>
-        <div className="flex flex-col divide-y divide-border rounded-xl border border-border overflow-hidden bg-card">
+        <div className="glass flex flex-col divide-y divide-[var(--glass-border)] overflow-hidden rounded-2xl">
           {otherInstances.map((inst) => {
             const isChecked = selectedIds.has(inst.id)
             const view = instances.find((x) => x.id === inst.id)
@@ -142,24 +157,16 @@ export function SyncSheetContent({
               <div
                 key={inst.id}
                 onClick={() => toggle(inst.id)}
-                className="flex cursor-pointer items-center justify-between p-3 transition-colors hover:bg-muted/40 select-none"
+                className="flex cursor-pointer select-none items-center justify-between gap-2 p-3 transition-colors hover:bg-white/[0.04]"
               >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                      isChecked
-                        ? 'border-accent bg-accent text-white'
-                        : 'border-border bg-transparent'
-                    }`}
-                  >
-                    {isChecked && <Check size={11} strokeWidth={3} />}
-                  </div>
-                  <Server size={15} className="text-t3 flex-none" />
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <CheckSquare checked={isChecked} />
+                  <Server size={15} className="flex-none text-t3" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-t1 truncate">{inst.label}</p>
+                    <p className="truncate text-[13px] font-medium text-t1">{inst.label}</p>
                     {isOffline && (
                       <span className="text-[10.5px] text-danger">
-                        （{t('filters.syncOfflineBadge')}）
+                        {t('filters.syncOfflineBadge')}
                       </span>
                     )}
                   </div>
@@ -173,15 +180,9 @@ export function SyncSheetContent({
       {/* Auto Backup Toggle */}
       <div
         onClick={() => setBackupBeforeSync(!backupBeforeSync)}
-        className="flex cursor-pointer items-center gap-2 rounded-xl border border-border/50 bg-card/60 p-2.5 text-[12px] text-t2 select-none hover:bg-card transition-colors"
+        className="glass press flex cursor-pointer select-none items-center gap-2 rounded-2xl p-3 text-[12px] text-t2"
       >
-        <div
-          className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-            backupBeforeSync ? 'border-accent bg-accent text-white' : 'border-border bg-transparent'
-          }`}
-        >
-          {backupBeforeSync && <Check size={11} strokeWidth={3} />}
-        </div>
+        <CheckSquare checked={backupBeforeSync} />
         <Shield size={14} className="text-accent flex-none" />
         <span>{t('settings.snapshotBackupBeforeSync')}</span>
       </div>

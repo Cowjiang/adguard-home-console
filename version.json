@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "appName": "agh-console",
+  "channel": "stable",
+  "version": "0.2.1",
+  "releaseTag": "v0.2.1",
+  "publishedAt": "2026-10-16T07:01:02.273Z",
+  "releaseNotes": "",
+  "htmlUrl": "https://github.com/Cowjiang/adguard-home-console/releases/tag/v0.2.1",
+  "downloads": {
+    "tarball": "https://github.com/Cowjiang/adguard-home-console/releases/download/v0.2.1/agh-console.tar.gz",
+    "ipa": "https://github.com/Cowjiang/adguard-home-console/releases/download/v0.2.1/agh-console.ipa",
+    "docker": "ghcr.io/cowjiang/agh-console:0.2.1",
+    "npm": "agh-console@0.2.1",
+    "altstoreSource": "https://raw.githubusercontent.com/Cowjiang/adguard-home-console/main/community-source.json"
+  }
+}

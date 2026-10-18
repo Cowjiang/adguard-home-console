@@ -1,9 +1,10 @@
 /** Filter management: blacklist/whitelist filters, custom rules, blocked services */
 import { useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Trans, useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import {
-  Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink, ArrowLeftRight,
+  Plus, RefreshCw, Trash2, Globe2, Search, Ban, ExternalLink,
 } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
 import { api, swrFetcher, type FilteringStatus, type Filter, type BlockedService, type SvrConfig } from '../lib/api'
@@ -17,8 +18,9 @@ import { IconBubble } from '../components/ui/atoms'
 import { hoursLabel, relTime, fmtNum } from '../lib/format'
 import { SERVICE_CACHE_KEY } from '../lib/constants'
 import { runMutation } from '../lib/mutation'
-import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { SyncForm } from '../components/protection/SyncForm'
 import { syncUserRulesToInstances, syncRewritesToInstances, syncFilterListsToInstances } from '../lib/session/rulesSync'
+import { useIsDesktop } from '../lib/useIsDesktop'
 
 // AGH /filtering interval is milliseconds; labels and picker options work in hours
 const HOUR_MS = 3_600_000
@@ -29,9 +31,11 @@ const HOUR_MS = 3_600_000
 export function FiltersPage({ whitelist }: { whitelist: boolean }) {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const pick = usePick()
   const confirm = useConfirm()
+  const isDesktop = useIsDesktop()
   const [refreshing, setRefreshing] = useState(false)
 
   const { data, mutate, isLoading } = useSWR<FilteringStatus>(
@@ -112,38 +116,40 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
     )
   }
 
+  // Sync entry lives in the bottom action card (not the cramped header):
+  // mobile opens the /sync/:type sub-page, desktop the centered sheet
+  function openSync() {
+    if (!isDesktop) {
+      nav(whitelist ? '/sync/allowlist' : '/sync/filters')
+      return
+    }
+    sheet.open(
+      <SyncForm
+        itemCount={filters.length}
+        itemTypeLabel={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')}
+        onSync={(targets) =>
+          syncFilterListsToInstances(
+            targets,
+            whitelist ? [] : filters,
+            whitelist ? filters : []
+          )
+        }
+        onClose={() => sheet.close()}
+      />,
+      { title: t('filters.syncModalTitle') }
+    )
+  }
+
   return (
     <Screen>
       <PageHeader back title={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')} subtitle={t('filters.listCountSub', { n: filters.length, interval: data ? hoursLabel(data.interval / HOUR_MS) : '…' })} right={
-        <div className="flex items-center gap-1.5">
-          {instances.length > 1 && (
-            <HeaderAction
-              onClick={() => {
-                sheet.open(
-                  <SyncSheetContent
-                    itemCount={filters.length}
-                    itemTypeLabel={whitelist ? t('filters.whitelistTitle') : t('filters.blacklistTitle')}
-                    onSync={(targets) =>
-                      syncFilterListsToInstances(
-                        targets,
-                        whitelist ? [] : filters,
-                        whitelist ? filters : []
-                      )
-                    }
-                    onClose={() => sheet.close()}
-                  />
-                )
-              }}
-              label={t('filters.syncAction')}
-              className="w-11 text-t2 hover:text-accent lg:w-10"
-            >
-              <ArrowLeftRight size={17} />
-            </HeaderAction>
-          )}
-          <HeaderAction onClick={refreshAll} className="px-4 font-semibold text-t1" native={{ label: t('filters.refresh'), sfSymbol: 'arrow.clockwise' }}>
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> {t('filters.refresh')}
-          </HeaderAction>
-        </div>
+        // Icon-only on mobile: a text pill would squeeze the centered title
+        // (see PageHeader's measured clamp); the desktop label stays inside
+        // the pill, so the native spec is icon-only too
+        <HeaderAction onClick={refreshAll} label={t('filters.refresh')} className="w-11 font-semibold text-t1 lg:w-auto lg:px-4" native={{ sfSymbol: 'arrow.clockwise', iconOnly: true }}>
+          <RefreshCw size={17} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden lg:inline">{t('filters.refresh')}</span>
+        </HeaderAction>
       } />
 
       {isLoading && <Loading />}
@@ -217,6 +223,14 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
           />
         </Rows>
       </Group>
+
+      {instances.length > 1 && (
+        <Group className="mt-2.5">
+          <Rows>
+            <Row title={t('filters.syncAction')} subtitle={t('filters.syncSub')} onClick={openSync} last />
+          </Rows>
+        </Group>
+      )}
     </Screen>
   )
 }
@@ -226,7 +240,9 @@ export function FiltersPage({ whitelist }: { whitelist: boolean }) {
 export function RulesPage() {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
+  const isDesktop = useIsDesktop()
   const { data, mutate } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher)
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -250,30 +266,28 @@ export function RulesPage() {
     if (ok) setDraft(null)
   }
 
+  // Bottom action card, same shape as the filters page: mobile goes to the
+  // /sync/rules sub-page, desktop opens the centered sheet
+  function openSync() {
+    if (!isDesktop) {
+      nav('/sync/rules')
+      return
+    }
+    const currentRules = (draft ?? (data?.user_rules ?? []).join('\n')).split('\n').map((s) => s.trim()).filter(Boolean)
+    sheet.open(
+      <SyncForm
+        itemCount={currentRules.length}
+        itemTypeLabel={t('protection.customRulesRow')}
+        onSync={(targets) => syncUserRulesToInstances(targets, currentRules)}
+        onClose={() => sheet.close()}
+      />,
+      { title: t('filters.syncModalTitle') }
+    )
+  }
+
   return (
     <Screen>
-      <PageHeader back title={t('filters.customTitle')} subtitle={t('filters.customSub', { n: activeCount })} right={
-        instances.length > 1 ? (
-          <HeaderAction
-            onClick={() => {
-              const currentRules = (draft ?? (data?.user_rules ?? []).join('\n')).split('\n').map((s) => s.trim()).filter(Boolean)
-              sheet.open(
-                <SyncSheetContent
-                  itemCount={currentRules.length}
-                  itemTypeLabel={t('protection.customRulesRow')}
-                  onSync={(targets) => syncUserRulesToInstances(targets, currentRules)}
-                  onClose={() => sheet.close()}
-                />
-              )
-            }}
-            label={t('filters.syncAction')}
-            className="w-11 text-accent lg:w-auto lg:px-2.5"
-            native={{ sfSymbol: 'arrow.triangle.2.circlepath', foreground: 'accent' }}
-          >
-            <ArrowLeftRight size={17} />
-          </HeaderAction>
-        ) : undefined
-      } />
+      <PageHeader back title={t('filters.customTitle')} subtitle={t('filters.customSub', { n: activeCount })} />
       <Card className="p-4">
         <textarea
           className="field"
@@ -292,6 +306,14 @@ export function RulesPage() {
           </Button>
         </div>
       </Card>
+
+      {instances.length > 1 && (
+        <Group className="mt-2.5">
+          <Rows>
+            <Row title={t('filters.syncAction')} subtitle={t('filters.syncSub')} onClick={openSync} last />
+          </Rows>
+        </Group>
+      )}
     </Screen>
   )
 }
@@ -468,8 +490,10 @@ export function ServicesPage() {
 export function RewritesPage() {
   const { cfg, instances } = useAuth()
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
   const confirm = useConfirm()
+  const isDesktop = useIsDesktop()
   const { data: entries, mutate } = useSWR<any[]>(cfg ? ['rw', cfg, '/rewrite/list'] : null, swrFetcher)
   const { data: settings, mutate: mSettings } = useSWR<any>(cfg ? ['rws', cfg, '/rewrite/settings'] : null, swrFetcher)
 
@@ -523,39 +547,36 @@ export function RewritesPage() {
     )
   }
 
+  // Bottom action card, same shape as the filters page: mobile goes to the
+  // /sync/rewrites sub-page, desktop opens the centered sheet
+  function openSync() {
+    if (!isDesktop) {
+      nav('/sync/rewrites')
+      return
+    }
+    const list = entries ?? []
+    sheet.open(
+      <SyncForm
+        itemCount={list.length}
+        itemTypeLabel={t('protection.rewritesRow')}
+        onSync={(targets) => syncRewritesToInstances(targets, list)}
+        onClose={() => sheet.close()}
+      />,
+      { title: t('filters.syncModalTitle') }
+    )
+  }
+
   return (
     <Screen>
       <PageHeader back title={t('filters.rwTitle')} subtitle={t('filters.rwCountSub', { n: entries?.length ?? 0 })} right={
-        <div className="flex items-center gap-1.5">
-          {instances.length > 1 && (
-            <HeaderAction
-              onClick={() => {
-                const list = entries ?? []
-                sheet.open(
-                  <SyncSheetContent
-                    itemCount={list.length}
-                    itemTypeLabel={t('protection.rewritesRow')}
-                    onSync={(targets) => syncRewritesToInstances(targets, list)}
-                    onClose={() => sheet.close()}
-                  />
-                )
-              }}
-              label={t('filters.syncAction')}
-              className="w-11 text-t2 hover:text-accent lg:w-auto lg:px-2.5"
-              native={{ sfSymbol: 'arrow.triangle.2.circlepath' }}
-            >
-              <ArrowLeftRight size={17} />
-            </HeaderAction>
-          )}
-          <HeaderAction
-            onClick={openAdd}
-            label={t('common.add')}
-            className="w-11 text-accent lg:w-10"
-            native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
-          >
-            <Plus size={19} />
-          </HeaderAction>
-        </div>
+        <HeaderAction
+          onClick={openAdd}
+          label={t('common.add')}
+          className="w-11 text-accent lg:w-10"
+          native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+        >
+          <Plus size={19} />
+        </HeaderAction>
       } />
 
       <Group>
@@ -596,6 +617,14 @@ export function RewritesPage() {
           <EmptyState icon={<ExternalLink size={28} className="text-t3" />} title={t('filters.rwEmptyTitle')} subtitle={t('filters.rwEmptySub')} />
         )}
       </div>
+
+      {instances.length > 1 && (
+        <Group className="mt-2.5">
+          <Rows>
+            <Row title={t('filters.syncAction')} subtitle={t('filters.syncSub')} onClick={openSync} last />
+          </Rows>
+        </Group>
+      )}
     </Screen>
   )
 }

@@ -53,21 +53,16 @@ export function AccessSettings() {
     <Screen>
       <PageHeader back title={t('advanced.titleAccess')} right={dirty ? <Button size="header" loading={saving} onClick={save} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button> : undefined} />
 
-      <div className="grid gap-x-4 lg:grid-cols-2 lg:items-start">
-        <div>
-          <GroupTitle>{t('advanced.groupClients')}</GroupTitle>
-          <Card className="p-4 flex flex-col gap-3">
-            <Field label={t('advanced.allowedLabel')} value={draft.allowed} onChange={(v) => form.patch('allowed', v)} placeholder="192.168.1.0/24" />
-            <Field label={t('advanced.blockedLabel')} value={draft.disallowed} onChange={(v) => form.patch('disallowed', v)} placeholder="10.0.0.1" />
-          </Card>
-        </div>
-        <div>
-          <GroupTitle>{t('advanced.groupDomains')}</GroupTitle>
-          <Card className="p-4">
-            <Field label={t('advanced.blockedHostsLabel')} value={draft.hosts} onChange={(v) => form.patch('hosts', v)} placeholder={'version.bind\nid.server'} />
-          </Card>
-        </div>
-      </div>
+      <GroupTitle>{t('advanced.groupClients')}</GroupTitle>
+      <Card className="p-4 flex flex-col gap-3">
+        <Field label={t('advanced.allowedLabel')} value={draft.allowed} onChange={(v) => form.patch('allowed', v)} placeholder="192.168.1.0/24" />
+        <Field label={t('advanced.blockedLabel')} value={draft.disallowed} onChange={(v) => form.patch('disallowed', v)} placeholder="10.0.0.1" />
+      </Card>
+
+      <GroupTitle>{t('advanced.groupDomains')}</GroupTitle>
+      <Card className="p-4">
+        <Field label={t('advanced.blockedHostsLabel')} value={draft.hosts} onChange={(v) => form.patch('hosts', v)} placeholder={'version.bind\nid.server'} />
+      </Card>
 
       <div className="mt-4 rounded-2xl px-4 py-3 text-[12px] leading-relaxed" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>
         {t('advanced.accessWarning')}
@@ -82,4 +77,3 @@ export function AccessSettings() {
     </Screen>
   )
 }
-

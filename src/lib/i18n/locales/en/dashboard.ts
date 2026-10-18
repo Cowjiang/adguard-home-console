@@ -23,9 +23,11 @@ const enDashboard = {
   safeBrowsing: 'Safe Browsing',
   safeSearch: 'SafeSearch',
   parental: 'Parental',
-  topDomains: 'Top domains',
-  topBlocked: 'Blocked domains',
-  topClients: 'Active clients',
+  // Short tab labels: the mobile top-list Segmented carries three of them and
+  // the longer wording overflows its pill below 400px
+  topDomains: 'Domains',
+  topBlocked: 'Blocked',
+  topClients: 'Clients',
   viewMore: 'View more',
   noBlockedTitle: 'Nothing blocked yet',
   noBlockedSub: 'Your network is very clean',
@@ -36,17 +38,6 @@ const enDashboard = {
   stopped: 'Stopped',
   dnsPort: 'DNS port',
   uptime: 'Uptime',
-  aggregateNote: 'Totals and leaderboards merge {{n}} instances; trends show the selected instance only.',
-  clusterHealthTitle: 'Cluster Health',
-  clusterHealthyBadge: 'All Healthy',
-  clusterDegradedBadge: 'Degraded',
-  activeInstance: 'Active',
-  switchInstance: 'Switch to instance',
-  protectionOn: 'Protected',
-  protectionOff: 'Unprotected',
-  probeAll: 'Probe All',
-  probing: 'Probing…',
-  offline: 'Offline',
 }
 
 export default enDashboard

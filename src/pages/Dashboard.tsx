@@ -2,13 +2,12 @@
  *  lists and upstream quick list, desktop (>=lg) carries the full stats
  *  analysis section merged from the former /stats page */
 import useSWR from 'swr'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Globe, ShieldAlert, Users, Database, PieChart } from 'lucide-react'
 import { useAuth } from '../lib/session/auth'
-import { api, swrFetcher, type Stats, type SvrConfig, type ClientsData } from '../lib/api'
-import { activeEndpoint } from '../lib/session/instances'
+import { api, swrFetcher, type Stats, type ClientsData } from '../lib/api'
 import { AreaChart, BarList, Donut, RankTable, StatTile } from '../components/charts'
 import { usePageInClass, Card, Segmented, Button, TabContent } from '../components/ui/primitives'
 import { Loading, Badge, EmptyState } from '../components/ui/atoms'
@@ -18,11 +17,10 @@ import { ProtectionCard } from '../components/protection/ProtectionCard'
 import { DashSkeleton } from '../components/dashboard/DashSkeleton'
 import { RangePicker, type RangeKey } from '../components/dashboard/RangePicker'
 import { ServerInfoCard } from '../components/dashboard/ServerInfoCard'
-import { ClusterHealthCard } from '../components/dashboard/ClusterHealthCard'
 import { UpstreamTable } from '../components/dashboard/UpstreamTable'
 import { InfoCell } from '../components/dashboard/InfoCell'
 import { fmtCompact, fmtNum, fmtPct, fmtMs } from '../lib/format'
-import { toMap, topEntries, aggregateStats } from '../lib/stats'
+import { toMap, topEntries } from '../lib/stats'
 
 
 const hourLabel = (hoursAgo: number) => {
@@ -35,7 +33,7 @@ export default function Dashboard() {
   // Mounted mid-slide-transition (e.g. gesture back landing) → skip the content-in
   // entrance, so a pending animation cannot leave the whole page blank during the gesture
   const enterSkip = useEnterSkip()
-  const { cfg, store, activeId, instances } = useAuth()
+  const { cfg } = useAuth()
   const nav = useNavigate()
   // Cross-tab jump (tab root → another tab root): replace keeps it out of the history
   // stack (swipe-back cannot return across tabs) + push transition animation; hierarchical
@@ -43,75 +41,17 @@ export default function Dashboard() {
   const jump = useTabJump()
   const [topTab, setTopTab] = useState<'clients' | 'domains' | 'blocked'>('domains')
 
-  const { data: activeStats, error } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
+  // Everything on this page describes the active instance
+  const { data: stats, error } = useSWR<Stats>(cfg ? ['stats', cfg, '/stats'] : null, swrFetcher, {
     refreshInterval: 5000,
     keepPreviousData: true,
   })
 
-  // Cross-instance aggregation: non-active instances poll /stats on a slow
-  // 30s cadence (the active one keeps the 5s hook above); totals and top_*
-  // lists merge, curves stay per-instance (see aggregateStats)
-  const others = useMemo(() => {
-    const st = store
-    if (!st) return []
-    return st.instances
-      .filter((x) => x.id !== st.activeId)
-      .map((x) => {
-        const ep = activeEndpoint(x)
-        return ep
-          ? { id: x.id, label: x.label, cfg: { url: ep.url, username: ep.username, password: ep.password } as SvrConfig }
-          : null
-      })
-      .filter((x): x is NonNullable<typeof x> => !!x)
-  }, [store])
-  const [otherStats, setOtherStats] = useState<Record<string, Stats | undefined>>({})
-  const onOtherStats = useCallback((url: string, s: Stats | undefined) => {
-    setOtherStats((prev) => (prev[url] === s ? prev : { ...prev, [url]: s }))
-  }, [])
-  const [curveId, setCurveId] = useState<string | null>(null)
-
-  // Merged view rendered by the whole page; the curve slots below swap in one
-  // instance's arrays
-  const stats = useMemo(
-    () => (activeStats ? aggregateStats(activeStats, others.map((o) => otherStats[o.cfg.url])) : undefined),
-    [activeStats, others, otherStats]
-  )
-  // Curve source: follows the active instance unless the user picked one;
-  // falls back to the active's data until the pick has loaded
-  const curveStats = useMemo(() => {
-    const want = curveId ?? activeId
-    if (!want || want === activeId) return activeStats
-    const other = others.find((o) => o.id === want)
-    return other ? otherStats[other.cfg.url] : activeStats
-  }, [curveId, activeId, others, activeStats, otherStats])
   const { data: clients } = useSWR<ClientsData>(cfg ? ['clients', cfg, '/clients'] : null, swrFetcher, {
     refreshInterval: 60000,
   })
   const [range, setRange] = useState<RangeKey>('24h')
   const { t } = useTranslation()
-
-  // Mobile trend legend: one row when it fits; when it doesn't, reflow as a
-  // symmetric 2×2 grid — a ragged 3+1 wrap reads badly next to the picker.
-  // Decided from the header box (content-width of items vs the space left
-  // beside title and picker) so both modes and live resizes recover; the
-  // callback ref re-attaches the observer when the card mounts with data
-  const [trendHeader, setTrendHeader] = useState<HTMLDivElement | null>(null)
-  const [legendGrid, setLegendGrid] = useState(false)
-  useEffect(() => {
-    if (!trendHeader) return
-    const decide = () => {
-      const kids = trendHeader.children as HTMLCollectionOf<HTMLElement>
-      const [title, legend, picker] = [kids[0], kids[1], kids[2]]
-      if (!legend || !picker) return
-      const oneLine = [...legend.children].reduce((w, c) => w + (c as HTMLElement).offsetWidth, 0) + 3 * 6
-      const avail = trendHeader.clientWidth - title.offsetWidth - picker.offsetWidth - 16
-      setLegendGrid(oneLine > avail)
-    }
-    const ro = new ResizeObserver(decide)
-    ro.observe(trendHeader)
-    decide()
-    return () => ro.disconnect()
-  }, [trendHeader])
 
   const clientName = (ip: string): string => {
     const c = clients?.clients?.find((x) => x.ids.includes(ip))
@@ -122,18 +62,18 @@ export default function Dashboard() {
 
   const chart = useMemo(() => {
     const n = range === '6h' ? 6 : range === '12h' ? 12 : 24
-    const q = curveStats?.dns_queries ?? []
-    const b = curveStats?.blocked_filtering ?? []
+    const q = stats?.dns_queries ?? []
+    const b = stats?.blocked_filtering ?? []
     const len = Math.min(n, q.length)
     return {
       queries: q.slice(-len),
       blocked: b.slice(-len),
       // Raw 24h filter-block series; each consumer slices to its own range
-      safe: curveStats?.replaced_safebrowsing ?? [],
-      parental: curveStats?.replaced_parental ?? [],
+      safe: stats?.replaced_safebrowsing ?? [],
+      parental: stats?.replaced_parental ?? [],
       labels: Array.from({ length: len }, (_, i) => hourLabel(len - 1 - i)),
     }
-  }, [range, curveStats])
+  }, [range, stats])
 
   // Filtering-trend card keeps its own picker, mirroring the traffic trend
   const [filterRange, setFilterRange] = useState<RangeKey>('24h')
@@ -183,11 +123,6 @@ export default function Dashboard() {
   return (
       <div className={`${pageIn} mx-auto w-full page-shell px-4`}>
       <div className={enterSkip ? '' : 'content-in'}>
-        {/* Silent /stats fetchers for the non-active instances (aggregation
-            feed); they render nothing */}
-        {others.map((o) => (
-          <OtherStats key={o.id} cfg={o.cfg} onData={onOtherStats} />
-        ))}
         {/* Protection card + stat tiles: side by side on desktop */}
       <div className="mt-0 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ProtectionCard />
@@ -205,19 +140,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Aggregation scope note: totals/leaderboards merge all instances,
-          curves stay per-instance */}
-      {instances.length > 1 && (
-        <p className="mt-2.5 px-1 text-[11.5px] leading-relaxed text-t3">
-          {t('dashboard.aggregateNote', { n: instances.length })}
-        </p>
-      )}
-
       {/* Traffic trend: mobile merges the filter-block series into the same
-          chart; its 4-entry legend sits right of the title as a 2×2 chip grid
-          aligned with the range picker — one inline row cannot fit 390px */}
+          chart without a legend (long-press preview names each series);
+          desktop keeps the two-entry legend beside the title */}
       <Card className="mt-4 p-4">
-        <div ref={setTrendHeader} className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <h2 className="whitespace-nowrap text-[15.5px] font-bold text-t1">{t('dashboard.trend')}</h2>
             <div className="hidden items-center gap-2 text-[10.5px] text-t2 lg:flex">
@@ -225,45 +152,18 @@ export default function Dashboard() {
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--danger)' }} /> {t('dashboard.legendBlocked')}
               </span>
             </div>
           </div>
-          {/* One row when it fits (wide phones), wraps right-aligned only
-              when the space between title and picker runs out */}
-          <div
-            className={`ml-auto items-center justify-end gap-x-1.5 gap-y-0.5 text-[10.5px] leading-tight text-t2 lg:hidden ${legendGrid ? 'grid grid-cols-2' : 'flex min-w-0 flex-wrap'}`}
-          >
-            <span className="flex w-max items-center gap-1 whitespace-nowrap">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-1)' }} /> {t('dashboard.legendQueries')}
-            </span>
-            <span className="flex w-max items-center gap-1 whitespace-nowrap">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--chart-2)' }} /> {t('dashboard.legendBlocked')}
-            </span>
-            <span className="flex w-max items-center gap-1 whitespace-nowrap">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warn)' }} /> {t('stats.malwareChart')}
-            </span>
-            <span className="flex w-max items-center gap-1 whitespace-nowrap">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--violet)' }} /> {t('stats.adultChart')}
-            </span>
-          </div>
           <RangePicker value={range} onChange={setRange} />
         </div>
-        {/* Curve source picker (multi-instance only): curves are never
-            aggregated, each instance renders its own series */}
-        {instances.length > 1 && (
-          <div className="mb-3">
-            <Segmented
-              value={curveId ?? activeId ?? ''}
-              onChange={(v) => setCurveId(v)}
-              options={instances.map((x) => ({ value: x.id, label: x.label }))}
-            />
-          </div>
-        )}
-        <div className="hidden lg:block">
+        {/* Blocked is remapped to the danger color: the chart tokens are
+            generic, but a red blocked band matches the donut and the lists */}
+        <div className="hidden lg:block" style={{ '--chart-2': 'var(--danger)' } as React.CSSProperties}>
           <AreaChart series={{ queries: chart.queries, blocked: chart.blocked }} labels={chart.labels} height={160} />
         </div>
-        <div className="lg:hidden">
+        <div className="lg:hidden" style={{ '--chart-2': 'var(--danger)' } as React.CSSProperties}>
           <AreaChart
             series={{ queries: chart.queries, blocked: chart.blocked }}
             labels={chart.labels}
@@ -277,7 +177,8 @@ export default function Dashboard() {
       </Card>
 
       {/* Request composition (mobile; the desktop analysis section below has
-          the full-size donut) */}
+          the full-size donut). Narrow card → no percentage column, so the
+          longer English segment names still fit beside the ring */}
       <Card className="mt-4 p-4 lg:hidden">
         <h2 className="mb-3 text-[15.5px] font-bold text-t1">{t('dashboard.composition')}</h2>
         <Donut
@@ -286,6 +187,7 @@ export default function Dashboard() {
           centerLabel={fmtCompact(stats.num_dns_queries)}
           centerSub={t('dashboard.totalRequests')}
           segments={compositionSegments}
+          hidePct
         />
       </Card>
 
@@ -361,7 +263,6 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <ClusterHealthCard />
         <ServerInfoCard />
       </div>
 
@@ -399,15 +300,6 @@ export default function Dashboard() {
             </div>
             <RangePicker value={filterRange} onChange={setFilterRange} />
           </div>
-          {instances.length > 1 && (
-            <div className="mb-3">
-              <Segmented
-                value={curveId ?? activeId ?? ''}
-                onChange={(v) => setCurveId(v)}
-                options={instances.map((x) => ({ value: x.id, label: x.label }))}
-              />
-            </div>
-          )}
           <div style={{ '--chart-1': 'var(--warn)', '--chart-2': 'var(--violet)' } as React.CSSProperties}>
             <AreaChart
               series={{ queries: chart.safe.slice(-filterLen), blocked: chart.parental.slice(-filterLen) }}
@@ -473,28 +365,10 @@ export default function Dashboard() {
             <UpstreamTable stats={stats} />
           </Card>
 
-          <ClusterHealthCard />
           <ServerInfoCard />
         </div>
       </div>
       </div>
     </div>
   )
-}
-
-
-
-/** Silent per-instance /stats fetcher for non-active instances, feeding the
- *  aggregation at a slow 30s cadence (the active instance's key is owned by
- *  the 5s hook above — same key shape, so the cache carries over on switch).
- *  One hook per instance is kept legal by mounting as a child component */
-function OtherStats({ cfg, onData }: { cfg: SvrConfig; onData: (url: string, s: Stats | undefined) => void }) {
-  const { data } = useSWR<Stats>(['stats', cfg, '/stats'], swrFetcher, {
-    refreshInterval: 30000,
-    keepPreviousData: true,
-  })
-  useEffect(() => {
-    onData(cfg.url, data)
-  }, [cfg.url, data, onData])
-  return null
 }

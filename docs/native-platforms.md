@@ -1,11 +1,11 @@
 # 原生平台现状
 
 **Status:** current
-**Updated:** 2026-10-15
+**Updated:** 2026-10-18（补记 Windows 桌面壳的打包与签名口径；当日又把它接进 `release.yml` 的 `windows` job）
 
 ## Tauri 2 壳
 
-`src-tauri/` 当前交付的是 **iOS 壳**；`src-tauri/gen/` 只有 apple 一套工程，`release.yml` 也只产 Web 产物。Windows / Android / macOS 桌面壳尚未交付（早期计划里列出过，未开工）；要做需另立提案，届时 `tauri-plugin-system-components` 里未启用的桌面/Android 实现才会被消费。
+`src-tauri/` 当前交付的是 **iOS 壳**与 **Windows 桌面安装包**；`src-tauri/gen/` 只有 apple 一套工程。`release.yml` 的 `windows` job（`windows-latest`）跑 `pnpm tauri build`，产 NSIS 与 MSI 两件安装包（资产名固定 `agh-console-setup.exe` / `agh-console.msi`），与 tarball、npm、镜像、ipa 同源同 ref；安装包**未签名**（没有 Windows 代码签名证书），首次运行有 SmartScreen 提示，改为 per-user 安装、无需管理员权限。产物走 Rust `agh_fetch` 代理，运行时不依赖 Node server；Android / macOS 桌面壳仍未开工。窗口尺寸按桌面布局钉住，见 [Tauri 2 壳](architecture/tauri-shell.md)。`tauri-plugin-system-components` 的桌面实现只覆盖 macOS，Windows 上其命令一律返回 `Unsupported`，前端回落 HTML 控件（启动时会打印一条原生标签栏不可用的警告，属预期）。
 
 `src-tauri/src/lib.rs` 注册 `agh_fetch`；Rust 层复刻 Express 的路径映射、Basic Auth 透传、重定向、超时和错误语义。前端在运行时选择 Rust 命令或同源 Web 代理，见 [架构](architecture/README.md)。
 
@@ -21,6 +21,7 @@ iOS 只有这一条线。2026-09-24 起原先并行的纯 SwiftUI 线退役：�
 - 部署目标是 `src-tauri/gen/apple/project.yml` 里的 `15.0`（Xcode 27 拒绝 Tauri 默认的 14.0）；`src-tauri/tauri.conf.json` 的 `bundle.iOS.minimumSystemVersion` 与之保持同值。`generate` 只跑 `xcodegen`，**不**调用 `tauri ios init`：init 会重写 `project.yml` 并把 `{{apple.development-team}}` 渲染成明文 team id 写进被跟踪文件。
 - **生成是被校验的一步**（2026-09-24 起）：脚本生成后断言 pbxproj 含 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`、`DEVELOPMENT_TEAM`、`PRODUCT_BUNDLE_IDENTIFIER`、`IPHONEOS_DEPLOYMENT_TARGET = 15.0`，以及预设哨兵 `CLANG_ENABLE_OBJC_ARC = YES`；任一不满足即中止并打印修法。原因是 XcodeGen 缺 `share/xcodegen/SettingPresets` 时会**静默**产出缺这些设置的工程，装出来的 ipa 会没有图标。构建路径同样先跑这套校验，且 pbxproj 缺失时按 `project.yml` 自动重建后继续（`tauri ios build` 自己不会重跑 xcodegen）。生成前脚本还会先建好 `Externals/` 与 `assets/`：这两个目录由 `project.yml` 声明为 source，但 git 都带不过来（前者被本目录 `.gitignore` 排除，后者是空目录），只能由构建填充，而全新克隆一个都没有——缺了 xcodegen 会以 `Spec validations errors` 拒绝生成，CI 曾因此在 `ios` job 上首次运行即失败。xcodegen 自身失败时脚本先打印它的原始输出再中止，不只留一个退出码。
 - 图标的两个来源都可重建：`gen/apple/Assets.xcassets/AppIcon.appiconset` 由 `npx tauri icon` 从 `src-tauri/icons/` 重新生成；选中它的构建设置来自 XcodeGen 预设，由上面那套校验兜底。验收看产物：ipa 里应有 `Assets.car` 与 `AppIcon60x60@2x.png`，Info.plist 应有 `CFBundleIcons`。
+- **Windows 图标是另一份源**：`icons/app-icon-windows.svg`（超椭圆盘面 + 透明边距，指数 5.5、盘面占 900/1024）。Windows 不给 Win32 图标自动遮罩，满幅方形会让任务栏与标题栏变成硬边矩形，所以这条不能与 `icons/app-icon-shield.svg`（满幅，供 iOS/Android/PWA 使用，那些平台由系统自己遮罩）混用。`icon.ico` 由它生成并回填：`npx tauri icon src-tauri/icons/app-icon-windows.svg -o <临时目录>`，只取其中的 `icon.ico`。两个易踩的点：resvg 解析的 XML 注释里不能出现 `--`（写 `-o` 而不是 `--output`），且 `tauri icon` 的输入尺寸必须是 1024 见方。
 - **版本号**：应用包的系统版本来自工程 Info.plist 的 `CFBundleShortVersionString`/`CFBundleVersion`，由 `project.yml` 的 `info.properties` 经 xcodegen 生成——所以改 `project.yml` 的版本后同样要重生成工程。发版时 `release-plan.mjs --set-version <版本> <build>` 会写这两项：plist 只接受 1–3 段纯数字（cargo-mobile2 逐段 `parse::<usize>()`，否则 `BundleVersionInvalid`），因此写的是**核心版本**（nightly 的 `0.1.0-nightly.<日期>.<sha>` → `0.1.0`）加数字 build（CI 传 `github.run_number`，同核心版本的 nightly 在设备上可区分）；完整版本号出现在应用内「关于」页。
 - `src-tauri/gen/apple/` 中的 `project.yml`、Swift 源、Info.plist、entitlements、资源等是维护内容，不能随生成工程一起忽略。
 - `_probe/` 是本机忽略的 API 探查材料；原生测试不能假定克隆后存在这些文件。

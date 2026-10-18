@@ -11,6 +11,10 @@ import Foundation
 /// Per-kind properties. All optional; a component reads only what it needs.
 class ComponentPropsArgs: Decodable {
     let label: String?
+    /// Spoken label for controls without visible text (icon-only buttons).
+    /// Without it UIKit announces the SF Symbol's own name, which can be
+    /// misleading (`arrow.up.doc` reads as "Previous Page").
+    let accessibilityLabel: String?
     let on: Bool?
     let value: Double?
     let min: Double?

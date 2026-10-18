@@ -90,6 +90,20 @@ export function relTime(iso: string): string {
   return i18n.t('units.dayAgo', { count: Math.floor(diff / 86400) })
 }
 
+/** Compact relative time for stat values ("now" / "45s" / "12m" / "26h" / "3d"):
+ *  the tile caption carries the "ago" ("Last update"), which is what keeps the
+ *  value inside a narrow column — the spelled-out form overflowed it in English */
+export function relTimeShort(iso: string): string {
+  const d = new Date(iso).getTime()
+  if (Number.isNaN(d)) return iso
+  const diff = (Date.now() - d) / 1000
+  if (diff < 10) return i18n.t('units.nowShort')
+  if (diff < 60) return i18n.t('units.secShort', { count: Math.floor(diff) })
+  if (diff < 3600) return i18n.t('units.minShort', { count: Math.floor(diff / 60) })
+  if (diff < 86400) return i18n.t('units.hourShort', { count: Math.floor(diff / 3600) })
+  return i18n.t('units.dayShort', { count: Math.floor(diff / 86400) })
+}
+
 export function hoursLabel(h: number): string {
   if (h === 0) return i18n.t('units.disabled')
   if (h < 1) return i18n.t('units.minute', { count: Math.round(h * 60) })

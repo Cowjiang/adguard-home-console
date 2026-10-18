@@ -81,6 +81,10 @@ export async function restoreSnapshot(
     selectedModules?: readonly SnapshotModule[]
     autoPreRollbackSnapshot?: boolean
     currentInstanceMeta?: SnapshotSourceInstance
+    /** Localized label / description for the fail-safe snapshot (the UI passes
+     *  translated copy; English defaults keep the lib standalone) */
+    guardLabel?: string
+    guardDescription?: string
   } = {}
 ): Promise<RestoreExecutionResult> {
   // 1. Pre-validation
@@ -95,8 +99,10 @@ export async function restoreSnapshot(
   if (opts.autoPreRollbackSnapshot !== false && opts.currentInstanceMeta) {
     try {
       const guardSnapshot = await captureInstanceSnapshot(cfg, opts.currentInstanceMeta, {
-        label: `Rollback Guard (${new Date().toLocaleTimeString()})`,
-        description: `Automated fail-safe backup captured before restoring snapshot ${snapshot.meta.id}`,
+        label: opts.guardLabel ?? `Rollback Guard (${new Date().toLocaleTimeString()})`,
+        description:
+          opts.guardDescription ??
+          `Automated fail-safe backup captured before restoring snapshot ${snapshot.meta.id}`,
         trigger: 'pre_rollback',
       })
       await saveSnapshot(guardSnapshot)

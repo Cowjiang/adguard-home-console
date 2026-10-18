@@ -17,7 +17,8 @@ import { Badge } from '../components/ui/atoms'
 import { useSheet } from '../components/ui/sheet'
 import { usePick, PickSelect } from '../components/ui/menu'
 import { isAppleMobile } from '../lib/native/shell'
-import { hoursLabel, relTime, fmtNum, fmtDate } from '../lib/format'
+import { useIsDesktop } from '../lib/useIsDesktop'
+import { hoursLabel, relTimeShort, fmtNum, fmtDate } from '../lib/format'
 import { runMutation } from '../lib/mutation'
 
 
@@ -32,6 +33,7 @@ export default function Protection() {
   const { cfg } = useAuth()
   const sheet = useSheet()
   const pick = usePick()
+  const isDesktop = useIsDesktop()
   const [refreshing, setRefreshing] = useState(false)
   const { data: filtering, mutate: mFiltering } = useSWR<FilteringStatus>(cfg ? ['filtering', cfg, '/filtering/status'] : null, swrFetcher, { refreshInterval: 15000 })
 
@@ -63,6 +65,12 @@ export default function Protection() {
     .filter(Boolean)
     .sort()
     .pop()
+
+  // "every hour" / "every day" read better than "every 1 hour/day" in English
+  // (zh keeps the count through units.hourEvery/dayEvery); picker options stay
+  // on hoursLabel's counted form
+  const intervalBareLabel = (h: number): string =>
+    h === 1 ? t('units.hourEvery') : h === 24 ? t('units.dayEvery') : hoursLabel(h)
 
   async function toggleFiltering(enabled: boolean) {
     if (!cfg || !filtering) return
@@ -113,6 +121,11 @@ export default function Protection() {
 
   function openSafeSearchSheet() {
     if (!sb) return
+    // Mobile: no floating panels — the switches live on a sub-page
+    if (!isDesktop) {
+      nav('/protection/safesearch')
+      return
+    }
     const engines: Record<string, boolean> = {}
     for (const e of SAFE_ENGINES) engines[e.key] = !!sb[e.key]
     let enabled = !!sb.enabled
@@ -152,7 +165,7 @@ export default function Protection() {
             <div className="min-w-0 flex-1 pr-1">
               <div className="text-[12px] text-t2">{t('protection.listCount')}</div>
               <div className="mt-0.5 truncate text-[22px] font-bold leading-tight num text-t1" title={lastUpdated ? fmtDate(lastUpdated) : undefined}>
-                {lastUpdated ? relTime(lastUpdated) : t('protection.neverUpdated')}
+                {lastUpdated ? relTimeShort(lastUpdated) : t('protection.neverUpdated')}
               </div>
               <div className="truncate text-[11.5px] text-t3">{t('protection.lastUpdated')}</div>
             </div>
@@ -182,8 +195,8 @@ export default function Protection() {
           </div>
           <div className="min-w-0">
             <div className="text-[12px] text-t2">{t('protection.lastUpdated')}</div>
-            <div className="text-[20px] font-bold leading-tight num text-t1">{lastUpdated ? relTime(lastUpdated) : '—'}</div>
-            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? hoursLabel(filtering.interval / HOUR_MS) : '…' })}</div>
+            <div className="text-[20px] font-bold leading-tight num text-t1">{lastUpdated ? relTimeShort(lastUpdated) : '—'}</div>
+            <div className="text-[11.5px] text-t3">{t('protection.autoUpdateEvery', { interval: filtering ? intervalBareLabel(filtering.interval / HOUR_MS) : '…' })}</div>
           </div>
           <div className="ml-auto">
             <Button variant="glass" loading={refreshing} onClick={refreshAllFilters}>

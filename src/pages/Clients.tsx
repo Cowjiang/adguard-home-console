@@ -24,7 +24,7 @@ import { useSheet, useConfirm } from '../components/ui/sheet'
 import { runMutation } from '../lib/mutation'
 import { Loading, EmptyState, SearchBar, Badge, SourceBadge, Pagination } from '../components/ui/atoms'
 import { usePick, PickSelect } from '../components/ui/menu'
-import { SyncSheetContent } from '../components/protection/SyncSheetContent'
+import { SyncForm } from '../components/protection/SyncForm'
 import { syncClientsToInstances } from '../lib/session/rulesSync'
 
 
@@ -273,17 +273,24 @@ export default function Clients() {
             {instances.length > 1 && (
               <HeaderAction
                 onClick={() => {
+                  if (!isDesktop) {
+                    nav('/sync/clients')
+                    return
+                  }
                   sheet.open(
-                    <SyncSheetContent
+                    <SyncForm
                       itemCount={clients.length}
                       itemTypeLabel={t('clients.title')}
                       onSync={(targets) => syncClientsToInstances(targets, clients)}
                       onClose={() => sheet.close()}
-                    />
+                    />,
+                    { title: t('filters.syncModalTitle') }
                   )
                 }}
                 label={t('filters.syncAction')}
                 className="w-11 text-t2 hover:text-accent lg:w-10"
+                // Slot 1: the add button owns the trailing slot here
+                native={{ sfSymbol: 'arrow.triangle.2.circlepath', iconOnly: true, slot: 1 }}
               >
                 <ArrowLeftRight size={17} />
               </HeaderAction>

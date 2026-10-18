@@ -45,10 +45,10 @@ const enQuerylog = {
   analytics: 'Analytics',
   analyticsTitle: 'Query Log Analytics',
   analyticsSub: 'Multidimensional metrics and slow-query diagnostics from sampled log entries',
-  instanceFilter: 'Node scope',
-  allInstances: '🌐 All Online Nodes (Aggregated)',
-  cacheHitRate: 'Cache hit rate',
-  avgLatency: 'Average latency',
+  analyticsNoSample: 'Analytics sample unavailable',
+  analyticsNoSampleSub: 'Reopen analytics from the query log list',
+  cacheHitRate: 'Cache hit',
+  avgLatency: 'Avg latency',
   totalSample: 'Sample size',
   slowQueries: 'Slow queries (Top latency)',
   noSlowQueries: 'No slow queries detected',
@@ -57,7 +57,6 @@ const enQuerylog = {
   topClients: 'Top active clients',
   topUpstreams: 'Upstream latency & volume',
   drillDownHint: '💡 Click any item to filter the query log',
-  node: 'Node',
   queriesUnit: 'queries',
 }
 

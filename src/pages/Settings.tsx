@@ -58,7 +58,7 @@ export default function Settings() {
     <Screen>
       <PageHeader title={t('settings.title')} />
 
-      <div className={isDesktop ? 'grid grid-cols-2 items-start gap-x-4' : ''}>
+      <div>
         {groups.map((g) => (
           <div key={g.title}>
             <GroupTitle>{g.title}</GroupTitle>

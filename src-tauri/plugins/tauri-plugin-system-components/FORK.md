@@ -42,7 +42,7 @@ bumping upstream stays a mechanical replay rather than a semantic merge.
 
 | File | Change | Why |
 | --- | --- | --- |
-| `src/models.rs` | 5 new `ComponentProps` fields: `foreground`, `alpha`, `appearAnimation`, `appearOffsetX`, `appearDuration`; new `SetAppearanceOptions` | carry the iOS-side affordances through the command payload |
+| `src/models.rs` | 6 new `ComponentProps` fields: `foreground`, `alpha`, `accessibilityLabel`, `appearAnimation`, `appearOffsetX`, `appearDuration`; new `SetAppearanceOptions` | carry the iOS-side affordances through the command payload |
 | `src/commands.rs`, `src/lib.rs` | register the `set_appearance` command | app theme → native overlays |
 | `src/mobile.rs` | `set_appearance` forwards to the Swift plugin (`run_mobile_plugin("setAppearance")`) | iOS implementation entry point |
 | `src/desktop/mod.rs` | `set_appearance` is a no-op on macOS | macOS native chrome follows the system appearance; only the iOS overlays need the override |
@@ -54,9 +54,9 @@ bumping upstream stays a mechanical replay rather than a semantic merge.
 | File | Change | Why |
 | --- | --- | --- |
 | `SystemComponentsPlugin.swift` | `SetAppearanceArgs`, `appearanceStyle`, `applyAppearance()` (applied on set **and** whenever an overlay is mounted), `setAppearance` entry point | UIKit otherwise follows the system appearance; overlays must follow the app theme instead |
-| `Components/ComponentArgs.swift` | decode `foreground`, `alpha`, `appearAnimation`, `appearOffsetX`, `appearDuration` | mirror of the Rust payload |
+| `Components/ComponentArgs.swift` | decode `foreground`, `alpha`, `accessibilityLabel`, `appearAnimation`, `appearOffsetX`, `appearDuration` | mirror of the Rust payload |
 | `ComponentsOverlay.swift` | appear animation on create (`appearOffsetX` slides in with the page-transition curve, else spring fade + scale via `appearAnimation`); `alpha` fade in `update` | native controls cannot ride CSS transitions; removal is instant, so JS fades out first |
-| `Components/ButtonComponent.swift` | `foreground` → `baseBackgroundColor`/`baseForegroundColor`/`tintColor`; SF Symbol tinting via `withTintColor(_:renderingMode: .alwaysOriginal)` | iOS 26 glass configurations ignore `baseForegroundColor` for symbols |
+| `Components/ButtonComponent.swift` | `foreground` → `baseBackgroundColor`/`baseForegroundColor`/`tintColor`; SF Symbol tinting via `withTintColor(_:renderingMode: .alwaysOriginal)`; `accessibilityLabel` → `UIButton.accessibilityLabel` | iOS 26 glass configurations ignore `baseForegroundColor` for symbols; an icon-only button otherwise announces the SF Symbol's own name (`arrow.up.doc` reads as "Previous Page") |
 
 ### Repo hygiene on top of the vendored tree
 

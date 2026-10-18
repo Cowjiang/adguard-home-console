@@ -425,7 +425,20 @@ const server = http.createServer(async (req, res) => {
     case 'GET /dns/info': return json(res, 200, state.dnsInfo)
     case 'POST /dns_config':
     case 'PUT /dns/config': state.dnsInfo = { ...state.dnsInfo, ...body }; return json(res, 200, {})
-    case 'POST /test_upstream_dns': return json(res, 200, {})
+    case 'POST /test_upstream_dns': {
+      // Faithful-ish: answer every upstream with "OK" after a per-upstream
+      // deterministic latency (hash-modulated), so the benchmark UI can be
+      // exercised locally with fast/good/slow variety
+      const upstreams = Array.isArray(body?.upstream_dns) ? body.upstream_dns : []
+      const out = {}
+      for (const up of upstreams) {
+        let h = 0
+        for (const ch of String(up)) h = (h * 31 + ch.charCodeAt(0)) % 997
+        await new Promise((r) => setTimeout(r, 20 + (h % 240)))
+        out[up] = 'OK'
+      }
+      return json(res, 200, out)
+    }
     case 'GET /access/list': return json(res, 200, state.accessList)
     case 'POST /access/set':
     case 'PUT /access/set': state.accessList = { allowed_clients: body.allowed_clients || [], disallowed_clients: body.disallowed_clients || [], blocked_hosts: body.blocked_hosts || [] }; return json(res, 200, {})

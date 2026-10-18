@@ -1,53 +1,41 @@
-/**
- * Configuration Snapshots & Rollback management page (P3-1).
+/** Configuration Snapshots & Rollback management page (P3-1).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  Archive,
-  ArrowDownToLine,
-  Camera,
-  CheckCircle2,
-  Clock,
-  Download,
-  FileUp,
-  Layers,
-  Plus,
-  RotateCcw,
-  Shield,
-  Trash2,
-} from 'lucide-react'
+import { ChevronDown, ChevronRight, Clock, Download, FileUp, Layers, Plus } from 'lucide-react'
 import { Badge, IconBubble, Loading } from '../../components/ui/atoms'
-import { Button, Card, GroupTitle, PageHeader, Screen } from '../../components/ui/primitives'
-import { useConfirm, useSheet } from '../../components/ui/sheet'
+import { Button, Card, HeaderAction, PageHeader, Screen, Segmented } from '../../components/ui/primitives'
+import { PickSelect, usePick } from '../../components/ui/menu'
+import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
 import { useAuth } from '../../lib/session/auth'
-import { captureInstanceSnapshot } from '../../lib/snapshot/snapshotCapture'
 import {
-  deleteSnapshot,
   exportClusterBundleJson,
-  exportSnapshotJson,
   listSnapshots,
   parseSnapshotImport,
   saveSnapshot,
 } from '../../lib/snapshot/snapshotStorage'
 import type { AghConfigSnapshot, SnapshotTrigger } from '../../lib/snapshot/types'
 import { SnapshotDiffSheet } from '../../components/snapshot/SnapshotDiffSheet'
+import { SnapshotActions } from '../../components/snapshot/SnapshotActions'
+import { SnapshotCreateForm } from '../../components/snapshot/SnapshotCreateForm'
+import { isAppleMobile } from '../../lib/native/shell'
+import { useIsDesktop } from '../../lib/useIsDesktop'
 
 export function SnapshotSettings() {
-  const { cfg, activeId, status, instances } = useAuth()
+  const { activeId, instances } = useAuth()
   const activeInstance = instances.find((i) => i.id === activeId) || instances[0]
   const { t } = useTranslation()
+  const nav = useNavigate()
   const sheet = useSheet()
-  const confirm = useConfirm()
+  const pick = usePick()
+  const isDesktop = useIsDesktop()
+  const apple = isAppleMobile()
 
   const [snapshots, setSnapshots] = useState<AghConfigSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState<'all' | 'manual' | 'auto'>('all')
-  const [creating, setCreating] = useState(false)
-  const [newLabel, setNewLabel] = useState('')
-  const [newDesc, setNewDesc] = useState('')
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -57,7 +45,7 @@ export function SnapshotSettings() {
       const list = await listSnapshots(activeInstance?.id)
       setSnapshots(list)
     } catch (e: any) {
-      toast(e?.message || 'Failed to load snapshots', 'err')
+      toast(t('settings.snapshotLoadFailed', { msg: e?.message || String(e) }), 'err')
     } finally {
       setLoading(false)
     }
@@ -65,6 +53,7 @@ export function SnapshotSettings() {
 
   useEffect(() => {
     void refreshSnapshots()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeInstance?.id])
 
   const filteredSnapshots = useMemo(() => {
@@ -77,48 +66,11 @@ export function SnapshotSettings() {
     return snapshots
   }, [snapshots, filterType])
 
-  async function handleCreateManualSnapshot() {
-    if (!cfg || !activeInstance) return
-    const label = newLabel.trim() || `Manual Snapshot - ${new Date().toLocaleTimeString()}`
-    setCreating(true)
-
-    try {
-      const snap = await captureInstanceSnapshot(
-        cfg,
-        {
-          id: activeInstance.id,
-          label: activeInstance.label,
-          url: activeInstance.url,
-          aghVersion: status?.version || 'unknown',
-        },
-        {
-          label,
-          description: newDesc.trim() || undefined,
-          trigger: 'manual',
-        }
-      )
-      await saveSnapshot(snap)
-      toast(t('settings.snapshotCreateSuccess'))
-      setNewLabel('')
-      setNewDesc('')
-      setShowCreateDialog(false)
-      await refreshSnapshots()
-    } catch (e: any) {
-      toast(e?.message || 'Failed to capture snapshot', 'err')
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  function handleExportSingle(snapshot: AghConfigSnapshot) {
-    const jsonStr = exportSnapshotJson(snapshot)
-    const blob = new Blob([jsonStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `agh-snapshot-${snapshot.meta.sourceInstance.label}-${snapshot.meta.id.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+  function openCreateSheet() {
+    sheet.open(
+      <SnapshotCreateForm onCreated={refreshSnapshots} onClose={sheet.close} />,
+      { title: t('settings.snapshotCreate') }
+    )
   }
 
   function handleExportClusterBundle() {
@@ -147,8 +99,8 @@ export function SnapshotSettings() {
         }
         toast(
           parsed.isBundle
-            ? `Imported bundle with ${parsed.snapshots.length} snapshot(s)`
-            : 'Snapshot imported successfully'
+            ? t('settings.snapshotImportBundleOk', { count: parsed.snapshots.length })
+            : t('settings.snapshotImportOk')
         )
         await refreshSnapshots()
 
@@ -156,7 +108,7 @@ export function SnapshotSettings() {
           openDiffSheet(parsed.snapshots[0])
         }
       } catch (err: any) {
-        toast(err?.message || 'Failed to import snapshot JSON file', 'err')
+        toast(t('settings.snapshotImportFailed', { msg: err?.message || String(err) }), 'err')
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
@@ -164,33 +116,33 @@ export function SnapshotSettings() {
     reader.readAsText(file)
   }
 
-  function handleDelete(snapshot: AghConfigSnapshot) {
-    confirm({
-      title: t('settings.snapshotDeleteConfirmTitle'),
-      message: t('settings.snapshotDeleteConfirmMsg'),
-      confirmText: t('common.delete'),
-      destructive: true,
-      onConfirm: async () => {
-        try {
-          await deleteSnapshot(snapshot.meta.id)
-          toast(t('settings.snapshotDeleted'))
-          await refreshSnapshots()
-        } catch (e: any) {
-          toast(e?.message || 'Failed to delete snapshot', 'err')
-        }
-      },
-    })
-  }
-
   function openDiffSheet(snapshot: AghConfigSnapshot) {
-    sheet.open(
-      <SnapshotDiffSheet
-        snapshot={snapshot}
-        onClose={sheet.close}
-        onRestored={refreshSnapshots}
-      />,
-      { title: t('settings.snapshotDiffTitle') }
-    )
+    if (isDesktop) {
+      sheet.open(
+        <SnapshotDiffSheet
+          snapshot={snapshot}
+          onClose={sheet.close}
+          onRestored={refreshSnapshots}
+        />,
+        {
+          title: t('settings.snapshotDiffTitle'),
+          // Snapshot actions live in the title bar (same place on mobile)
+          right: (
+            <SnapshotActions
+              compact
+              snapshot={snapshot}
+              onDeleted={() => {
+                refreshSnapshots()
+                sheet.close()
+              }}
+            />
+          ),
+        }
+      )
+    } else {
+      // Diff & rollback is browsing content: a sub-page on mobile
+      nav(`/settings/snapshots/diff?id=${snapshot.meta.id}`)
+    }
   }
 
   function getTriggerBadge(trigger: SnapshotTrigger) {
@@ -206,6 +158,24 @@ export function SnapshotSettings() {
     }
   }
 
+  const filterOptions = [
+    { value: 'all' as const, label: `${t('settings.snapshotFilterAll')} (${snapshots.length})` },
+    { value: 'manual' as const, label: t('settings.snapshotFilterManual') },
+    { value: 'auto' as const, label: t('settings.snapshotFilterAuto') },
+  ]
+  const filterLabel = filterOptions.find((o) => o.value === filterType)?.label ?? ''
+
+  function pickFilter(e: React.MouseEvent<HTMLButtonElement>) {
+    pick({
+      title: t('settings.snapshotsTitle'),
+      anchor: e.currentTarget,
+      align: 'left',
+      value: filterType,
+      options: filterOptions,
+      onPick: setFilterType,
+    })
+  }
+
   return (
     <Screen>
       <PageHeader
@@ -213,23 +183,29 @@ export function SnapshotSettings() {
         title={t('settings.snapshotsTitle')}
         right={
           <div className="flex items-center gap-1.5">
-            <span title={t('settings.snapshotImport')}>
-              <Button
-                variant="glass"
-                size="header"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <FileUp size={15} />
-              </Button>
-            </span>
-            <Button
-              variant="glass"
-              size="header"
-              onClick={() => setShowCreateDialog(true)}
-              native={{ label: t('settings.snapshotCreate'), foreground: 'accent' }}
+            <HeaderAction
+              onClick={() => fileInputRef.current?.click()}
+              label={t('settings.snapshotImport')}
+              className="w-11 text-t2 hover:text-accent lg:w-10"
+              // Slot 1: the create button owns the trailing slot, so this one
+              // gets its own native component one capsule to the left
+              native={{ sfSymbol: 'arrow.up.doc', iconOnly: true, slot: 1 }}
             >
-              <Plus size={15} /> {t('settings.snapshotCreate')}
-            </Button>
+              <FileUp size={17} />
+            </HeaderAction>
+            <HeaderAction
+              onClick={openCreateSheet}
+              label={t('settings.snapshotCreate')}
+              className="w-11 font-semibold text-accent lg:w-auto lg:px-4"
+              // Icon-only native button: the CSS placeholder is 44pt on mobile,
+              // and a native text pill would grow leftwards over the import
+              // capsule next to it (see .agents/pipelines/proposals/bug-fix/
+              // 2026-10-18-native-header-button-overflow.md)
+              native={{ sfSymbol: 'plus', foreground: 'accent', iconOnly: true }}
+            >
+              <Plus size={17} />
+              <span className="hidden lg:inline">{t('settings.snapshotCreate')}</span>
+            </HeaderAction>
           </div>
         }
       />
@@ -243,200 +219,104 @@ export function SnapshotSettings() {
         className="hidden"
       />
 
-      {/* Manual Creation Dialog */}
-      {showCreateDialog && (
-        <Card className="mb-4 border border-accent/40 bg-card p-4">
-          <div className="flex items-center justify-between pb-2 border-b border-border/40">
-            <h3 className="text-[15px] font-bold text-t1 flex items-center gap-2">
-              <Camera size={16} className="text-accent" />
-              {t('settings.snapshotCreate')}
-            </h3>
-            <span className="text-[12px] text-t3">{activeInstance?.label}</span>
-          </div>
-          <div className="mt-3 flex flex-col gap-2.5">
-            <input
-              type="text"
-              className="w-full rounded-xl border border-border bg-black/5 dark:bg-white/5 px-3 py-2 text-[13px] text-t1 focus:border-accent focus:outline-none"
-              placeholder={t('settings.snapshotLabelPlaceholder')}
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-            />
-            <textarea
-              rows={2}
-              className="w-full rounded-xl border border-border bg-black/5 dark:bg-white/5 px-3 py-2 text-[13px] text-t1 focus:border-accent focus:outline-none resize-none"
-              placeholder={t('settings.snapshotDescPlaceholder')}
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
-            />
-            <div className="flex items-center justify-end gap-2 mt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCreateDialog(false)}
-                disabled={creating}
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                size="sm"
-                loading={creating}
-                onClick={handleCreateManualSnapshot}
-              >
-                <CheckCircle2 size={14} />
-                {t('common.save')}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Header Controls & Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-1 rounded-xl bg-black/5 dark:bg-white/5 p-1 text-[12px]">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition-all ${
-              filterType === 'all'
-                ? 'bg-card text-t1 shadow-sm'
-                : 'text-t3 hover:text-t1'
-            }`}
-          >
-            {t('settings.snapshotFilterAll')} ({snapshots.length})
-          </button>
-          <button
-            onClick={() => setFilterType('manual')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition-all ${
-              filterType === 'manual'
-                ? 'bg-card text-t1 shadow-sm'
-                : 'text-t3 hover:text-t1'
-            }`}
-          >
-            {t('settings.snapshotFilterManual')}
-          </button>
-          <button
-            onClick={() => setFilterType('auto')}
-            className={`rounded-lg px-2.5 py-1 font-medium transition-all ${
-              filterType === 'auto'
-                ? 'bg-card text-t1 shadow-sm'
-                : 'text-t3 hover:text-t1'
-            }`}
-          >
-            {t('settings.snapshotFilterAuto')}
-          </button>
-        </div>
-
-        {snapshots.length > 0 && (
-          <Button
-            variant="ghost"
+      {/* Filter by category: dropdown on mobile (same picker idiom as the
+          other pages), segmented control on desktop */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {isDesktop ? (
+          <Segmented
             size="sm"
-            onClick={handleExportClusterBundle}
-            className="text-[12px] text-t3 hover:text-t1"
+            fit
+            value={filterType}
+            onChange={setFilterType}
+            options={filterOptions}
+          />
+        ) : apple ? (
+          <span className="press glass relative flex flex-none items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-t1">
+            {filterLabel}
+            <ChevronDown size={14} className="pointer-events-none text-t3" />
+            <PickSelect
+              ariaLabel={t('settings.snapshotsTitle')}
+              className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-transparent"
+              value={filterType}
+              options={filterOptions}
+              onPick={setFilterType}
+            />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={pickFilter}
+            className="press glass flex flex-none items-center gap-1.5 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-t1"
           >
+            {filterLabel}
+            <ChevronDown size={14} className="text-t3" />
+          </button>
+        )}
+        {snapshots.length > 0 && (
+          <Button variant="glass" size="sm" onClick={handleExportClusterBundle}>
             <Download size={13} /> {t('settings.snapshotExportBundle')}
           </Button>
         )}
       </div>
 
-      {/* Snapshot Version List */}
+      {/* Auto backups are triggered by sync/restore, not by a setting on this
+          page: say so where the category is selected */}
+      {filterType === 'auto' && (
+        <p className="-mt-1 mb-3 px-1 text-[12px] leading-relaxed text-t3">
+          {t('settings.snapshotAutoHint')}
+        </p>
+      )}
+
+      {/* Snapshot list */}
       {loading ? (
-        <div className="py-16 flex flex-col items-center justify-center gap-2">
-          <Loading />
-          <span className="text-[12px] text-t3">Loading local snapshots vault...</span>
-        </div>
+        <Loading />
       ) : filteredSnapshots.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-12 px-4 text-center">
-          <IconBubble color="var(--accent)" bg="color-mix(in srgb, var(--accent) 12%, transparent)">
+        <Card className="flex flex-col items-center justify-center px-4 py-12 text-center">
+          <IconBubble color="var(--accent)" bg="var(--accent-soft)">
             <Layers size={22} />
           </IconBubble>
-          <p className="mt-3 text-[15px] font-bold text-t1">{t('settings.snapshotEmptyTitle')}</p>
-          <p className="mt-1 text-[12.5px] text-t3 max-w-[320px]">
-            {t('settings.snapshotEmptyDesc')}
+          <p className="mt-3 text-[15px] font-bold text-t1">
+            {filterType === 'auto' ? t('settings.snapshotEmptyAutoTitle') : t('settings.snapshotEmptyTitle')}
           </p>
-          <Button
-            variant="glass"
-            size="sm"
-            className="mt-4"
-            onClick={() => setShowCreateDialog(true)}
-          >
-            <Plus size={14} /> {t('settings.snapshotCreate')}
-          </Button>
+          <p className="mt-1 max-w-[320px] text-[12.5px] text-t3">
+            {filterType === 'auto' ? t('settings.snapshotEmptyAutoSub') : t('settings.snapshotEmptyDesc')}
+          </p>
+          {filterType !== 'auto' && (
+            <Button variant="glass" size="sm" className="mt-4" onClick={openCreateSheet}>
+              <Plus size={14} /> {t('settings.snapshotCreate')}
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
           {filteredSnapshots.map((item) => (
-            <Card
-              key={item.meta.id}
-              className="p-4 transition-all hover:border-accent/40 flex flex-col gap-2.5"
-            >
-              {/* Card Header */}
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
+            <Card key={item.meta.id} className="p-0">
+              <button
+                type="button"
+                onClick={() => openDiffSheet(item)}
+                className="press flex w-full items-center justify-between gap-2 p-4 text-left"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[15px] font-bold text-t1">{item.meta.label}</span>
                     {getTriggerBadge(item.meta.trigger)}
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[12px] text-t3">
-                    <span className="flex items-center gap-1">
+                  <div className="mt-1 flex min-w-0 items-center gap-2 text-[12px] text-t3">
+                    <span className="flex flex-none items-center gap-1 whitespace-nowrap">
                       <Clock size={12} />
                       {new Date(item.meta.createdAt).toLocaleString()}
                     </span>
-                    <span>•</span>
-                    <span>{item.meta.sourceInstance.label}</span>
+                    <span className="flex-none">·</span>
+                    <span className="truncate">{item.meta.sourceInstance.label}</span>
                   </div>
+                  {/* Index card only: one truncated line, the full note lives
+                      in the detail view (docs/web-interaction.md) */}
+                  {item.meta.description && (
+                    <p className="mt-1 truncate text-[12px] text-t3">{item.meta.description}</p>
+                  )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <span title={t('settings.snapshotExportJson')}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1.5 text-t3 hover:text-accent"
-                      onClick={() => handleExportSingle(item)}
-                    >
-                      <ArrowDownToLine size={15} />
-                    </Button>
-                  </span>
-                  <span title={t('common.delete')}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-1.5 text-t3 hover:text-danger"
-                      onClick={() => handleDelete(item)}
-                    >
-                      <Trash2 size={15} />
-                    </Button>
-                  </span>
-                </div>
-              </div>
-
-              {/* Description */}
-              {item.meta.description && (
-                <p className="text-[12.5px] text-t2 leading-relaxed bg-black/5 dark:bg-white/5 rounded-xl px-3 py-2">
-                  {item.meta.description}
-                </p>
-              )}
-
-              {/* Modules Tags */}
-              <div className="flex items-center justify-between pt-2 border-t border-border/40 gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {item.meta.modules.map((m) => (
-                    <span
-                      key={m}
-                      className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/5 text-t2 uppercase"
-                    >
-                      {m}
-                    </span>
-                  ))}
-                </div>
-                <Button
-                  variant="glass"
-                  size="sm"
-                  onClick={() => openDiffSheet(item)}
-                  className="ml-auto"
-                >
-                  <RotateCcw size={14} />
-                  {t('settings.snapshotCompareRestore')}
-                </Button>
-              </div>
+                <ChevronRight size={17} className="flex-none text-t3" />
+              </button>
             </Card>
           ))}
         </div>
