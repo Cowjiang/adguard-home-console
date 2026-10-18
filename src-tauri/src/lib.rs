@@ -1,4 +1,5 @@
 //! Tauri shell entry: command registration + mobile entry point
+pub mod crypto;
 mod proxy;
 
 /// Debug builds only: reads the auto-login config from environment variables

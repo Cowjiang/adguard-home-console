@@ -26,6 +26,14 @@ thiserror = "2"
 # sosweetham v0.1.8, MIT)
 tauri-plugin-system-components = "0.1.8"
 
+# Crypto engine: PBKDF2-HMAC-SHA256 & AES-256-GCM for managed-mode E2EE
+aes-gcm = "0.10"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+
 # iOS swipe-back gesture: after with_webview grabs the WKWebView pointer, use
 # objc2 msg_send to call setAllowsBackForwardNavigationGestures (objc2-web-kit
 # type bindings only support macOS)
