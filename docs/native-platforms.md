@@ -1,11 +1,11 @@
 # 原生平台现状
 
 **Status:** current
-**Updated:** 2026-10-15
+**Updated:** 2026-10-18（补记 Windows 桌面壳的本机打包路径与未签名口径）
 
 ## Tauri 2 壳
 
-`src-tauri/` 当前交付的是 **iOS 壳**；`src-tauri/gen/` 只有 apple 一套工程，`release.yml` 也只产 Web 产物。Windows / Android / macOS 桌面壳尚未交付（早期计划里列出过，未开工）；要做需另立提案，届时 `tauri-plugin-system-components` 里未启用的桌面/Android 实现才会被消费。
+`src-tauri/` 当前交付的是 **iOS 壳**；`src-tauri/gen/` 只有 apple 一套工程，`release.yml` 只产 Web 产物与 ipa，**Windows 桌面产物不进交付线**（CI 不构建、Release 不发）。Windows 桌面壳的本机打包路径已打通并验收：`pnpm tauri build`（`x86_64-pc-windows-msvc`）产出 MSI 与 NSIS，产物走 Rust `agh_fetch` 代理，运行时不依赖 Node server；Android / macOS 桌面壳仍未开工。安装包**未签名**（没有 `bundle.windows` 的签名配置），安装时会有 SmartScreen 提示。窗口尺寸按桌面布局钉住，见 [Tauri 2 壳](architecture/tauri-shell.md)。`tauri-plugin-system-components` 的桌面实现只覆盖 macOS，Windows 上其命令一律返回 `Unsupported`，前端回落 HTML 控件（启动时会打印一条原生标签栏不可用的警告，属预期）。
 
 `src-tauri/src/lib.rs` 注册 `agh_fetch`；Rust 层复刻 Express 的路径映射、Basic Auth 透传、重定向、超时和错误语义。前端在运行时选择 Rust 命令或同源 Web 代理，见 [架构](architecture/README.md)。
 

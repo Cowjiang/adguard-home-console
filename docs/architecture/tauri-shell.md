@@ -1,7 +1,7 @@
 # Tauri 2 壳
 
 **Status:** current
-**Updated:** 2026-10-15
+**Updated:** 2026-10-18（窗口尺寸按桌面布局钉住：默认 1280×800、最小宽取桌面断点 1024）
 
 `src-tauri/` 把同一个 React 前端装进系统 WebView，并用 Rust 复刻 Express 代理的传输语义，使 Web 与壳内共用页面，同时不依赖浏览器的同源代理。
 
@@ -52,7 +52,7 @@
 
 ## 窗口与构建
 
-- `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.cowjiang.aghconsole`、version 与 `package.json` 同值（发版时由 `release-plan.mjs --set-version` 一起写）、单窗口 `main`（960×640，最小 400×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。
+- `src-tauri/tauri.conf.json`：productName `AGH Console`、identifier `com.cowjiang.aghconsole`、version 与 `package.json` 同值（发版时由 `release-plan.mjs --set-version` 一起写）、单窗口 `main`（1280×800，最小 1024×600）；`frontendDist` 指向 `../dist`，devUrl 为 5173。窗口宽度按桌面布局钉住：`minWidth` 直接取 `useIsDesktop` 的 `min-width: 1024px` 断点，桌面壳不会落进移动布局（Windows 实测拖动下限为 1024 内宽）。移动布局仍服务浏览器窄窗口与移动端，响应式代码不动。
 - `beforeDevCommand`/`beforeBuildCommand` 复用 pnpm 脚本，壳与 Web 构建同一份 `dist/`。
 - iOS 在 setup 中禁用 WKWebView 的前进/后退手势，页面转场由前端自己负责（见 `docs/web-interaction.md`）。
 - `src-tauri/gen/` 只生成 apple 一套工程且不入库；生成与构建统一走 `./scripts/ios-signing.sh`，签名值来自被忽略的 `.env.signing`。
