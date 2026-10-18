@@ -11,7 +11,7 @@ import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
 import { useAuth } from '../../lib/session/auth'
 import {
-  exportClusterBundleJson,
+  exportSnapshotBundleJson,
   listSnapshots,
   parseSnapshotImport,
   saveSnapshot,
@@ -73,14 +73,14 @@ export function SnapshotSettings() {
     )
   }
 
-  function handleExportClusterBundle() {
+  function handleExportBundle() {
     if (snapshots.length === 0) return
-    const jsonStr = exportClusterBundleJson(snapshots, activeInstance?.label || 'Cluster')
+    const jsonStr = exportSnapshotBundleJson(snapshots, activeInstance?.label || 'Instance')
     const blob = new Blob([jsonStr], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `agh-cluster-bundle-${Date.now()}.json`
+    a.download = `agh-snapshots-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -253,7 +253,7 @@ export function SnapshotSettings() {
           </button>
         )}
         {snapshots.length > 0 && (
-          <Button variant="glass" size="sm" onClick={handleExportClusterBundle}>
+          <Button variant="glass" size="sm" onClick={handleExportBundle}>
             <Download size={13} /> {t('settings.snapshotExportBundle')}
           </Button>
         )}
@@ -321,6 +321,11 @@ export function SnapshotSettings() {
           ))}
         </div>
       )}
+
+      {/* Storage location hint */}
+      <p className="mt-4 px-2 text-center text-[12px] leading-relaxed text-t3">
+        {t('settings.snapshotStorageHint')}
+      </p>
     </Screen>
   )
 }

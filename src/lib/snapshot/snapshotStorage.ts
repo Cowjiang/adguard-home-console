@@ -4,7 +4,7 @@
  */
 import type {
   AghConfigSnapshot,
-  ClusterSnapshotBundle,
+  SnapshotBundle,
   SnapshotTrigger,
 } from './types'
 
@@ -172,19 +172,30 @@ export function exportSnapshotJson(snapshot: AghConfigSnapshot): string {
 }
 
 /**
- * Packs multiple snapshots into a unified cluster snapshot bundle.
+ * Packs multiple snapshots into a unified snapshot bundle.
+ */
+export function exportSnapshotBundleJson(
+  snapshots: AghConfigSnapshot[],
+  instanceLabel?: string
+): string {
+  const bundle: SnapshotBundle = {
+    bundleVersion: '1.0',
+    createdAt: new Date().toISOString(),
+    instanceLabel,
+    snapshots,
+  }
+  return JSON.stringify(bundle, null, 2)
+}
+
+/**
+ * Backward compatibility alias for exportSnapshotBundleJson.
+ * @deprecated Use exportSnapshotBundleJson instead.
  */
 export function exportClusterBundleJson(
   snapshots: AghConfigSnapshot[],
   clusterName?: string
 ): string {
-  const bundle: ClusterSnapshotBundle = {
-    bundleVersion: '1.0',
-    createdAt: new Date().toISOString(),
-    clusterName,
-    snapshots,
-  }
-  return JSON.stringify(bundle, null, 2)
+  return exportSnapshotBundleJson(snapshots, clusterName)
 }
 
 /**
@@ -193,6 +204,7 @@ export function exportClusterBundleJson(
 export function parseSnapshotImport(jsonText: string): {
   isBundle: boolean
   snapshots: AghConfigSnapshot[]
+  instanceLabel?: string
 } {
   const parsed = JSON.parse(jsonText)
   if (!parsed || typeof parsed !== 'object') {
@@ -204,6 +216,7 @@ export function parseSnapshotImport(jsonText: string): {
     return {
       isBundle: true,
       snapshots: parsed.snapshots,
+      instanceLabel: parsed.instanceLabel || parsed.clusterName,
     }
   }
 
