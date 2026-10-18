@@ -59,7 +59,7 @@ export function InstanceEdit() {
     const cleanLabel = label.trim() || labelFromUrl(cleanUrl)
     const targetId = editId || newId()
 
-    let managedMeta: { serverUrl: string; salt: string } | undefined
+    let managedMeta: { serverUrl: string; salt: string } | null = null
     if (isManaged) {
       const cleanServer = serverUrl.trim().replace(/\/+$/, '')
       const salt = target?.managed?.salt || uint8ArrayToBase64(generateSalt())
@@ -99,7 +99,7 @@ export function InstanceEdit() {
 
     const ok = await connect(
       { url: cleanUrl, username: cleanUsername, password },
-      { id: targetId, label: cleanLabel, activate: isNew, managed: managedMeta }
+      { id: targetId, label: cleanLabel, activate: isNew, managed: isManaged ? managedMeta : null }
     )
     if (ok) {
       toast(t('settings.serverSaved'))

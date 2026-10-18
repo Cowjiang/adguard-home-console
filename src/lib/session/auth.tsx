@@ -79,7 +79,7 @@ interface AuthCtx {
       activate?: boolean
       id?: string
       label?: string
-      managed?: InstanceManagedMetadata
+      managed?: InstanceManagedMetadata | null
     }
   ) => Promise<boolean>
   /** Remove one instance; the active one falls back to the first remaining */
@@ -118,7 +118,7 @@ function applyTheme(t: ThemeSetting) {
     t === 'dark' ||
     (t === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-  document.querySelector('meta[name=\"theme-color\"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
   // Native layer (glass TabBar / back button / top bar action / native sheets)
   // ignores CSS; must be told light/dark explicitly
   applyNativeAppearance(dark)
@@ -282,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         activate?: boolean
         id?: string
         label?: string
-        managed?: InstanceManagedMetadata
+        managed?: InstanceManagedMetadata | null
       }
     ): Promise<boolean> => {
       const activate = opts?.activate ?? true
@@ -314,8 +314,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           label: opts?.label?.trim() || existingInst?.label || labelFromUrl(clean.url),
           endpoints: [{ ...clean }],
         }
-        if (opts?.managed !== undefined) {
-          entry.managed = opts.managed
+        if (opts && 'managed' in opts) {
+          if (opts.managed) {
+            entry.managed = opts.managed
+          } else {
+            delete entry.managed
+          }
         } else if (existingInst?.managed) {
           entry.managed = existingInst.managed
         }

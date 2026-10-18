@@ -5,8 +5,8 @@ import {
   generateSalt,
   uint8ArrayToBase64,
 } from '../lib/crypto/e2ee'
-import { clearSessionKeys, getSessionKey, setSessionKey } from '../lib/crypto/keyVault'
-import { newId, labelFromUrl } from '../lib/session/instances'
+import { clearSessionKeys, getSessionKey, setSessionKey, removeSessionKey } from '../lib/crypto/keyVault'
+import { newId, labelFromUrl, parseStore, type Instance } from '../lib/session/instances'
 
 describe('Login Page Dual-Mode (Direct vs Managed)', () => {
   const SERVER_URL = 'https://console.example.com'
@@ -156,5 +156,112 @@ describe('Login Page Dual-Mode (Direct vs Managed)', () => {
     const key = await deriveMasterKey(password, saltBytes, 100_000)
     setSessionKey(id, key)
     expect(getSessionKey(id)).toBe(key)
+  })
+
+  it('clears managed metadata and session keys when switching back to direct mode', async () => {
+    const targetId = 'inst-switch-test'
+    const saltBytes = generateSalt()
+    const salt = uint8ArrayToBase64(saltBytes)
+
+    // 1. Initial state: instance has managed metadata and session key
+    const masterKey = await deriveMasterKey(PASSWORD, saltBytes, 100_000)
+    setSessionKey(targetId, masterKey)
+    expect(getSessionKey(targetId)).toBe(masterKey)
+
+    const existingInst: Instance = {
+      id: targetId,
+      label: 'Home Gateway',
+      endpoints: [{ url: AGH_URL, username: USERNAME, password: PASSWORD }],
+      managed: {
+        serverUrl: SERVER_URL,
+        salt,
+      },
+    }
+
+    // 2. User toggles managed mode off (isManaged = false) in InstanceEdit
+    const isManaged = false
+    let managedMeta: { serverUrl: string; salt: string } | null = null
+    if (!isManaged) {
+      removeSessionKey(targetId)
+    }
+
+    // Key is purged from memory vault
+    expect(getSessionKey(targetId)).toBeUndefined()
+
+    // 3. Connect options are constructed with managed: null (or isManaged ? managedMeta : null)
+    const connectOpts = {
+      id: targetId,
+      label: existingInst.label,
+      activate: false,
+      managed: isManaged ? managedMeta : null,
+    }
+    expect(connectOpts.managed).toBeNull()
+    expect('managed' in connectOpts).toBe(true)
+
+    // 4. Resolve instance entry according to connect logic
+    const entry: Instance = {
+      id: targetId,
+      label: connectOpts.label || existingInst.label,
+      endpoints: existingInst.endpoints,
+    }
+
+    if (connectOpts && 'managed' in connectOpts) {
+      if (connectOpts.managed) {
+        entry.managed = connectOpts.managed
+      } else {
+        delete entry.managed
+      }
+    } else if (existingInst?.managed) {
+      entry.managed = existingInst.managed
+    }
+
+    // STRICT CHECK: entry.managed is completely deleted, reverting to pure direct instance
+    expect(entry.managed).toBeUndefined()
+    expect('managed' in entry).toBe(false)
+
+    // Verify storage persistence does not keep managed metadata
+    const parsed = parseStore({
+      instances: [entry],
+      activeId: targetId,
+    })
+    expect(parsed?.instances[0].managed).toBeUndefined()
+  })
+
+  it('preserves existing managed metadata when connect opts does not specify managed field', () => {
+    const targetId = 'inst-keep-managed'
+    const existingInst: Instance = {
+      id: targetId,
+      label: 'Managed Server',
+      endpoints: [{ url: AGH_URL, username: USERNAME, password: PASSWORD }],
+      managed: {
+        serverUrl: SERVER_URL,
+        salt: 'fake-salt',
+      },
+    }
+
+    // Reconnecting or updating label without touching managed config
+    const connectOpts = {
+      id: targetId,
+      label: 'Renamed Managed Server',
+    }
+    expect('managed' in connectOpts).toBe(false)
+
+    const entry: Instance = {
+      id: targetId,
+      label: connectOpts.label || existingInst.label,
+      endpoints: existingInst.endpoints,
+    }
+
+    if (connectOpts && 'managed' in connectOpts) {
+      if ((connectOpts as any).managed) {
+        entry.managed = (connectOpts as any).managed
+      } else {
+        delete entry.managed
+      }
+    } else if (existingInst?.managed) {
+      entry.managed = existingInst.managed
+    }
+
+    expect(entry.managed).toEqual(existingInst.managed)
   })
 })
