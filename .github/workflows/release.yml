@@ -316,7 +316,11 @@ jobs:
       # the core version plus this run's number. What the UI reports is the full
       # version in package.json (vite.config.ts injects it, and tauri-cli runs
       # pnpm build), which is also what this workflow publishes to npm.
+      # shell: bash on purpose — the Windows default is PowerShell, where "$VERSION"
+      # is an unset PowerShell variable rather than the environment variable, so
+      # the stamp would run with empty arguments.
       - name: Stamp version
+        shell: bash
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
           BUILD: ${{ github.run_number }}
