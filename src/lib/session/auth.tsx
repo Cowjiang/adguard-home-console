@@ -20,8 +20,10 @@ import {
   type Instance,
   type InstanceStoreData,
   type SvrConfig,
+  type InstanceManagedMetadata,
 } from './instances'
 import { createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS, type ProbeOutcome } from './probe'
+import { removeSessionKey, clearSessionKeys } from '../crypto/keyVault'
 
 export type { SvrConfig }
 
@@ -47,6 +49,7 @@ export interface InstanceView {
   latencyMs?: number
   version?: string
   protectionEnabled?: boolean
+  managed?: InstanceManagedMetadata
 }
 
 interface AuthCtx {
@@ -70,7 +73,15 @@ interface AuthCtx {
    *  (keeping the active pointer), otherwise add a new instance or update the
    *  endpoint of the instance matching url+username; activates unless told
    *  otherwise */
-  connect: (cfg: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }) => Promise<boolean>
+  connect: (
+    cfg: SvrConfig,
+    opts?: {
+      activate?: boolean
+      id?: string
+      label?: string
+      managed?: InstanceManagedMetadata
+    }
+  ) => Promise<boolean>
   /** Remove one instance; the active one falls back to the first remaining */
   removeInstance: (id: string) => void
   /** Legacy logout: forget every instance (and the migrated v1 copy) */
@@ -107,7 +118,7 @@ function applyTheme(t: ThemeSetting) {
     t === 'dark' ||
     (t === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
+  document.querySelector('meta[name=\"theme-color\"]')?.setAttribute('content', dark ? '#07090f' : '#eef1f7')
   // Native layer (glass TabBar / back button / top bar action / native sheets)
   // ignores CSS; must be told light/dark explicitly
   applyNativeAppearance(dark)
@@ -250,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           latencyMs: s?.latencyMs,
           version: s?.status?.version,
           protectionEnabled: s?.status?.protection_enabled,
+          managed: i.managed,
         }
       }),
     [store, sessions]
@@ -264,7 +276,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const connect = useCallback(
-    async (next: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }): Promise<boolean> => {
+    async (
+      next: SvrConfig,
+      opts?: {
+        activate?: boolean
+        id?: string
+        label?: string
+        managed?: InstanceManagedMetadata
+      }
+    ): Promise<boolean> => {
       const activate = opts?.activate ?? true
       setConnecting(true)
       setError(null)
@@ -288,10 +308,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return e && e.url === clean.url && e.username === clean.username
           })?.id ??
           newId()
+        const existingInst = prev?.instances.find((x) => x.id === targetId)
         const entry: Instance = {
           id: targetId,
-          label: opts?.label?.trim() || labelFromUrl(clean.url),
+          label: opts?.label?.trim() || existingInst?.label || labelFromUrl(clean.url),
           endpoints: [{ ...clean }],
+        }
+        if (opts?.managed !== undefined) {
+          entry.managed = opts.managed
+        } else if (existingInst?.managed) {
+          entry.managed = existingInst.managed
         }
         const instances = prev ? [...prev.instances] : []
         const idx = instances.findIndex((x) => x.id === targetId)
@@ -332,6 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       const prev = storeRef.current
       if (!prev) return
+      removeSessionKey(id)
       const remaining = prev.instances.filter((x) => x.id !== id)
       if (remaining.length) {
         const next: InstanceStoreData = {
@@ -360,6 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const logout = useCallback(() => {
+    clearSessionKeys()
     clearStore()
     setStore(null)
     setSessions({})

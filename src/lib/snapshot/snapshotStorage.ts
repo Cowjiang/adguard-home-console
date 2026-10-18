@@ -9,6 +9,8 @@ import {
   type SnapshotEncryptedBlob,
 } from '../crypto/e2ee'
 import { OutboxSyncCoordinator, type OutboxTask } from './outboxSync'
+import { getSessionKey } from '../crypto/keyVault'
+import { loadStore } from '../session/instances'
 import type {
   AghConfigSnapshot,
   SnapshotBundle,
@@ -414,9 +416,31 @@ export async function saveSnapshot(
   snapshot: AghConfigSnapshot,
   options?: SaveSnapshotOptions
 ): Promise<void> {
-  const isManaged = Boolean(
+  const instId = snapshot.meta.sourceInstance.id
+  let isManaged = Boolean(
     options?.managed || options?.managedConfig || options?.password || options?.key
   )
+  let managedConfig = options?.managedConfig
+  let key = options?.key
+  let password = options?.password
+
+  if (instId) {
+    const store = loadStore()
+    const inst = store?.instances.find((i) => i.id === instId)
+    if (inst?.managed) {
+      isManaged = true
+      if (!managedConfig) {
+        managedConfig = inst.managed
+      }
+    }
+    if (!key) {
+      key = getSessionKey(instId)
+    }
+    if (!key && !password && inst) {
+      const ep = inst.endpoints[0]
+      if (ep?.password) password = ep.password
+    }
+  }
 
   if (!isManaged) {
     await saveDirectSnapshot(snapshot)
@@ -428,8 +452,8 @@ export async function saveSnapshot(
 
   // Managed mode:
   // 1. Encrypt snapshot locally
-  const saltBytes = options?.managedConfig?.salt
-    ? base64ToUint8Array(options.managedConfig.salt)
+  const saltBytes = managedConfig?.salt
+    ? base64ToUint8Array(managedConfig.salt)
     : undefined
 
   const blob = await encryptSnapshotBlob({
@@ -437,8 +461,8 @@ export async function saveSnapshot(
     instanceId: snapshot.meta.sourceInstance.id,
     createdAt: snapshot.meta.createdAt,
     plaintext: snapshot as unknown as Record<string, unknown>,
-    password: options?.password,
-    key: options?.key,
+    password,
+    key,
     salt: saltBytes,
   })
 
@@ -469,7 +493,7 @@ export async function saveSnapshot(
   // 4. Asynchronously trigger OutboxSyncCoordinator without blocking saveSnapshot
   if (!options?.skipAutoSync) {
     void OutboxSyncCoordinator.triggerSync(
-      options?.managedConfig?.serverUrl,
+      managedConfig?.serverUrl,
       snapshot.meta.sourceInstance.id
     ).catch(() => {
       // Expected when offline or server unreachable; tasks are safely persisted in outbox
@@ -514,7 +538,16 @@ export async function listSnapshots(
   instanceId?: string,
   options?: { managed?: boolean }
 ): Promise<AghConfigSnapshot[]> {
-  if (options?.managed === true) {
+  let isManaged = options?.managed
+  if (isManaged === undefined && instanceId) {
+    const store = loadStore()
+    const inst = store?.instances.find((i) => i.id === instanceId)
+    if (inst?.managed) {
+      isManaged = true
+    }
+  }
+
+  if (isManaged === true) {
     const records = await listManagedSnapshots(instanceId)
     return records
       .map((r) => r.snapshot)
@@ -533,24 +566,36 @@ export async function deleteSnapshot(
   options?: DeleteSnapshotOptions
 ): Promise<boolean> {
   let deleted = false
+  let isManaged = options?.managed
+  const instId = options?.instanceId
+  let serverUrl = options?.managedConfig?.serverUrl
+
+  if (isManaged === undefined && instId) {
+    const store = loadStore()
+    const inst = store?.instances.find((i) => i.id === instId)
+    if (inst?.managed) {
+      isManaged = true
+      if (!serverUrl) serverUrl = inst.managed.serverUrl
+    }
+  }
 
   // 1. Direct snapshot deletion (unless options.managed === true)
-  if (options?.managed !== true) {
+  if (isManaged !== true) {
     const directDeleted = await deleteDirectSnapshot(id)
     if (directDeleted) deleted = true
   }
 
   // 2. Managed snapshot deletion (unless options.managed === false)
-  if (options?.managed !== false) {
+  if (isManaged !== false) {
     const managedRecord = await getManagedSnapshot(id)
-    if (managedRecord || options?.managed) {
-      const instId = managedRecord?.instanceId || options?.instanceId || ''
+    if (managedRecord || isManaged) {
+      const targetInstId = managedRecord?.instanceId || instId || ''
       await deleteManagedSnapshot(id)
       deleted = true
 
       const delTask: OutboxTask = {
         taskId: `outbox-del-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        instanceId: instId,
+        instanceId: targetInstId,
         snapshotId: id,
         action: 'delete',
         createdAt: new Date().toISOString(),
@@ -559,7 +604,7 @@ export async function deleteSnapshot(
       await saveOutboxTask(delTask)
 
       if (!options?.skipAutoSync) {
-        void OutboxSyncCoordinator.triggerSync(options?.managedConfig?.serverUrl, instId).catch(() => {})
+        void OutboxSyncCoordinator.triggerSync(serverUrl, targetInstId).catch(() => {})
       }
     }
   }

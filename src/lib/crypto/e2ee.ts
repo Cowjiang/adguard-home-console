@@ -4,6 +4,8 @@
  * with deterministic AAD binding, running 100% on standard W3C WebCrypto API.
  */
 
+export * from './keyVault'
+
 export const PBKDF2_ITERATIONS = 600_000
 export const MIN_PBKDF2_ITERATIONS = 100_000
 export const MAX_PBKDF2_ITERATIONS = 2_000_000

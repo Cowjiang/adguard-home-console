@@ -89,14 +89,14 @@ Web/PWA 形态下「托管」即「托管到本服务器」；壳形态下才是
 
 - [x] 文案不再承诺跨设备持久：标题、空态、存储说明三处
 - [x] 导出的 bundle 文件名与类型名不再使用「集群」措辞，旧文件仍可导入
-- [ ] 连接页可显式选择「直连」与「托管」；切回直连后本机状态不丢
-- [ ] 托管下任意设备创建的实例与快照，在其它登录同一 console 的设备可见并能正确解密
+- [x] 连接页可显式选择「直连」与「托管」；切回直连后本机状态不丢
+- [x] 托管下任意设备创建的实例与快照，在其它登录同一 console 的设备可见并能正确解密
 - [x] 服务端存储与日志中都不出现 AGH 密码明文，且服务端存储的快照数据为 AES-GCM 密文（零知识存储）
 - [x] Console 服务端失守时，泄露的数据无法还原为明文配置或密码
 - [x] AES-256-GCM 跨端互通：Web/Node (SubtleCrypto) 与 Rust (aes-gcm) 测试向量交叉解密通过，且 AAD 篡改时拒绝解密
 - [x] 服务端不可达时：实例/快照只读缓存可用；保护快照可写且标记待上传，恢复后自动补传且不重复
 - [x] 首次开启托管提供「把本机已有快照迁移到托管库」入口（本地加密后上传），迁移后本机副本的去留对用户可见
-- [ ] `pnpm check`、`pnpm test`、`pnpm build`、`npm run test:server`、`cd src-tauri && cargo test`、`node scripts/verify-proposals.mjs` 通过
+- [x] `pnpm check`、`pnpm test`、`pnpm build`、`npm run test:server`、`cd src-tauri && cargo test`、`node scripts/verify-proposals.mjs` 通过
 
 ## Note
 

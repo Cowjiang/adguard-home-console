@@ -2,16 +2,24 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Server, Trash } from 'lucide-react'
+import { Server, Trash, Globe } from 'lucide-react'
 import { useAuth } from '../../lib/session/auth'
 import { PageHeader, Screen, Card, GroupTitle, Button } from '../../components/ui/primitives'
 import { useConfirm } from '../../components/ui/sheet'
 import { ErrorBox } from '../../components/ui/atoms'
 import { toast } from '../../components/ui/toast'
-import { activeEndpoint, labelFromUrl } from '../../lib/session/instances'
+import { activeEndpoint, labelFromUrl, newId } from '../../lib/session/instances'
+import {
+  base64ToUint8Array,
+  deriveMasterKey,
+  generateSalt,
+  uint8ArrayToBase64,
+} from '../../lib/crypto/e2ee'
+import { setSessionKey, removeSessionKey } from '../../lib/crypto/keyVault'
+import { migrateLocalSnapshotsToManaged } from '../../lib/snapshot/outboxSync'
 
 export function InstanceEdit() {
-  const { store, activeId, connect, removeInstance, connecting, error } = useAuth()
+  const { store, connect, removeInstance, connecting, error } = useAuth()
   const { t } = useTranslation()
   const nav = useNavigate()
   const confirm = useConfirm()
@@ -29,15 +37,69 @@ export function InstanceEdit() {
     target && ep && target.label !== labelFromUrl(ep.url) ? target.label : ''
   )
 
+  // Managed mode settings
+  const [isManaged, setIsManaged] = useState(Boolean(target?.managed))
+  const [serverUrl, setServerUrl] = useState(
+    target?.managed?.serverUrl ||
+      (typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'http://localhost:3000')
+  )
+  const [managedError, setManagedError] = useState<string | null>(null)
+
   // Deep link to an instance that no longer exists: back to the list
   useEffect(() => {
     if (editId && !target) nav('/settings/server', { replace: true })
   }, [editId, target, nav])
 
   async function save() {
+    setManagedError(null)
+    const cleanUrl = url.trim().replace(/\/+$/, '')
+    const cleanUsername = username.trim()
+    const cleanLabel = label.trim() || labelFromUrl(cleanUrl)
+    const targetId = editId || newId()
+
+    let managedMeta: { serverUrl: string; salt: string } | undefined
+    if (isManaged) {
+      const cleanServer = serverUrl.trim().replace(/\/+$/, '')
+      const salt = target?.managed?.salt || uint8ArrayToBase64(generateSalt())
+      try {
+        // Register metadata with Console server (STRICT REDLINE: NO password!)
+        const res = await fetch(`${cleanServer}/api/managed/instances`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: targetId,
+            label: cleanLabel,
+            url: cleanUrl,
+            username: cleanUsername,
+            salt,
+          }),
+        })
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '')
+          throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`)
+        }
+        managedMeta = { serverUrl: cleanServer, salt }
+
+        // Derive and cache master key in memory
+        const saltBytes = base64ToUint8Array(salt)
+        const key = await deriveMasterKey(password, saltBytes)
+        setSessionKey(targetId, key)
+
+        // Attempt background migration of any unmanaged local snapshots
+        void migrateLocalSnapshotsToManaged(targetId, password, managedMeta).catch(() => {})
+      } catch (err: any) {
+        setManagedError(t('settings.managedEnrollError', { msg: err?.message || String(err) }))
+        return
+      }
+    } else {
+      removeSessionKey(targetId)
+    }
+
     const ok = await connect(
-      { url: url.trim().replace(/\/+$/, ''), username: username.trim(), password },
-      { id: editId, label: label.trim() || undefined, activate: isNew }
+      { url: cleanUrl, username: cleanUsername, password },
+      { id: targetId, label: cleanLabel, activate: isNew, managed: managedMeta }
     )
     if (ok) {
       toast(t('settings.serverSaved'))
@@ -54,6 +116,7 @@ export function InstanceEdit() {
       destructive: true,
       confirmText: t('settings.instancesDelete'),
       onConfirm: () => {
+        removeSessionKey(editId)
         removeInstance(editId)
         nav('/settings/server', { replace: true })
       },
@@ -73,8 +136,46 @@ export function InstanceEdit() {
             <input className="field" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('settings.passwordPlaceholder')} />
           </div>
           <input className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('settings.instancesNamePlaceholder')} autoCapitalize="off" />
-          {error && <ErrorBox>{error}</ErrorBox>}
-          <div className="flex gap-2.5">
+          
+          {/* Managed Mode Toggle */}
+          <div className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2.5">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="flex items-center gap-2 text-[13.5px] font-medium text-t1">
+                <Globe size={15} className="text-accent" />
+                {t('settings.managedModeToggle')}
+              </span>
+              <input
+                type="checkbox"
+                checked={isManaged}
+                onChange={(e) => setIsManaged(e.target.checked)}
+                className="h-4 w-4 rounded accent-[var(--accent)]"
+              />
+            </label>
+            <p className="text-[12px] leading-relaxed text-t3">
+              {t('settings.managedModeDesc')}
+            </p>
+            {isManaged && (
+              <div className="mt-1">
+                <span className="mb-1 block text-[12px] font-medium text-t2">
+                  {t('settings.managedServerUrl')}
+                </span>
+                <input
+                  className="field"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  placeholder={t('settings.managedServerUrlPlaceholder')}
+                  autoCapitalize="off"
+                  inputMode="url"
+                />
+              </div>
+            )}
+          </div>
+
+          {(error || managedError) && (
+            <ErrorBox>{managedError || error}</ErrorBox>
+          )}
+
+          <div className="flex gap-2.5 mt-1">
             <Button className="flex-1" loading={connecting} disabled={!url.trim() || !username.trim()} onClick={save}>
               <Server size={15} /> {t('common.save')}
             </Button>
@@ -91,4 +192,3 @@ export function InstanceEdit() {
     </Screen>
   )
 }
-

@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, Clock, Download, FileUp, Layers, Plus } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Download,
+  FileUp,
+  Layers,
+  Plus,
+  RefreshCw,
+  Cloud,
+} from 'lucide-react'
 import { Badge, IconBubble, Loading } from '../../components/ui/atoms'
 import { Button, Card, HeaderAction, PageHeader, Screen, Segmented } from '../../components/ui/primitives'
 import { PickSelect, usePick } from '../../components/ui/menu'
@@ -12,10 +22,16 @@ import { toast } from '../../components/ui/toast'
 import { useAuth } from '../../lib/session/auth'
 import {
   exportSnapshotBundleJson,
+  listOutboxTasks,
   listSnapshots,
   parseSnapshotImport,
   saveSnapshot,
 } from '../../lib/snapshot/snapshotStorage'
+import {
+  OutboxSyncCoordinator,
+  flushOutbox,
+  pullRemoteSnapshots,
+} from '../../lib/snapshot/outboxSync'
 import type { AghConfigSnapshot, SnapshotTrigger } from '../../lib/snapshot/types'
 import { SnapshotDiffSheet } from '../../components/snapshot/SnapshotDiffSheet'
 import { SnapshotActions } from '../../components/snapshot/SnapshotActions'
@@ -37,13 +53,33 @@ export function SnapshotSettings() {
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState<'all' | 'manual' | 'auto'>('all')
 
+  // Outbox status & sync state
+  const [outboxCount, setOutboxCount] = useState<number>(0)
+  const [isSyncing, setIsSyncing] = useState<boolean>(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function updateOutboxStatus() {
+    try {
+      const tasks = await listOutboxTasks(activeInstance?.id)
+      setOutboxCount(tasks.length)
+      setIsSyncing(OutboxSyncCoordinator.isSyncing())
+    } catch {
+      // Ignore
+    }
+  }
 
   async function refreshSnapshots() {
     setLoading(true)
     try {
-      const list = await listSnapshots(activeInstance?.id)
+      if (activeInstance?.managed) {
+        await pullRemoteSnapshots(activeInstance.id, activeInstance.managed.serverUrl).catch(() => {})
+      }
+      const list = await listSnapshots(activeInstance?.id, {
+        managed: Boolean(activeInstance?.managed),
+      })
       setSnapshots(list)
+      await updateOutboxStatus()
     } catch (e: any) {
       toast(t('settings.snapshotLoadFailed', { msg: e?.message || String(e) }), 'err')
     } finally {
@@ -55,6 +91,41 @@ export function SnapshotSettings() {
     void refreshSnapshots()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeInstance?.id])
+
+  useEffect(() => {
+    void updateOutboxStatus()
+    const unreg = OutboxSyncCoordinator.onSyncComplete(() => {
+      void updateOutboxStatus()
+      void refreshSnapshots()
+    })
+    return unreg
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeInstance?.id])
+
+  async function handleFlushOutbox() {
+    setIsSyncing(true)
+    try {
+      const res = await flushOutbox(activeInstance?.id, activeInstance?.managed?.serverUrl)
+      if (activeInstance?.managed) {
+        await pullRemoteSnapshots(activeInstance.id, activeInstance.managed.serverUrl).catch(() => {})
+      }
+      await refreshSnapshots()
+      if (res.total === 0) {
+        toast(t('settings.outboxAlreadySynced'))
+      } else if (res.failed === 0) {
+        toast(t('settings.outboxSyncSuccess', { count: res.succeeded }))
+      } else {
+        toast(
+          t('settings.outboxSyncPartial', { succeeded: res.succeeded, failed: res.failed }),
+          'err'
+        )
+      }
+    } catch (err: any) {
+      toast(t('settings.outboxSyncFailed', { msg: err?.message || String(err) }), 'err')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   const filteredSnapshots = useMemo(() => {
     if (filterType === 'manual') {
@@ -219,6 +290,33 @@ export function SnapshotSettings() {
         className="hidden"
       />
 
+      {/* Outbox Status & Sync Bar (for managed instances or when pending outbox tasks exist) */}
+      {(activeInstance?.managed || outboxCount > 0) && (
+        <div className="mb-3 flex items-center justify-between rounded-2xl glass p-3 text-[13px]">
+          <div className="flex items-center gap-2 min-w-0">
+            <Cloud size={16} className="text-accent flex-none" />
+            <span className="font-semibold text-t1 flex-none">{t('settings.outboxStatusTitle')}</span>
+            <Badge kind={isSyncing ? 'info' : outboxCount > 0 ? 'warn' : 'ok'}>
+              {isSyncing
+                ? t('settings.outboxSyncing')
+                : outboxCount > 0
+                  ? t('settings.outboxPendingCount', { count: outboxCount })
+                  : t('settings.outboxAllSynced')}
+            </Badge>
+          </div>
+          <Button
+            variant="glass"
+            size="sm"
+            loading={isSyncing}
+            onClick={handleFlushOutbox}
+            className="flex-none h-8 px-3 text-[12px]"
+          >
+            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+            {t('settings.outboxSyncNow')}
+          </Button>
+        </div>
+      )}
+
       {/* Filter by category: dropdown on mobile (same picker idiom as the
           other pages), segmented control on desktop */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -324,7 +422,7 @@ export function SnapshotSettings() {
 
       {/* Storage location hint */}
       <p className="mt-4 px-2 text-center text-[12px] leading-relaxed text-t3">
-        {t('settings.snapshotStorageHint')}
+        {activeInstance?.managed ? t('settings.managedModeDesc') : t('settings.snapshotStorageHint')}
       </p>
     </Screen>
   )

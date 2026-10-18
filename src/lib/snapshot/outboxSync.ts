@@ -4,17 +4,27 @@
  * local IndexedDB/memory storage and the remote AdGuard Home Console server.
  */
 
-import { type SnapshotEncryptedBlob } from '../crypto/e2ee'
-import { loadStore } from '../session/instances'
+import {
+  base64ToUint8Array,
+  deriveMasterKey,
+  decryptSnapshotBlob,
+  type SnapshotEncryptedBlob,
+} from '../crypto/e2ee'
+import { getSessionKey, setSessionKey } from '../crypto/keyVault'
+import { activeEndpoint, loadStore } from '../session/instances'
 import {
   deleteOutboxTask,
   deleteSnapshot,
+  getManagedSnapshot,
   listOutboxTasks,
   listSnapshots,
+  saveManagedSnapshot,
   saveSnapshot,
   updateManagedSnapshotStatus,
   updateOutboxTask,
+  type ManagedSnapshotRecord,
 } from './snapshotStorage'
+import type { AghConfigSnapshot } from './types'
 
 export interface OutboxTask {
   taskId: string
@@ -46,6 +56,12 @@ export interface MigrationSummary {
   total: number
   migrated: number
   synced: number
+  failed: number
+}
+
+export interface PullRemoteResult {
+  total: number
+  pulled: number
   failed: number
 }
 
@@ -231,6 +247,114 @@ export class OutboxSyncCoordinatorClass {
 }
 
 export const OutboxSyncCoordinator = new OutboxSyncCoordinatorClass()
+
+/**
+ * Triggers an immediate outbox synchronization flush.
+ */
+export async function flushOutbox(
+  instanceId?: string,
+  serverUrl?: string
+): Promise<SyncExecutionResult> {
+  return await OutboxSyncCoordinator.triggerSync(serverUrl, instanceId)
+}
+
+/**
+ * Pulls remote snapshots from the managed console server, decrypts them locally,
+ * and saves them into the local managed_snapshots store.
+ */
+export async function pullRemoteSnapshots(
+  instanceId: string,
+  serverUrl?: string,
+  options?: { key?: CryptoKey; password?: string }
+): Promise<PullRemoteResult> {
+  const store = loadStore()
+  const inst = store?.instances.find((i) => i.id === instanceId)
+  const targetServer = serverUrl || inst?.managed?.serverUrl
+  if (!targetServer) {
+    return { total: 0, pulled: 0, failed: 0 }
+  }
+
+  const base = targetServer.replace(/\/+$/, '')
+  const listUrl = `${base}/api/managed/instances/${encodeURIComponent(instanceId)}/snapshots`
+
+  let summaries: Array<{ id: string; instanceId: string; createdAt: string }> = []
+  try {
+    const res = await fetch(listUrl)
+    if (!res.ok) {
+      if (res.status === 404) return { total: 0, pulled: 0, failed: 0 }
+      throw new Error(`Failed to list remote snapshots HTTP ${res.status}`)
+    }
+    summaries = await res.json()
+    if (!Array.isArray(summaries)) return { total: 0, pulled: 0, failed: 0 }
+  } catch {
+    return { total: 0, pulled: 0, failed: 0 }
+  }
+
+  const result: PullRemoteResult = {
+    total: summaries.length,
+    pulled: 0,
+    failed: 0,
+  }
+
+  let key = options?.key || getSessionKey(instanceId)
+  const password = options?.password || (inst ? activeEndpoint(inst)?.password : undefined)
+  if (!key && password && inst?.managed?.salt) {
+    try {
+      key = await deriveMasterKey(password, base64ToUint8Array(inst.managed.salt))
+      setSessionKey(instanceId, key)
+    } catch {
+      // Ignore key derivation failure
+    }
+  }
+
+  for (const item of summaries) {
+    const local = await getManagedSnapshot(item.id)
+    if (local && local.snapshot) {
+      continue
+    }
+
+    try {
+      const snapUrl = `${listUrl}/${encodeURIComponent(item.id)}`
+      const snapRes = await fetch(snapUrl)
+      if (!snapRes.ok) {
+        result.failed++
+        continue
+      }
+      const blob: SnapshotEncryptedBlob = await snapRes.json()
+      if (!blob || !blob.ciphertext) {
+        result.failed++
+        continue
+      }
+
+      let decrypted: AghConfigSnapshot | undefined
+      if (key || password) {
+        try {
+          const jsonStr = await decryptSnapshotBlob({ blob, key, password })
+          decrypted = JSON.parse(jsonStr) as AghConfigSnapshot
+        } catch {
+          result.failed++
+          continue
+        }
+      }
+
+      const record: ManagedSnapshotRecord = {
+        id: blob.id,
+        instanceId: blob.instanceId,
+        createdAt: blob.createdAt,
+        status: 'synced',
+        blob,
+        snapshot: decrypted,
+        updatedAt: new Date().toISOString(),
+      }
+      await saveManagedSnapshot(record)
+      result.pulled++
+    } catch {
+      result.failed++
+    }
+  }
+
+  return result
+}
 
 /**
  * Registers event listeners for automatic outbox sync on online and visibilitychange events.
