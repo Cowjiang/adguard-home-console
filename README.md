@@ -90,6 +90,10 @@ pnpm start
 
 Every release also carries `agh-console.ipa`, built from the same commit as the other artifacts. It is **unsigned**, because it is built without an Apple certificate: iOS only installs apps signed by a certificate you own, so re-sign it with your own Apple ID before installing. Sideloadly and AltStore do that on Windows or macOS, Xcode on macOS. A free Apple ID is enough — its signing profile expires after seven days, after which the app has to be re-signed to run again.
 
+### Windows
+
+Every release also carries `agh-console-setup.exe` (NSIS, for the usual double-click install) and `agh-console.msi` (WiX, for group policy or scripted deployment), built from the same commit as the other artifacts. They install per user, so no administrator rights are needed, and the installer pulls the WebView2 runtime from Microsoft when the machine does not have it yet. Both are **unsigned**, because the build has no Windows code-signing certificate, so SmartScreen warns on first run — "More info" → "Run anyway".
+
 ### Build from source
 
 Requires Node.js ≥ 24 and pnpm (`corepack enable` is enough; both versions are pinned in `package.json`).

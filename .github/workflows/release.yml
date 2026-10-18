@@ -1,11 +1,12 @@
 name: Release
 
-# Two channels, one build, four consumers: the GitHub Release tarball, the npm
+# Two channels, one build, five consumers: the GitHub Release tarball, the npm
 # package and the GHCR image all carry the same version, computed once in the
 # prepare job (scripts/release-plan.mjs; `node .github/scripts/release-plan.mjs --self-test`
-# pins the mapping); the iOS IPA rides along on the Release as a fourth one,
-# built by the `ios` job from the same ref (unsigned, no version stamp — see
-# .agents/pipelines/proposals/process/2026-10-15-release-ipa-artifact.md).
+# pins the mapping); the iOS IPA and the Windows installers ride along on the
+# Release as the fourth and fifth, built by the `ios` and `windows` jobs from the
+# same ref (both unsigned — see .agents/pipelines/proposals/process/2026-10-15-release-ipa-artifact.md
+# and 2026-10-18-release-windows-installers.md).
 #
 #   nightly  schedule from `dev` / dispatch   one rolling prerelease, tag `nightly` moved to each build
 #                                              npm dist-tag nightly, image :nightly :<version> :sha-<sha>
@@ -276,14 +277,93 @@ jobs:
           if-no-files-found: error
           path: agh-console.ipa
 
+  # The desktop installers. Unsigned on purpose, like the IPA: CI holds no
+  # Windows code-signing certificate, so the installers raise SmartScreen on
+  # first run. bundle.windows.certificateThumbprint / signCommand (or the
+  # TAURI_SIGNING_* variables) is the hook if a signed build is ever wanted.
+  windows:
+    needs: prepare
+    # Same gate and same reason as the iOS job: a private repository bills
+    # Windows minutes at 2×, where a daily build would eat the free allowance.
+    if: >-
+      needs.prepare.outputs.skip != 'true' &&
+      (needs.prepare.outputs.channel == 'stable' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event.repository.private == false)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The Rust half dominates the build, as it does for iOS; keys off Cargo.lock.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The installers take their version from tauri.conf.json, which this stamps
+      # with the core version — the MSI and NSIS version fields reject a semver
+      # prerelease suffix the way the iOS plist does, so a nightly build carries
+      # the core version plus this run's number. What the UI reports is the full
+      # version in package.json (vite.config.ts injects it, and tauri-cli runs
+      # pnpm build), which is also what this workflow publishes to npm.
+      - name: Stamp version
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD: ${{ github.run_number }}
+        run: node .github/scripts/release-plan.mjs --set-version "$VERSION" "$BUILD"
+
+      # The command the local Windows build uses, with no extra flags: tauri-cli
+      # runs build.beforeBuildCommand (pnpm build), the frontend ends up embedded
+      # in the Rust binary, and the NSIS/WiX toolsets are fetched on first use.
+      # bundle.targets is "all", so this yields both the NSIS setup and the MSI.
+      - name: Build the installers
+        run: pnpm tauri build
+
+      # Fixed asset names, like agh-console.tar.gz and agh-console.ipa: the
+      # nightly release is upserted in place, so a name carrying the version
+      # would pile up one set per night instead of replacing the previous one.
+      - name: Collect the installers
+        shell: bash
+        run: |
+          setup="$(find src-tauri/target/release/bundle/nsis -name '*-setup.exe' -print -quit)"
+          msi="$(find src-tauri/target/release/bundle/msi -name '*.msi' -print -quit)"
+          if [ -z "$setup" ] || [ -z "$msi" ]; then
+            echo "::error::Windows 构建没有同时产出 NSIS 安装器与 MSI"
+            exit 1
+          fi
+          cp "$setup" agh-console-setup.exe
+          cp "$msi" agh-console.msi
+          # What the installed app will report: print it so the log carries the
+          # evidence that the stamp above reached the bundle.
+          echo "bundled version: $(node -p "require('./src-tauri/tauri.conf.json').version")"
+          ls -l agh-console-setup.exe agh-console.msi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installers
+          if-no-files-found: error
+          path: |
+            agh-console-setup.exe
+            agh-console.msi
+
   release:
-    needs: [prepare, build, ios]
-    # The iOS job must not be able to block the web, npm and image channels, and
-    # it must not race them either (an IPA that arrives after the release has been
-    # created would be missing from it), hence both the extra need and
-    # !cancelled(). A failed build still blocks publishing: without its tarball
-    # there is nothing to publish. The IPA step at the end attaches one only when
-    # the macOS job actually produced it.
+    needs: [prepare, build, ios, windows]
+    # The platform jobs must not be able to block the web, npm and image
+    # channels, and they must not race them either (an artifact that arrives
+    # after the release has been created would be missing from it), hence both
+    # the extra needs and !cancelled(). A failed build still blocks publishing:
+    # without its tarball there is nothing to publish. The IPA and the Windows
+    # installer steps at the end attach only what the platform job produced.
     if: ${{ !cancelled() && needs.build.result == 'success' && needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -383,6 +463,22 @@ jobs:
           REPO: ${{ github.repository }}
           TAG: ${{ needs.prepare.outputs.release_tag }}
         run: gh release upload "$TAG" agh-console.ipa community-source.json --clobber --repo "$REPO"
+
+      # Same shape as the IPA above: the installers ride along only when the
+      # Windows job produced them, in a step of its own so a missing file can
+      # never fail the release upsert.
+      - uses: actions/download-artifact@v8
+        if: needs.windows.result == 'success'
+        with:
+          name: windows-installers
+
+      - name: Attach the Windows installers
+        if: needs.windows.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: gh release upload "$TAG" agh-console-setup.exe agh-console.msi --clobber --repo "$REPO"
 
   npm:
     needs: [prepare, build]

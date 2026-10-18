@@ -1,7 +1,7 @@
 # 工程约束与已知边界
 
 **Status:** current
-**Updated:** 2026-10-18（设置页草稿在未被编辑时跟随服务端副本：判据表 `draftFollow` 带单测，消掉后台校验落地后页面停在旧值并挂假未保存标记的问题）
+**Updated:** 2026-10-18（设置页草稿在未被编辑时跟随服务端副本：判据表 `draftFollow` 带单测，消掉后台校验落地后页面停在旧值并挂假未保存标记的问题；发布线新增 `windows` job，Release 多带两件 Windows 安装包）
 
 ## 实现约束
 
@@ -50,7 +50,7 @@
 
 ## 发布
 
-一条工作流、一次构建、三个消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，版本只在 `prepare` 算一次（`.github/scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
+一条工作流、一次构建、多消费者：`.github/workflows/release.yml` 是 `prepare → build → {release, npm, docker}`，另有 `ios` 与 `windows` 两个平台 job 挂在同一个 `prepare` 之下；版本只在 `prepare` 算一次（`.github/scripts/release-plan.mjs`），写回 `package.json` 后由 Release 产物、npm 包与镜像标签共同携带。
 
 - 两个渠道：**nightly** 由定时任务（每天 UTC 19:17，避开整点以躲开 GitHub 的 cron 拥塞）从 `dev` 构建，版本 `<package.json 的 version>-nightly.<UTC YYYYMMDD>.<短 sha>`，Release 标 prerelease 且**只占一条**（tag 固定为 `nightly`，每次强移到最新构建后原地更新），npm dist-tag `nightly`，镜像 `<版本>`/`nightly`/`sha-<短 sha>`，**不带 `latest`**；**stable** 由 tag `vX.Y.Z` 触发，版本取自 tag，npm `latest`，镜像 `<版本>`/`X.Y`/`latest`/`sha-<短 sha>`。映射由 `pnpm test:release` 的断言钉住。
 - 因此 `releases/latest`（`scripts/server-pull.sh` 读的）、npm 的 `latest` dist-tag 与镜像 `:latest` 都只属于 stable，nightly 不抢这三个位置。
@@ -67,7 +67,8 @@
 - `release.yml` 里的 action 一律钉在 **node24 主线**（node20 的动作会被 runner 强制降级运行并逐 job 打弃用告警）；升大版本前逐个核对本流程用到的 input 在新版里是否仍然存在，本仓没有 Dependabot 兜底。
 - npm 渠道发布的就是 CI 校验过的那个 tgz：`scripts/check-npm-pack.mjs` 断言包里只有 `dist/`、`server/` 与包元数据（npm 无 `.npmignore` 时回退 `.gitignore`，而 `dist` 正被忽略，没有这条断言就会发出一个没有前端产物的包）。发布前会先查该版本是否已存在，存在就跳过；失败会让 job 变红（不再有"没配 token 就告警跳过"这条退路）。
 - iOS 产物由 `release.yml` 的 `ios` job（`macos-latest`）构建：`./scripts/ios-signing.sh tauri build --target aarch64 --no-sign` 出**未签名** ipa（资产名固定 `agh-console.ipa`），安装者用自己的 Apple ID 重签；签名值与本地一致，只走仓库变量，缺省兜底 `unsigned` 与 `tauri.conf.json#identifier`。stable 恒构建，nightly 只在仓库公开或手动 `workflow_dispatch` 时构建（`github.event.repository.private == false`；私有仓库的 macOS 分钟按 10× 计费，才需要这道闸——仓库已于 2026-10-15 转为 public，nightly 因此自动构建）；`release` job 用 `!cancelled()` 接住 iOS 的失败，ipa 缺失只让运行页变红，不阻断 tarball / npm / 镜像。
-- 版本只有一个来源：`release-plan.mjs --set-version <版本> <build>` 把**完整版本**写进 `package.json`（前端经 `vite.config.ts` 的 `define` 编进 `dist`，也是 npm/Release 的版本），把**核心版本 + 数字 build** 写进 `src-tauri/tauri.conf.json` 与 iOS 工程的 plist 两项——tauri 从 `tauri.conf.json#version` 派生 `apple.bundle-version`，给它 nightly 串会直接中止（`apple.bundle-version can only contain numbers`），所以那两个文件只放数字版本，完整 nightly 串只出现在应用界面与 npm 版本里。镜像用 `APP_VERSION` build-arg 传入（改上下文里的 `package.json` 会让 `pnpm install` 的缓存层每次发版重跑）；仓库内三个声明值平时与 `package.json` 同值。`src-tauri/Cargo.toml` 的 crate 版本不参与（不出现在任何产物或界面里）。
+- Windows 桌面产物由 `release.yml` 的 `windows` job（`windows-latest`）构建：`pnpm tauri build` 直出 NSIS 与 MSI 两件安装包，资产名固定为 `agh-console-setup.exe` 与 `agh-console.msi`，同样**未签名**（无 Windows 代码签名证书，首次运行有 SmartScreen 提示）。闸与 iOS 同条件、同理由（stable 恒构建；nightly 只在仓库公开或手动派发时构建——私有仓库的 Windows runner 按 2× 计费）；安装包里的版本取自 `tauri.conf.json`（核心版本 + 本次 run number），完整 nightly 串仍只出现在应用界面与 npm 版本里。两件都发：MSI 便于组策略/脚本分发，NSIS 便于普通用户双击安装。
+- 版本只有一个来源：`release-plan.mjs --set-version <版本> <build>` 把**完整版本**写进 `package.json`（前端经 `vite.config.ts` 的 `define` 编进 `dist`，也是 npm/Release 的版本），把**核心版本 + 数字 build** 写进 `src-tauri/tauri.conf.json` 与 iOS 工程的 plist 两项——tauri 从 `tauri.conf.json#version` 派生 `apple.bundle-version`，给它 nightly 串会直接中止（`apple.bundle-version can only contain numbers`），所以那两个文件只放数字版本，完整 nightly 串只出现在应用界面与 npm 版本里（Windows 安装包的版本字段同样取自 `tauri.conf.json`，因此也只有核心版本 + build 号）。镜像用 `APP_VERSION` build-arg 传入（改上下文里的 `package.json` 会让 `pnpm install` 的缓存层每次发版重跑）；仓库内三个声明值平时与 `package.json` 同值。`src-tauri/Cargo.toml` 的 crate 版本不参与（不出现在任何产物或界面里）。
 - GHCR 包的可见性**不随仓库继承**，是包设置里的独立开关（现已设为 public）：未公开时 README 里的匿名 `docker run` 需要先在目标机 `docker login ghcr.io`。
 
 ## 验证入口
