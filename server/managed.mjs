@@ -89,11 +89,12 @@ export function withLock(lockKey, task) {
 
 /**
  * Resolves the data directory for managed mode.
- * Priority: options.dataDir > env.DATA_DIR > <ROOT>/data
+ * Priority: options.dataDir > env.AGH_DATA_DIR > env.DATA_DIR > <ROOT>/data
  */
 export function resolveDataDir(options = {}) {
   const env = options.env || process.env;
   if (options.dataDir) return path.resolve(options.dataDir);
+  if (env.AGH_DATA_DIR) return path.resolve(env.AGH_DATA_DIR);
   if (env.DATA_DIR) return path.resolve(env.DATA_DIR);
   return path.resolve(ROOT, 'data');
 }

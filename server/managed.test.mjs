@@ -40,6 +40,27 @@ test('isValidId: strictly validates IDs and blocks path traversal attempts', () 
   assert.equal(isValidId(123), false);
 });
 
+test('resolveDataDir: resolves data dir with priority options.dataDir > env.AGH_DATA_DIR > env.DATA_DIR > ROOT/data', () => {
+  const optDir = '/custom/opt/data';
+  const aghDir = '/custom/agh/data';
+  const dataDir = '/custom/env/data';
+
+  assert.equal(
+    resolveDataDir({ dataDir: optDir, env: { AGH_DATA_DIR: aghDir, DATA_DIR: dataDir } }),
+    path.resolve(optDir)
+  );
+  assert.equal(
+    resolveDataDir({ env: { AGH_DATA_DIR: aghDir, DATA_DIR: dataDir } }),
+    path.resolve(aghDir)
+  );
+  assert.equal(
+    resolveDataDir({ env: { DATA_DIR: dataDir } }),
+    path.resolve(dataDir)
+  );
+  const defaultDir = resolveDataDir({ env: {} });
+  assert.ok(defaultDir.endsWith(path.join('adguard-home-console', 'data')));
+});
+
 test('resolveSafePath: prevents path traversal beyond base directory', () => {
   const baseDir = '/tmp/safe-base';
   assert.equal(

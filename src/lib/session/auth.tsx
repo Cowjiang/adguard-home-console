@@ -310,10 +310,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // With an explicit id: edit that instance in place. Otherwise add a
         // new one or update the instance already pointing at the same
         // url+username
-        const editId =
-          opts?.id && prev?.instances.some((x) => x.id === opts.id) ? opts.id : undefined
+        const isExistingEdit = Boolean(opts?.id && prev?.instances.some((x) => x.id === opts.id))
         const targetId =
-          editId ??
+          opts?.id ??
           prev?.instances.find((i) => {
             const e = activeEndpoint(i)
             return e && e.url === clean.url && e.username === clean.username
@@ -351,7 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           instances,
           // Editing never moves the pointer; adding activates the new entry
           // unless asked not to (debug auto-login of a second instance)
-          activeId: editId
+          activeId: isExistingEdit
             ? prev
               ? prev.activeId
               : targetId

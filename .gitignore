@@ -40,3 +40,9 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 AGENTS.local.md
 .local-backup/
 .seecode/
+
+# Playwright 测试报告与产物
+test-results/
+playwright-report/
+blob-report/
+.playwright/

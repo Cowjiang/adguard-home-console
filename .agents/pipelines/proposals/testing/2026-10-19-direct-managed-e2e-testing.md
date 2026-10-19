@@ -1,7 +1,7 @@
 # 建立直连与托管模式端到端（E2E）质量闭环
 
 **Class:** testing
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-19
 **Source:** 用户 2026-10-19 需求讨论：围绕直连和托管模式建立端到端测试；上游主提案 `.agents/pipelines/proposals/architecture/2026-10-18-managed-mode-architecture-reconstruction.md`
 
@@ -79,14 +79,14 @@ flowchart TD
 
 ## Accept
 
-- [ ] 根目录建立 `playwright.config.ts`，配置轻量化 Headless Chromium 运行环境与 WebServer 自动拉起机制
-- [ ] 编写并跑通场景 1：直连模式登录与托管模式互斥隔离性端到端测试
-- [ ] 编写并跑通场景 2：双设备（Dual-Context）跨端同步与零知识密码安全黑盒嗅探端到端测试
-- [ ] 编写并跑通场景 2 反向用例：错误密码激活时解密安全防御与 UI 优雅容错测试
-- [ ] 编写并跑通场景 3：断网离线 Outbox 队列暂存与网络恢复自动补传端到端测试
-- [ ] `package.json` 补充 `test:e2e` 脚本，全量 E2E 测试在本地运行时间稳定在 15 秒以内
-- [ ] `.github/workflows/ci.yml` 集成 Playwright 依赖安装与 `pnpm test:e2e` 执行门禁
-- [ ] 提案校验工具 `node scripts/verify-proposals.mjs` 校验通过
+- [x] 根目录建立 `playwright.config.ts`，配置轻量化 Headless Chromium 运行环境与 WebServer 自动拉起机制
+- [x] 编写并跑通场景 1：直连模式登录与托管模式互斥隔离性端到端测试
+- [x] 编写并跑通场景 2：双设备（Dual-Context）跨端同步与零知识密码安全黑盒嗅探端到端测试
+- [x] 编写并跑通场景 2 反向用例：错误密码激活时解密安全防御与 UI 优雅容错测试
+- [x] 编写并跑通场景 3：断网离线 Outbox 队列暂存与网络恢复自动补传端到端测试
+- [x] `package.json` 补充 `test:e2e` 脚本，全量 E2E 测试在本地运行时间稳定在 15 秒以内
+- [x] `.github/workflows/ci.yml` 集成 Playwright 依赖安装与 `pnpm test:e2e` 执行门禁
+- [x] 提案校验工具 `node scripts/verify-proposals.mjs` 校验通过
 
 ## Note
 

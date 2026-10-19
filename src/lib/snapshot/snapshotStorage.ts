@@ -91,8 +91,22 @@ export interface DeleteSnapshotOptions {
   skipAutoSync?: boolean
 }
 
+let cachedDb: IDBDatabase | null = null
+let openingPromise: Promise<IDBDatabase> | null = null
+
 export function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (cachedDb) {
+    try {
+      cachedDb.transaction([STORE_NAME], 'readonly')
+      return Promise.resolve(cachedDb)
+    } catch {
+      cachedDb = null
+    }
+  }
+  if (openingPromise) {
+    return openingPromise
+  }
+  openingPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (!isIdbAvailable()) {
       reject(new Error('IndexedDB not supported'))
       return
@@ -124,9 +138,27 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
     }
 
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      cachedDb = request.result
+      cachedDb.onversionchange = () => {
+        cachedDb?.close()
+        cachedDb = null
+      }
+      cachedDb.onclose = () => {
+        cachedDb = null
+      }
+      resolve(cachedDb)
+    }
     request.onerror = () => reject(request.error || new Error('Failed to open IndexedDB'))
+    request.onblocked = () => {
+      cachedDb?.close()
+      cachedDb = null
+    }
+  }).finally(() => {
+    openingPromise = null
   })
+
+  return openingPromise
 }
 
 // Wire default db opener and instantiate store drivers
@@ -139,6 +171,9 @@ export const outboxStore = new IdbStore<OutboxTask>(OUTBOX_STORE_NAME, 'taskId')
  * Resets in-memory storage vaults for testing.
  */
 export function resetMemoryVaultsForTesting(): void {
+  cachedDb?.close()
+  cachedDb = null
+  openingPromise = null
   directStore.clearMemory()
   managedStore.clearMemory()
   outboxStore.clearMemory()
@@ -156,19 +191,23 @@ export async function clearAllDatabase(): Promise<void> {
         const storeNames = [STORE_NAME, MANAGED_STORE_NAME, OUTBOX_STORE_NAME].filter((s) =>
           db.objectStoreNames.contains(s)
         )
-        if (storeNames.length === 0) {
+        const closeAndClear = () => {
+          if (cachedDb === db) cachedDb = null
           db.close()
+        }
+        if (storeNames.length === 0) {
+          closeAndClear()
           resolve()
           return
         }
         const tx = db.transaction(storeNames, 'readwrite')
         for (const s of storeNames) tx.objectStore(s).clear()
         tx.oncomplete = () => {
-          db.close()
+          closeAndClear()
           resolve()
         }
         tx.onerror = () => {
-          db.close()
+          closeAndClear()
           reject(tx.error)
         }
       })
