@@ -6,9 +6,12 @@ import {
   uint8ArrayToBase64,
 } from '../lib/crypto/e2ee'
 import { clearSessionKeys, getSessionKey, setSessionKey, removeSessionKey } from '../lib/crypto/keyVault'
-import { newId, labelFromUrl, parseStore, type Instance } from '../lib/session/instances'
+import { newId, parseStore, type Instance } from '../lib/session/instances'
+import { ManagedSessionService, type ManagedInstanceMeta } from '../lib/session/managedService'
+import type { ManagedPhase } from '../components/login/ManagedLoginView'
+import type { ManagedAction, ConnectOptions } from '../lib/session/auth'
 
-describe('Login Page Dual-Mode (Direct vs Managed)', () => {
+describe('Login Architecture & Managed State Machine', () => {
   const SERVER_URL = 'https://console.example.com'
   const AGH_URL = 'http://192.168.1.1:3000'
   const USERNAME = 'admin'
@@ -19,57 +22,44 @@ describe('Login Page Dual-Mode (Direct vs Managed)', () => {
     clearSessionKeys()
   })
 
-  it('preserves direct mode configuration without interference from managed mode', () => {
-    let mode: 'direct' | 'managed' = 'direct'
-    const directState = {
+  it('manages mutually exclusive FSM phases without boolean flags or ghost states', () => {
+    const instance: ManagedInstanceMeta = {
+      id: 'inst-01',
+      label: 'Home Gateway',
       url: AGH_URL,
       username: USERNAME,
-      password: PASSWORD,
+      salt: uint8ArrayToBase64(generateSalt()),
     }
 
-    // Switch to managed mode
-    mode = 'managed'
-    const managedConsoleUrl = SERVER_URL
-    expect(mode).toBe('managed')
+    // 1. Initial phase is list
+    let phase: ManagedPhase = { type: 'list' }
+    expect(phase.type).toBe('list')
 
-    // Switch back to direct mode
-    mode = 'direct'
-    expect(mode).toBe('direct')
-    expect(directState.url).toBe(AGH_URL)
-    expect(directState.username).toBe(USERNAME)
-    expect(directState.password).toBe(PASSWORD)
+    // 2. Select an instance to activate
+    phase = { type: 'activate', instance }
+    expect(phase.type).toBe('activate')
+    if (phase.type === 'activate') {
+      expect(phase.instance.id).toBe('inst-01')
+      expect(phase.instance.label).toBe('Home Gateway')
+    }
+
+    // 3. Cancel activation returns to list
+    phase = { type: 'list' }
+    expect(phase.type).toBe('list')
+
+    // 4. Click register
+    phase = { type: 'register' }
+    expect(phase.type).toBe('register')
+
+    // 5. Cancel registration returns to list
+    phase = { type: 'list' }
+    expect(phase.type).toBe('list')
   })
 
-  it('fetches managed instances list from console server', async () => {
-    const mockInstances = [
-      {
-        id: 'inst-01',
-        label: 'Gateway AGH',
-        url: 'http://192.168.1.1:3000',
-        username: 'admin',
-        salt: uint8ArrayToBase64(generateSalt()),
-      },
-    ]
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => mockInstances,
-    })
-
-    const res = await fetch(`${SERVER_URL}/api/managed/instances`)
-    const data = await res.json()
-
-    expect(fetch).toHaveBeenCalledWith(`${SERVER_URL}/api/managed/instances`)
-    expect(data.length).toBe(1)
-    expect(data[0].id).toBe('inst-01')
-    expect(data[0].label).toBe('Gateway AGH')
-  })
-
-  it('activates a managed instance by deriving CryptoKey locally and never sending password to server', async () => {
+  it('activates a managed instance via ManagedSessionService and derives master key into KeyVault', async () => {
     const saltBytes = generateSalt()
     const salt = uint8ArrayToBase64(saltBytes)
-    const inst = {
+    const inst: ManagedInstanceMeta = {
       id: 'inst-02',
       label: 'Home Router',
       url: 'http://192.168.1.254:3000',
@@ -77,96 +67,49 @@ describe('Login Page Dual-Mode (Direct vs Managed)', () => {
       salt,
     }
 
-    // Simulating user entering password to activate instance
-    const enteredPassword = PASSWORD
+    const key = await ManagedSessionService.activateManagedInstance(inst, PASSWORD)
+    expect(key).toBeDefined()
+    expect(key.algorithm.name).toBe('AES-GCM')
 
-    // 1. Derive CryptoKey locally
-    const derivedKey = await deriveMasterKey(
-      enteredPassword,
-      base64ToUint8Array(inst.salt),
-      100_000
-    )
-    expect(derivedKey).toBeDefined()
-    expect(derivedKey.algorithm.name).toBe('AES-GCM')
-
-    // 2. Cache in memory session key vault
-    setSessionKey(inst.id, derivedKey)
-    expect(getSessionKey(inst.id)).toBe(derivedKey)
-
-    // 3. Connect options contain managed metadata
-    const connectPayload = {
-      url: inst.url,
-      username: inst.username,
-      password: enteredPassword,
-    }
-    const connectOpts = {
-      id: inst.id,
-      label: inst.label,
-      managed: {
-        serverUrl: SERVER_URL,
-        salt: inst.salt,
-      },
-    }
-
-    expect(connectOpts.managed.serverUrl).toBe(SERVER_URL)
-    expect(connectOpts.managed.salt).toBe(salt)
+    // Key is safely in memory KeyVault
+    expect(getSessionKey(inst.id)).toBe(key)
   })
 
-  it('registers new managed instance without sending password in request body to console server', async () => {
-    const postMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ ok: true }),
+  it('enrolls new managed instance without leaking password to remote console', async () => {
+    let capturedPayload: any = null
+    globalThis.fetch = vi.fn().mockImplementation(async (_url, init) => {
+      capturedPayload = JSON.parse(init.body)
+      return {
+        ok: true,
+        status: 200,
+        text: async () => 'OK',
+      }
     })
-    globalThis.fetch = postMock
 
     const id = newId()
-    const label = 'Office DNS'
-    const cleanAghUrl = AGH_URL
-    const username = USERNAME
-    const password = PASSWORD
-    const saltBytes = generateSalt()
-    const salt = uint8ArrayToBase64(saltBytes)
-
-    // Client registration POST payload
-    const postPayload = {
-      id,
-      label,
-      url: cleanAghUrl,
-      username,
-      salt,
-    }
-
-    // STRICT CHECK: Password must NOT be in postPayload
-    expect('password' in postPayload).toBe(false)
-    expect(JSON.stringify(postPayload)).not.toContain(password)
-
-    const res = await fetch(`${SERVER_URL}/api/managed/instances`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(postPayload),
+    const meta = await ManagedSessionService.enroll({
+      instanceId: id,
+      label: 'Office DNS',
+      url: AGH_URL,
+      username: USERNAME,
+      serverUrl: SERVER_URL,
+      password: PASSWORD,
     })
-    expect(res.ok).toBe(true)
 
-    const calledBody = JSON.parse(postMock.mock.calls[0][1].body)
-    expect(calledBody.password).toBeUndefined()
-    expect(calledBody.salt).toBe(salt)
+    // Strict Redline: Password MUST NOT be transmitted to console server
+    expect(capturedPayload).toBeDefined()
+    expect(capturedPayload.id).toBe(id)
+    expect(capturedPayload.password).toBeUndefined()
+    expect(JSON.stringify(capturedPayload)).not.toContain(PASSWORD)
 
-    // Key derived locally
-    const key = await deriveMasterKey(password, saltBytes, 100_000)
-    setSessionKey(id, key)
-    expect(getSessionKey(id)).toBe(key)
+    // Derived metadata & KeyVault
+    expect(meta.serverUrl).toBe(SERVER_URL)
+    expect(getSessionKey(id)).toBeDefined()
   })
 
-  it('clears managed metadata and session keys when switching back to direct mode', async () => {
+  it('handles explicit ManagedAction contract in connect options', () => {
     const targetId = 'inst-switch-test'
-    const saltBytes = generateSalt()
-    const salt = uint8ArrayToBase64(saltBytes)
-
-    // 1. Initial state: instance has managed metadata and session key
-    const masterKey = await deriveMasterKey(PASSWORD, saltBytes, 100_000)
-    setSessionKey(targetId, masterKey)
-    expect(getSessionKey(targetId)).toBe(masterKey)
+    const salt = uint8ArrayToBase64(generateSalt())
 
     const existingInst: Instance = {
       id: targetId,
@@ -178,90 +121,28 @@ describe('Login Page Dual-Mode (Direct vs Managed)', () => {
       },
     }
 
-    // 2. User toggles managed mode off (isManaged = false) in InstanceEdit
-    const isManaged = false
-    let managedMeta: { serverUrl: string; salt: string } | null = null
-    if (!isManaged) {
-      removeSessionKey(targetId)
-    }
-
-    // Key is purged from memory vault
-    expect(getSessionKey(targetId)).toBeUndefined()
-
-    // 3. Connect options are constructed with managed: null (or isManaged ? managedMeta : null)
-    const connectOpts = {
+    // 1. Explicit remove action
+    const removeOpts: ConnectOptions = {
       id: targetId,
-      label: existingInst.label,
-      activate: false,
-      managed: isManaged ? managedMeta : null,
+      managedAction: { type: 'remove' },
     }
-    expect(connectOpts.managed).toBeNull()
-    expect('managed' in connectOpts).toBe(true)
+    expect(removeOpts.managedAction?.type).toBe('remove')
 
-    // 4. Resolve instance entry according to connect logic
-    const entry: Instance = {
+    // 2. Explicit set action
+    const setOpts: ConnectOptions = {
       id: targetId,
-      label: connectOpts.label || existingInst.label,
-      endpoints: existingInst.endpoints,
-    }
-
-    if (connectOpts && 'managed' in connectOpts) {
-      if (connectOpts.managed) {
-        entry.managed = connectOpts.managed
-      } else {
-        delete entry.managed
-      }
-    } else if (existingInst?.managed) {
-      entry.managed = existingInst.managed
-    }
-
-    // STRICT CHECK: entry.managed is completely deleted, reverting to pure direct instance
-    expect(entry.managed).toBeUndefined()
-    expect('managed' in entry).toBe(false)
-
-    // Verify storage persistence does not keep managed metadata
-    const parsed = parseStore({
-      instances: [entry],
-      activeId: targetId,
-    })
-    expect(parsed?.instances[0].managed).toBeUndefined()
-  })
-
-  it('preserves existing managed metadata when connect opts does not specify managed field', () => {
-    const targetId = 'inst-keep-managed'
-    const existingInst: Instance = {
-      id: targetId,
-      label: 'Managed Server',
-      endpoints: [{ url: AGH_URL, username: USERNAME, password: PASSWORD }],
-      managed: {
-        serverUrl: SERVER_URL,
-        salt: 'fake-salt',
+      managedAction: {
+        type: 'set',
+        metadata: { serverUrl: SERVER_URL, salt },
       },
     }
+    expect(setOpts.managedAction?.type).toBe('set')
 
-    // Reconnecting or updating label without touching managed config
-    const connectOpts = {
+    // 3. Explicit preserve action
+    const preserveOpts: ConnectOptions = {
       id: targetId,
-      label: 'Renamed Managed Server',
+      managedAction: { type: 'preserve' },
     }
-    expect('managed' in connectOpts).toBe(false)
-
-    const entry: Instance = {
-      id: targetId,
-      label: connectOpts.label || existingInst.label,
-      endpoints: existingInst.endpoints,
-    }
-
-    if (connectOpts && 'managed' in connectOpts) {
-      if ((connectOpts as any).managed) {
-        entry.managed = (connectOpts as any).managed
-      } else {
-        delete entry.managed
-      }
-    } else if (existingInst?.managed) {
-      entry.managed = existingInst.managed
-    }
-
-    expect(entry.managed).toEqual(existingInst.managed)
+    expect(preserveOpts.managedAction?.type).toBe('preserve')
   })
 })

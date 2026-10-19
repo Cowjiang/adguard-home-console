@@ -24,6 +24,7 @@ import {
 } from './instances'
 import { createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS, type ProbeOutcome } from './probe'
 import { removeSessionKey, clearSessionKeys } from '../crypto/keyVault'
+import { registerAutoSync } from '../snapshot/outboxSync'
 
 export type { SvrConfig }
 
@@ -38,6 +39,21 @@ interface InstanceSession {
   offline: boolean
   lastProbeOk: boolean
   latencyMs?: number
+}
+
+/** Explicit managed mode action for connect */
+export type ManagedAction =
+  | { type: 'set'; metadata: InstanceManagedMetadata }
+  | { type: 'remove' }
+  | { type: 'preserve' }
+
+export interface ConnectOptions {
+  activate?: boolean
+  id?: string
+  label?: string
+  managedAction?: ManagedAction
+  /** @deprecated Prefer explicit `managedAction` instead */
+  managed?: InstanceManagedMetadata | null
 }
 
 /** What the instance UIs (switcher, list) need per instance */
@@ -75,12 +91,7 @@ interface AuthCtx {
    *  otherwise */
   connect: (
     cfg: SvrConfig,
-    opts?: {
-      activate?: boolean
-      id?: string
-      label?: string
-      managed?: InstanceManagedMetadata | null
-    }
+    opts?: ConnectOptions
   ) => Promise<boolean>
   /** Remove one instance; the active one falls back to the first remaining */
   removeInstance: (id: string) => void
@@ -177,6 +188,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }),
     [fetchStatus]
   )
+
+  // Register automatic background outbox sync on online and visibilitychange
+  useEffect(() => {
+    return registerAutoSync()
+  }, [])
 
   useEffect(() => applyTheme(theme), [theme])
   useEffect(() => {
@@ -278,12 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const connect = useCallback(
     async (
       next: SvrConfig,
-      opts?: {
-        activate?: boolean
-        id?: string
-        label?: string
-        managed?: InstanceManagedMetadata | null
-      }
+      opts?: ConnectOptions
     ): Promise<boolean> => {
       const activate = opts?.activate ?? true
       setConnecting(true)
@@ -314,13 +325,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           label: opts?.label?.trim() || existingInst?.label || labelFromUrl(clean.url),
           endpoints: [{ ...clean }],
         }
-        if (opts && 'managed' in opts) {
-          if (opts.managed) {
-            entry.managed = opts.managed
-          } else {
-            delete entry.managed
-          }
-        } else if (existingInst?.managed) {
+        // Determine explicit managed action (with fallback for legacy opts.managed)
+        let action: ManagedAction
+        if (opts?.managedAction) {
+          action = opts.managedAction
+        } else if (opts && 'managed' in opts) {
+          action = opts.managed ? { type: 'set', metadata: opts.managed } : { type: 'remove' }
+        } else {
+          action = { type: 'preserve' }
+        }
+
+        if (action.type === 'set') {
+          entry.managed = action.metadata
+        } else if (action.type === 'remove') {
+          delete entry.managed
+          removeSessionKey(targetId)
+        } else if (action.type === 'preserve' && existingInst?.managed) {
           entry.managed = existingInst.managed
         }
         const instances = prev ? [...prev.instances] : []

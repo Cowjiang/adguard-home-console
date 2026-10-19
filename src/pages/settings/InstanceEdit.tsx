@@ -8,15 +8,8 @@ import { PageHeader, Screen, Card, GroupTitle, Button } from '../../components/u
 import { useConfirm } from '../../components/ui/sheet'
 import { ErrorBox } from '../../components/ui/atoms'
 import { toast } from '../../components/ui/toast'
-import { activeEndpoint, labelFromUrl, newId } from '../../lib/session/instances'
-import {
-  base64ToUint8Array,
-  deriveMasterKey,
-  generateSalt,
-  uint8ArrayToBase64,
-} from '../../lib/crypto/e2ee'
-import { setSessionKey, removeSessionKey } from '../../lib/crypto/keyVault'
-import { migrateLocalSnapshotsToManaged } from '../../lib/snapshot/outboxSync'
+import { activeEndpoint, labelFromUrl, newId, type InstanceManagedMetadata } from '../../lib/session/instances'
+import { ManagedSessionService } from '../../lib/session/managedService'
 
 export function InstanceEdit() {
   const { store, connect, removeInstance, connecting, error } = useAuth()
@@ -59,47 +52,36 @@ export function InstanceEdit() {
     const cleanLabel = label.trim() || labelFromUrl(cleanUrl)
     const targetId = editId || newId()
 
-    let managedMeta: { serverUrl: string; salt: string } | null = null
+    let managedMeta: InstanceManagedMetadata | null = null
     if (isManaged) {
-      const cleanServer = serverUrl.trim().replace(/\/+$/, '')
-      const salt = target?.managed?.salt || uint8ArrayToBase64(generateSalt())
       try {
-        // Register metadata with Console server (STRICT REDLINE: NO password!)
-        const res = await fetch(`${cleanServer}/api/managed/instances`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: targetId,
-            label: cleanLabel,
-            url: cleanUrl,
-            username: cleanUsername,
-            salt,
-          }),
+        managedMeta = await ManagedSessionService.enroll({
+          instanceId: targetId,
+          label: cleanLabel,
+          url: cleanUrl,
+          username: cleanUsername,
+          serverUrl,
+          password,
+          salt: target?.managed?.salt,
         })
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '')
-          throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`)
-        }
-        managedMeta = { serverUrl: cleanServer, salt }
-
-        // Derive and cache master key in memory
-        const saltBytes = base64ToUint8Array(salt)
-        const key = await deriveMasterKey(password, saltBytes)
-        setSessionKey(targetId, key)
-
-        // Attempt background migration of any unmanaged local snapshots
-        void migrateLocalSnapshotsToManaged(targetId, password, managedMeta).catch(() => {})
       } catch (err: any) {
         setManagedError(t('settings.managedEnrollError', { msg: err?.message || String(err) }))
         return
       }
     } else {
-      removeSessionKey(targetId)
+      ManagedSessionService.unenroll(targetId)
     }
 
     const ok = await connect(
       { url: cleanUrl, username: cleanUsername, password },
-      { id: targetId, label: cleanLabel, activate: isNew, managed: isManaged ? managedMeta : null }
+      {
+        id: targetId,
+        label: cleanLabel,
+        activate: isNew,
+        managedAction: isManaged && managedMeta
+          ? { type: 'set', metadata: managedMeta }
+          : { type: 'remove' },
+      }
     )
     if (ok) {
       toast(t('settings.serverSaved'))
@@ -116,7 +98,7 @@ export function InstanceEdit() {
       destructive: true,
       confirmText: t('settings.instancesDelete'),
       onConfirm: () => {
-        removeSessionKey(editId)
+        ManagedSessionService.unenroll(editId)
         removeInstance(editId)
         nav('/settings/server', { replace: true })
       },
