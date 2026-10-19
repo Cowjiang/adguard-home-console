@@ -6,6 +6,7 @@ import {
   decryptSnapshotBlobJson,
   deriveMasterKey,
   deriveRawKey,
+  deriveRawKeyForTesting,
   encryptSnapshotBlob,
   generateIv,
   generateSalt,
@@ -24,7 +25,6 @@ export const CROSS_PLATFORM_VECTOR = {
   derivedKeyHex: '8b8783b61c2e9b68464d8ee5239b647c2687e4344cd19a648a0459628355fae9',
   ciphertextBase64:
     'YNKzO8pggTJuI/F4L/tyZ5OAwLAMJVfj0vDBXc/WsmiWcVnx6ANI8B+x9BGybrlMDhOXAtgWWYqITwnkFG3tRr1Nz/HpOulW45ATOjL++gH6ykVMvg0lwmPZVG+LSFz1fHE=',
-  checksum: '26b0e7be4ed91ac5a9016364e10a7b72a7de16b9e1307abec5d79dfb1b969637',
   plaintext:
     '{"dns":{"bootstrap_dns":["1.1.1.1"],"upstream_dns":["9.9.9.9","149.112.112.112"]}}',
 } as const
@@ -46,7 +46,6 @@ function getTestVectorBlob(): SnapshotEncryptedBlob {
       tagLength: 128,
     },
     ciphertext: CROSS_PLATFORM_VECTOR.ciphertextBase64,
-    checksum: CROSS_PLATFORM_VECTOR.checksum,
   }
 }
 
@@ -74,18 +73,35 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     })
     const decoded = new TextDecoder().decode(aad)
     expect(decoded).toBe(
-      '{\"id\":\"snap-1\",\"instanceId\":\"inst-1\",\"createdAt\":\"2026-10-18T10:00:00.000Z\"}'
+      '{"id":"snap-1","instanceId":"inst-1","createdAt":"2026-10-18T10:00:00.000Z"}'
     )
   })
 
-  it('computes deterministic SHA-256 hex checksum', async () => {
+  it('computes deterministic SHA-256 hex checksum via utility function', async () => {
     const checksum = await computeSha256(CROSS_PLATFORM_VECTOR.plaintext)
-    expect(checksum).toBe(CROSS_PLATFORM_VECTOR.checksum)
+    expect(checksum).toBe('26b0e7be4ed91ac5a9016364e10a7b72a7de16b9e1307abec5d79dfb1b969637')
   })
 
-  it('derives key matching cross-platform test vector', async () => {
+  it('locks down derived master key as non-extractable (extractable: false)', async () => {
     const salt = base64ToUint8Array(CROSS_PLATFORM_VECTOR.saltBase64)
-    const rawKey = await deriveRawKey(
+    const key = await deriveMasterKey(
+      CROSS_PLATFORM_VECTOR.password,
+      salt,
+      600_000
+    )
+
+    expect(key).toBeDefined()
+    expect(key.type).toBe('secret')
+    expect(key.algorithm.name).toBe('AES-GCM')
+    expect(key.extractable).toBe(false)
+
+    // Attempting to export raw key must reject to safeguard master key against memory leakage
+    await expect(crypto.subtle.exportKey('raw', key)).rejects.toThrow()
+  })
+
+  it('derives key matching cross-platform test vector via deriveRawKeyForTesting', async () => {
+    const salt = base64ToUint8Array(CROSS_PLATFORM_VECTOR.saltBase64)
+    const rawKey = await deriveRawKeyForTesting(
       CROSS_PLATFORM_VECTOR.password,
       salt,
       600_000
@@ -95,9 +111,17 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
       .join('')
 
     expect(keyHex).toBe(CROSS_PLATFORM_VECTOR.derivedKeyHex)
+
+    // Backward-compatible deriveRawKey should produce identical output
+    const rawKeyCompat = await deriveRawKey(
+      CROSS_PLATFORM_VECTOR.password,
+      salt,
+      600_000
+    )
+    expect(rawKeyCompat).toEqual(rawKey)
   })
 
-  it('encrypts to standard GCM format exactly matching cross-platform vector', async () => {
+  it('encrypts to standard GCM format without plaintext checksum and matches vector', async () => {
     const salt = base64ToUint8Array(CROSS_PLATFORM_VECTOR.saltBase64)
     const iv = base64ToUint8Array(CROSS_PLATFORM_VECTOR.ivBase64)
 
@@ -112,12 +136,12 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     })
 
     expect(blob.ciphertext).toBe(CROSS_PLATFORM_VECTOR.ciphertextBase64)
-    expect(blob.checksum).toBe(CROSS_PLATFORM_VECTOR.checksum)
+    expect((blob as any).checksum).toBeUndefined()
     expect(blob.kdf.iterations).toBe(600_000)
     expect(blob.cipher.algorithm).toBe('AES-256-GCM')
   })
 
-  it('decrypts cross-platform vector successfully', async () => {
+  it('decrypts cross-platform vector successfully using AEAD authentication', async () => {
     const blob = getTestVectorBlob()
     const decrypted = await decryptSnapshotBlob({
       blob,
@@ -127,7 +151,7 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     expect(decrypted).toBe(CROSS_PLATFORM_VECTOR.plaintext)
   })
 
-  it('roundtrip: encrypts and decrypts arbitrary JSON objects and strings', async () => {
+  it('roundtrip: encrypts and decrypts arbitrary JSON objects and strings without checksum leakage', async () => {
     const original = {
       dns: {
         upstream_dns: ['https://dns.adguard.com/dns-query'],
@@ -145,7 +169,7 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     })
 
     expect(blob.ciphertext).toBeTruthy()
-    expect(blob.checksum).toBeTruthy()
+    expect((blob as any).checksum).toBeUndefined()
 
     const decrypted = await decryptSnapshotBlobJson<typeof original>({
       blob,
@@ -153,6 +177,51 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     })
 
     expect(decrypted).toEqual(original)
+  })
+
+  it('supports encrypting and decrypting with pre-derived key when salt is bound', async () => {
+    const salt = generateSalt()
+    const key = await deriveMasterKey('PreDerivedKeyPassword#2026', salt)
+
+    const blob = await encryptSnapshotBlob({
+      id: 'snap-predrv-01',
+      instanceId: 'inst-predrv-01',
+      createdAt: '2026-10-18T15:00:00.000Z',
+      plaintext: 'secure payload with pre-derived key',
+      key,
+      salt,
+    })
+
+    expect(blob.kdf.salt).toBe(uint8ArrayToBase64(salt))
+
+    // Decrypt using pre-derived key
+    const decryptedWithKey = await decryptSnapshotBlob({
+      blob,
+      key,
+    })
+    expect(decryptedWithKey).toBe('secure payload with pre-derived key')
+
+    // Decrypt using password and salt stored in blob.kdf.salt
+    const decryptedWithPassword = await decryptSnapshotBlob({
+      blob,
+      password: 'PreDerivedKeyPassword#2026',
+    })
+    expect(decryptedWithPassword).toBe('secure payload with pre-derived key')
+  })
+
+  it('rejects encryption when key is provided without salt', async () => {
+    const salt = generateSalt()
+    const key = await deriveMasterKey('PreDerivedKeyPassword#2026', salt)
+
+    await expect(
+      encryptSnapshotBlob({
+        id: 'snap-missing-salt',
+        instanceId: 'inst-missing-salt',
+        createdAt: '2026-10-18T15:00:00.000Z',
+        plaintext: 'should fail',
+        key,
+      } as any)
+    ).rejects.toThrow(/Salt must be explicitly provided when encrypting with a pre-derived key/i)
   })
 
   it('rejects decryption when password is incorrect', async () => {
@@ -191,7 +260,7 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     ).rejects.toThrow(/Decryption failed/i)
   })
 
-  it('rejects decryption when ciphertext body is tampered', async () => {
+  it('rejects decryption when ciphertext payload body is tampered', async () => {
     const blob = getTestVectorBlob()
     const raw = base64ToUint8Array(blob.ciphertext)
     raw[8] ^= 0xff
@@ -205,10 +274,10 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
     ).rejects.toThrow(/Decryption failed/i)
   })
 
-  it('rejects decryption when 16-byte auth tag is tampered', async () => {
+  it('rejects decryption when 16-byte auth tag is tampered (last byte corrupted)', async () => {
     const blob = getTestVectorBlob()
     const raw = base64ToUint8Array(blob.ciphertext)
-    // Flip bit in the trailing 16B tag
+    // Flip bit in the trailing 16B tag (last byte of ciphertext blob)
     raw[raw.length - 1] ^= 0x01
     blob.ciphertext = uint8ArrayToBase64(raw)
 
@@ -218,18 +287,6 @@ describe('Crypto Engine E2EE (Web Crypto API)', () => {
         password: CROSS_PLATFORM_VECTOR.password,
       })
     ).rejects.toThrow(/Decryption failed/i)
-  })
-
-  it('rejects decryption when checksum does not match payload', async () => {
-    const blob = getTestVectorBlob()
-    blob.checksum = '0000000000000000000000000000000000000000000000000000000000000000'
-
-    await expect(
-      decryptSnapshotBlob({
-        blob,
-        password: CROSS_PLATFORM_VECTOR.password,
-      })
-    ).rejects.toThrow(/Checksum verification failed/i)
   })
 
   it('rejects decryption when iterations are out of bounds (DoS / downgrade protection)', async () => {

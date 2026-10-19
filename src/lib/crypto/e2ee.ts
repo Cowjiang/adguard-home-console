@@ -40,19 +40,31 @@ export interface SnapshotEncryptedBlob {
   kdf: KdfMeta
   cipher: CipherMeta
   ciphertext: string // Base64 (ciphertext + 16-byte auth tag)
-  checksum: string // SHA-256 hex of original plaintext
 }
 
-export interface EncryptSnapshotParams {
+export interface EncryptSnapshotBaseParams {
   id: string
   instanceId: string
   createdAt: string
   plaintext: string | Uint8Array | Record<string, unknown>
-  password?: string
-  key?: CryptoKey
-  salt?: Uint8Array
   iv?: Uint8Array
 }
+
+export interface EncryptWithKeyParams extends EncryptSnapshotBaseParams {
+  key: CryptoKey
+  salt: Uint8Array
+  password?: string
+}
+
+export interface EncryptWithPasswordParams extends EncryptSnapshotBaseParams {
+  password: string
+  salt?: Uint8Array
+  key?: undefined
+}
+
+export type EncryptSnapshotParams =
+  | EncryptWithKeyParams
+  | EncryptWithPasswordParams
 
 export interface DecryptSnapshotParams {
   blob: SnapshotEncryptedBlob
@@ -115,7 +127,7 @@ export async function computeSha256(data: string | Uint8Array): Promise<string> 
 
 /**
  * Deterministically serializes { id, instanceId, createdAt } to UTF-8 bytes for AAD binding.
- * Guarantees exact property order and encoding across TypeScript and Rust.
+ * Guarantees exact property order and encoding across platforms.
  */
 export function serializeAad(meta: AadMeta): Uint8Array {
   const json = JSON.stringify({
@@ -128,6 +140,7 @@ export function serializeAad(meta: AadMeta): Uint8Array {
 
 /**
  * Derives a 256-bit AES-GCM CryptoKey from password and salt via PBKDF2-HMAC-SHA256.
+ * The derived master key is locked with extractable: false to prevent memory leakage and export.
  */
 export async function deriveMasterKey(
   password: string,
@@ -161,22 +174,63 @@ export async function deriveMasterKey(
     },
     passwordKey,
     { name: 'AES-GCM', length: 256 },
-    true,
+    false,
     ['encrypt', 'decrypt']
   )
 }
 
 /**
- * Derives raw 32-byte key from password and salt (useful for testing or direct byte comparison).
+ * Derives raw 32-byte key from password and salt via PBKDF2 deriveBits.
+ * EXPLICITLY FOR TESTING AND CROSS-PLATFORM VECTOR VERIFICATION ONLY.
+ * Production flows must always use non-extractable CryptoKey from deriveMasterKey.
+ */
+export async function deriveRawKeyForTesting(
+  password: string,
+  salt: Uint8Array,
+  iterations = PBKDF2_ITERATIONS
+): Promise<Uint8Array> {
+  if (salt.length !== SALT_LEN) {
+    throw new Error(`Invalid salt length: expected ${SALT_LEN}, got ${salt.length}`)
+  }
+  if (iterations < MIN_PBKDF2_ITERATIONS || iterations > MAX_PBKDF2_ITERATIONS) {
+    throw new Error(
+      `KDF iterations out of bounds (${MIN_PBKDF2_ITERATIONS}..${MAX_PBKDF2_ITERATIONS}): ${iterations}`
+    )
+  }
+
+  const encoder = new TextEncoder()
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits']
+  )
+
+  const rawBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt as BufferSource,
+      iterations,
+      hash: 'SHA-256',
+    },
+    passwordKey,
+    KEY_LEN * 8
+  )
+
+  return new Uint8Array(rawBits)
+}
+
+/**
+ * Derives raw 32-byte key from password and salt.
+ * @deprecated Prefer deriveMasterKey in production or deriveRawKeyForTesting for tests.
  */
 export async function deriveRawKey(
   password: string,
   salt: Uint8Array,
   iterations = PBKDF2_ITERATIONS
 ): Promise<Uint8Array> {
-  const key = await deriveMasterKey(password, salt, iterations)
-  const raw = await crypto.subtle.exportKey('raw', key)
-  return new Uint8Array(raw)
+  return deriveRawKeyForTesting(password, salt, iterations)
 }
 
 /**
@@ -185,10 +239,17 @@ export async function deriveRawKey(
 export async function encryptSnapshotBlob(
   params: EncryptSnapshotParams
 ): Promise<SnapshotEncryptedBlob> {
-  const { id, instanceId, createdAt, plaintext, password, key, salt, iv } = params
+  const { id, instanceId, createdAt, plaintext, iv } = params
+  const key = 'key' in params ? params.key : undefined
+  const password = 'password' in params ? params.password : undefined
+  const salt = 'salt' in params ? params.salt : undefined
 
   if (!password && !key) {
     throw new Error('Either password or key must be provided for encryption')
+  }
+
+  if (key && !salt) {
+    throw new Error('Salt must be explicitly provided when encrypting with a pre-derived key')
   }
 
   const saltBytes = salt ?? generateSalt(SALT_LEN)
@@ -217,7 +278,6 @@ export async function encryptSnapshotBlob(
     plaintextBytes = new TextEncoder().encode(JSON.stringify(plaintext))
   }
 
-  const checksum = await computeSha256(plaintextBytes)
   const aad = serializeAad({ id, instanceId, createdAt })
 
   const ciphertextBuffer = await crypto.subtle.encrypt(
@@ -247,13 +307,12 @@ export async function encryptSnapshotBlob(
       tagLength: 128,
     },
     ciphertext: uint8ArrayToBase64(new Uint8Array(ciphertextBuffer)),
-    checksum,
   }
 }
 
 /**
  * Decrypts a SnapshotEncryptedBlob using password or pre-derived key.
- * Verifies AAD, algorithms, iteration bounds, and SHA-256 checksum, throwing on any tamper or error.
+ * Relies on AES-256-GCM AEAD Tag and deterministic AAD binding for integrity and anti-tampering.
  */
 export async function decryptSnapshotBlob(
   params: DecryptSnapshotParams
@@ -318,13 +377,6 @@ export async function decryptSnapshotBlob(
   }
 
   const decryptedBytes = new Uint8Array(decryptedBuffer)
-  const checksum = await computeSha256(decryptedBytes)
-  if (checksum !== blob.checksum) {
-    throw new Error(
-      `Checksum verification failed: expected ${blob.checksum}, got ${checksum}`
-    )
-  }
-
   return new TextDecoder().decode(decryptedBytes)
 }
 
