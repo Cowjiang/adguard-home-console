@@ -337,6 +337,15 @@ describe('Snapshot Storage Vault', () => {
     const parsedLegacyExport = parseSnapshotImport(legacyExportJson)
     expect(parsedLegacyExport.isBundle).toBe(true)
     expect(parsedLegacyExport.snapshots).toHaveLength(1)
+
+    // Filters out locked snapshots
+    const lockedSnap: AghConfigSnapshot = {
+      ...snap,
+      isLocked: true,
+    }
+    const filteredBundleJson = exportSnapshotBundleJson([snap, lockedSnap], 'Test Instance')
+    const parsedFiltered = parseSnapshotImport(filteredBundleJson)
+    expect(parsedFiltered.snapshots).toHaveLength(1)
   })
 })
 
@@ -435,6 +444,14 @@ describe('Snapshot Restore Engine', () => {
     const validation = await validateSnapshot(badSnapshot)
     expect(validation.valid).toBe(false)
     expect(validation.errors.some((e) => e.includes('Unsupported schemaVersion'))).toBe(true)
+
+    const lockedSnapshot = {
+      meta: { schemaVersion: '1.0' },
+      isLocked: true,
+    } as any
+    const lockedValidation = await validateSnapshot(lockedSnapshot)
+    expect(lockedValidation.valid).toBe(false)
+    expect(lockedValidation.errors[0]).toContain('Cannot restore locked encrypted snapshot')
   })
 
   it('performs restore sequentially, restores whitelists, prunes obsolete filters, and captures pre-rollback safety snapshot', async () => {

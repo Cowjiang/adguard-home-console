@@ -10,6 +10,7 @@ import {
   Download,
   FileUp,
   Layers,
+  Lock,
   Plus,
   RefreshCw,
   Cloud,
@@ -188,6 +189,10 @@ export function SnapshotSettings() {
   }
 
   function openDiffSheet(snapshot: AghConfigSnapshot) {
+    if (snapshot.isLocked) {
+      toast(t('settings.snapshotLockedToast'), 'err')
+      return
+    }
     if (isDesktop) {
       sheet.open(
         <SnapshotDiffSheet
@@ -391,13 +396,30 @@ export function SnapshotSettings() {
             <Card key={item.meta.id} className="p-0">
               <button
                 type="button"
-                onClick={() => openDiffSheet(item)}
-                className="press flex w-full items-center justify-between gap-2 p-4 text-left"
+                onClick={() => {
+                  if (item.isLocked) {
+                    toast(t('settings.snapshotLockedToast'), 'err')
+                    return
+                  }
+                  openDiffSheet(item)
+                }}
+                className={`press flex w-full items-center justify-between gap-2 p-4 text-left ${
+                  item.isLocked ? 'opacity-85' : ''
+                }`}
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[15px] font-bold text-t1">{item.meta.label}</span>
-                    {getTriggerBadge(item.meta.trigger)}
+                    {item.isLocked ? (
+                      <Badge kind="warn">
+                        <span className="inline-flex items-center gap-1">
+                          <Lock size={11} className="text-warn" />
+                          {t('settings.snapshotLocked')}
+                        </span>
+                      </Badge>
+                    ) : (
+                      getTriggerBadge(item.meta.trigger)
+                    )}
                   </div>
                   <div className="mt-1 flex min-w-0 items-center gap-2 text-[12px] text-t3">
                     <span className="flex flex-none items-center gap-1 whitespace-nowrap">
@@ -409,11 +431,19 @@ export function SnapshotSettings() {
                   </div>
                   {/* Index card only: one truncated line, the full note lives
                       in the detail view (docs/web-interaction.md) */}
-                  {item.meta.description && (
+                  {item.isLocked ? (
+                    <p className="mt-1 truncate text-[12px] text-warn">
+                      {t('settings.snapshotLockedDesc')}
+                    </p>
+                  ) : item.meta.description ? (
                     <p className="mt-1 truncate text-[12px] text-t3">{item.meta.description}</p>
-                  )}
+                  ) : null}
                 </div>
-                <ChevronRight size={17} className="flex-none text-t3" />
+                {item.isLocked ? (
+                  <Lock size={16} className="flex-none text-warn" />
+                ) : (
+                  <ChevronRight size={17} className="flex-none text-t3" />
+                )}
               </button>
             </Card>
           ))}

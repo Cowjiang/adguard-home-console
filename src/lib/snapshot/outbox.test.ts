@@ -12,13 +12,18 @@ import {
   openDatabase,
   resetMemoryVaultsForTesting,
   saveDirectSnapshot,
+  saveManagedSnapshot,
   saveSnapshot,
+  setSyncTrigger,
   type ManagedSnapshotRecord,
+  commitDeleteManagedSnapshotWithOutbox,
 } from './snapshotStorage'
 import {
   migrateLocalSnapshotsToManaged,
   OutboxSyncCoordinator,
+  registerAutoSync,
   type OutboxTask,
+  MAX_OUTBOX_RETRIES,
 } from './outboxSync'
 import type { AghConfigSnapshot } from './types'
 
@@ -155,6 +160,7 @@ describe('Storage & Outbox Dual-Track Engine', () => {
       expect(managedRecord?.blob.cipher.algorithm).toBe('AES-256-GCM')
       expect(managedRecord?.blob.kdf.algorithm).toBe('PBKDF2-HMAC-SHA256')
       expect(managedRecord?.blob.ciphertext).toBeTruthy()
+      expect((managedRecord?.blob as any).checksum).toBeUndefined()
 
       // 2. Verify snapshot content is retrieved through getSnapshot
       const retrieved = await getSnapshot('managed-snap-01', { managed: true })
@@ -206,6 +212,7 @@ describe('Storage & Outbox Dual-Track Engine', () => {
       expect(body.id).toBe('sync-snap-02')
       expect(body.instanceId).toBe('inst-managed')
       expect(body.ciphertext).toBeTruthy()
+      expect(body.checksum).toBeUndefined()
 
       // Verify task removed from outbox
       const remainingTasks = await listOutboxTasks('inst-managed')
@@ -451,4 +458,269 @@ describe('Storage & Outbox Dual-Track Engine', () => {
       }
     })
   })
-})
+
+  describe('Per-Instance Concurrency Isolation and Locks', () => {
+    it('executes Instance A and Instance B synchronization concurrently without blocking or crosstalk', async () => {
+      let resolveInstA: () => void = () => {}
+      const instAPromise = new Promise<void>((resolve) => {
+        resolveInstA = resolve
+      })
+
+      const mockFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const urlStr = String(input)
+        if (urlStr.includes('/inst-a/')) {
+          await instAPromise
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+            text: async () => JSON.stringify({ ok: true }),
+          }
+        }
+        if (urlStr.includes('/inst-b/')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+            text: async () => JSON.stringify({ ok: true }),
+          }
+        }
+        return { ok: true, status: 200, json: async () => ({}) }
+      })
+      globalThis.fetch = mockFetch as any
+
+      const snapA = makeSampleSnapshot('snap-inst-a', 'inst-a')
+      const snapB = makeSampleSnapshot('snap-inst-b', 'inst-b')
+
+      await saveSnapshot(snapA, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+      await saveSnapshot(snapB, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+
+      // Trigger sync for both instances concurrently
+      const promiseA = OutboxSyncCoordinator.triggerSync('https://managed.example.com', 'inst-a')
+      const promiseB = OutboxSyncCoordinator.triggerSync('https://managed.example.com', 'inst-b')
+
+      // Instance B should complete immediately without being blocked by Instance A's pending sync
+      const resultB = await promiseB
+      expect(resultB.succeeded).toBe(1)
+      expect(OutboxSyncCoordinator.isSyncing('inst-b')).toBe(false)
+      expect(OutboxSyncCoordinator.isSyncing('inst-a')).toBe(true)
+
+      // Unblock Instance A
+      resolveInstA()
+      const resultA = await promiseA
+      expect(resultA.succeeded).toBe(1)
+      expect(OutboxSyncCoordinator.isSyncing('inst-a')).toBe(false)
+    })
+  })
+
+  describe('Timeout Protection and Storage Decoupling', () => {
+    it('passes 15s timeout signal to fetch and updates retryCount on timeout error', async () => {
+      let passedSignal: AbortSignal | undefined
+
+      const mockFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        passedSignal = init?.signal as AbortSignal
+        const err = new Error('The operation was aborted due to timeout')
+        err.name = 'TimeoutError'
+        throw err
+      })
+      globalThis.fetch = mockFetch as any
+
+      const snap = makeSampleSnapshot('snap-timeout', 'inst-timeout')
+      await saveSnapshot(snap, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+
+      const res = await OutboxSyncCoordinator.syncPendingTasks('inst-timeout', 'https://managed.example.com')
+      expect(res.failed).toBe(1)
+      expect(passedSignal).toBeDefined()
+
+      const tasks = await listOutboxTasks('inst-timeout')
+      expect(tasks.length).toBe(1)
+      expect(tasks[0].retryCount).toBe(1)
+      expect(tasks[0].lastError).toContain('timeout')
+    })
+
+    it('allows registering a decoupled custom sync trigger in snapshotStorage', async () => {
+      const triggerMock = vi.fn()
+      setSyncTrigger(triggerMock)
+
+      try {
+        const snap = makeSampleSnapshot('snap-custom-trigger', 'inst-custom')
+        await saveSnapshot(snap, {
+          password: 'Pass',
+          managedConfig: { serverUrl: 'https://custom.example.com' },
+        })
+
+        expect(triggerMock).toHaveBeenCalledWith('https://custom.example.com', 'inst-custom')
+      } finally {
+        // Restore default trigger
+        setSyncTrigger((serverUrl, instanceId) => OutboxSyncCoordinator.triggerSync(serverUrl, instanceId))
+      }
+    })
+
+    it('registerAutoSync registers online and visibilitychange listeners and cleans them up', () => {
+      const addWindowSpy = vi.fn()
+      const removeWindowSpy = vi.fn()
+      const addDocSpy = vi.fn()
+      const removeDocSpy = vi.fn()
+
+      const origWindow = (globalThis as any).window
+      const origDocument = (globalThis as any).document
+      try {
+        ;(globalThis as any).window = {
+          addEventListener: addWindowSpy,
+          removeEventListener: removeWindowSpy,
+        }
+        ;(globalThis as any).document = {
+          visibilityState: 'visible',
+          addEventListener: addDocSpy,
+          removeEventListener: removeDocSpy,
+        }
+
+        const unregister = registerAutoSync()
+        expect(addWindowSpy).toHaveBeenCalledWith('online', expect.any(Function))
+        expect(addDocSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+
+        unregister()
+        expect(removeWindowSpy).toHaveBeenCalledWith('online', expect.any(Function))
+        expect(removeDocSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+      } finally {
+        ;(globalThis as any).window = origWindow
+        ;(globalThis as any).document = origDocument
+      }
+    })
+  })
+  describe('Locked / Undecrypted Managed Snapshots Preservation', () => {
+    it('preserves undecrypted managed snapshot records and returns isLocked: true placeholder', async () => {
+      // 1. Insert an undecrypted managed snapshot record (e.g. pulled from server without key)
+      const undecryptedRecord: ManagedSnapshotRecord = {
+        id: 'remote-encrypted-123',
+        instanceId: 'inst-remote',
+        createdAt: '2026-10-18T10:00:00.000Z',
+        status: 'synced',
+        blob: {
+          version: 1,
+          id: 'remote-encrypted-123',
+          instanceId: 'inst-remote',
+          createdAt: '2026-10-18T10:00:00.000Z',
+          ciphertext: 'mock-ciphertext-abc',
+          cipher: {
+            algorithm: 'AES-256-GCM',
+            iv: 'mock-iv',
+            tagLength: 128,
+          },
+          kdf: {
+            algorithm: 'PBKDF2-HMAC-SHA256',
+            salt: 'mock-salt',
+            iterations: 100_000,
+          },
+        },
+        snapshot: undefined, // Not yet decrypted locally
+      }
+      await saveManagedSnapshot(undecryptedRecord)
+
+      // Also save a normal decrypted snapshot
+      const decryptedSnapshot = makeSampleSnapshot('decrypted-456', 'inst-remote')
+      await saveSnapshot(decryptedSnapshot, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+
+      // 2. Query snapshots via listSnapshots with managed: true
+      const snapshots = await listSnapshots('inst-remote', { managed: true })
+
+      // Both snapshots MUST be returned - the undecrypted one must NOT be silently dropped!
+      expect(snapshots.length).toBe(2)
+
+      const locked = snapshots.find((s) => s.meta.id === 'remote-encrypted-123')
+      expect(locked).toBeDefined()
+      expect(locked?.isLocked).toBe(true)
+      expect(locked?.meta.id).toBe('remote-encrypted-123')
+      expect(locked?.meta.sourceInstance.id).toBe('inst-remote')
+      expect(locked?.data).toEqual({})
+
+      const unlocked = snapshots.find((s) => s.meta.id === 'decrypted-456')
+      expect(unlocked).toBeDefined()
+      expect(unlocked?.isLocked).toBeUndefined()
+      expect(unlocked?.data.dns).toBeDefined()
+
+      // 3. getSnapshot also returns locked placeholder for undecrypted records
+      const fetchedLocked = await getSnapshot('remote-encrypted-123', { managed: true })
+      expect(fetchedLocked).toBeDefined()
+      expect(fetchedLocked?.isLocked).toBe(true)
+      expect(fetchedLocked?.meta.id).toBe('remote-encrypted-123')
+    })
+  })
+  describe('Thermo-Nuclear Audit Invariants (Atomic Deletion & Poison-Pill Hardening)', () => {
+    it('atomically deletes managed snapshot and stages delete outbox task', async () => {
+      const snap = makeSampleSnapshot('del-atomic-01', 'inst-del')
+      await saveSnapshot(snap, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+
+      // Verify it exists in managed store
+      expect(await getManagedSnapshot('del-atomic-01')).not.toBeNull()
+
+      // Delete snapshot
+      const deleted = await deleteSnapshot('del-atomic-01', {
+        managed: true,
+        instanceId: 'inst-del',
+        skipAutoSync: true,
+      })
+      expect(deleted).toBe(true)
+
+      // Verify managed store record was deleted
+      expect(await getManagedSnapshot('del-atomic-01')).toBeNull()
+
+      // Verify delete task is committed into outbox
+      const tasks = await listOutboxTasks('inst-del')
+      const delTask = tasks.find((t) => t.action === 'delete' && t.snapshotId === 'del-atomic-01')
+      expect(delTask).toBeDefined()
+      expect(delTask?.retryCount).toBe(0)
+    })
+
+    it('marks deterministic 4xx errors as fatal with MAX_OUTBOX_RETRIES to prevent head-of-line blocking', async () => {
+      const snap = makeSampleSnapshot('poison-snap-01', 'inst-poison')
+      await saveSnapshot(snap, {
+        password: 'Pass',
+        managedConfig: { serverUrl: 'https://managed.example.com' },
+        skipAutoSync: true,
+      })
+
+      // Mock 400 Bad Request (e.g. malformed or rejected payload)
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: () => Promise.resolve('Schema validation rejected'),
+      } as unknown as Response)
+
+      const result = await OutboxSyncCoordinator.syncPendingTasks('inst-poison')
+      expect(result.failed).toBe(1)
+
+      const tasks = await listOutboxTasks('inst-poison')
+      expect(tasks[0].retryCount).toBe(MAX_OUTBOX_RETRIES)
+      expect(tasks[0].lastError).toContain('400')
+
+      // Subsequent sync runs should skip dead-letter task and not block execution
+      const secondSync = await OutboxSyncCoordinator.syncPendingTasks('inst-poison')
+      expect(secondSync.total).toBe(0)
+      expect(secondSync.failed).toBe(0)
+    })
+
+
+  })
+});

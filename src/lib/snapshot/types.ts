@@ -97,9 +97,14 @@ export interface SnapshotPayload {
   safesearch?: SafeSearchPayload
 }
 
+/** Alias for snapshot configuration payload */
+export type AghConfigSnapshotPayload = SnapshotPayload
+
 export interface AghConfigSnapshot {
   meta: SnapshotMeta
   data: SnapshotPayload
+  /** When true, indicates this managed snapshot was pulled from server but not yet decrypted locally */
+  isLocked?: boolean
 }
 
 export interface SnapshotBundle {

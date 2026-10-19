@@ -126,7 +126,6 @@ describe('Managed Mode E2E Cross-Device Zero-Knowledge Synchronization', () => {
               id: blob.id,
               instanceId: blob.instanceId,
               createdAt: blob.createdAt,
-              checksum: blob.checksum,
             })
           }
         }
@@ -252,6 +251,7 @@ describe('Managed Mode E2E Cross-Device Zero-Knowledge Synchronization', () => {
     expect(serverBlob.ciphertext).toBeTypeOf('string')
     expect(JSON.stringify(serverBlob)).not.toContain(AGH_PASSWORD)
     expect(JSON.stringify(serverBlob)).not.toContain('malware-domain.test')
+    expect((serverBlob as any).checksum).toBeUndefined()
   })
 
   it('Device B activates instance with AGH password, pulls and decrypts Device A snapshot', async () => {

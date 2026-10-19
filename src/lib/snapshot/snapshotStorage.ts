@@ -8,7 +8,6 @@ import {
   encryptSnapshotBlob,
   type SnapshotEncryptedBlob,
 } from '../crypto/e2ee'
-import { OutboxSyncCoordinator, type OutboxTask } from './outboxSync'
 import { getSessionKey } from '../crypto/keyVault'
 import { loadStore } from '../session/instances'
 import type {
@@ -16,8 +15,9 @@ import type {
   SnapshotBundle,
   SnapshotTrigger,
 } from './types'
+import { IdbStore, isIdbAvailable } from './idbStore'
 
-export type { OutboxTask }
+export { isIdbAvailable }
 
 export const DB_NAME = 'agh_console_snapshots'
 export const STORE_NAME = 'snapshots'
@@ -38,6 +38,41 @@ export interface ManagedSnapshotRecord {
   updatedAt?: string
 }
 
+export interface OutboxTask {
+  taskId: string
+  instanceId: string
+  snapshotId: string
+  action: 'upload' | 'delete'
+  blob?: SnapshotEncryptedBlob
+  createdAt: string
+  retryCount: number
+  lastError?: string
+}
+
+export type SyncTriggerFn = (serverUrl?: string, instanceId?: string) => Promise<unknown> | unknown
+
+let syncTrigger: SyncTriggerFn | null = null
+
+export function setSyncTrigger(fn: SyncTriggerFn | null): void {
+  syncTrigger = fn
+}
+
+export function getSyncTrigger(): SyncTriggerFn | null {
+  return syncTrigger
+}
+
+export function notifySyncTrigger(serverUrl?: string, instanceId?: string): void {
+  if (syncTrigger) {
+    try {
+      void Promise.resolve(syncTrigger(serverUrl, instanceId)).catch(() => {
+        // Expected when offline or server unreachable; tasks are safely persisted in outbox
+      })
+    } catch {
+      // Ignore synchronous exceptions
+    }
+  }
+}
+
 export interface SaveSnapshotOptions {
   password?: string
   key?: CryptoKey
@@ -54,60 +89,6 @@ export interface DeleteSnapshotOptions {
   managedConfig?: { serverUrl?: string }
   /** Skip immediate fire-and-forget background sync */
   skipAutoSync?: boolean
-}
-
-// In-memory fallback maps for test environments where indexedDB is undefined
-const memoryVault = new Map<string, AghConfigSnapshot>()
-const memoryManagedVault = new Map<string, ManagedSnapshotRecord>()
-const memoryOutboxVault = new Map<string, OutboxTask>()
-
-export function isIdbAvailable(): boolean {
-  return typeof globalThis.indexedDB !== 'undefined'
-}
-
-/**
- * Resets in-memory storage vaults for testing.
- */
-export function resetMemoryVaultsForTesting(): void {
-  memoryVault.clear()
-  memoryManagedVault.clear()
-  memoryOutboxVault.clear()
-}
-
-/**
- * Clears all data from both in-memory vaults and IndexedDB stores for clean test isolation.
- */
-export async function clearAllDatabase(): Promise<void> {
-  resetMemoryVaultsForTesting()
-  if (isIdbAvailable()) {
-    try {
-      const db = await openDatabase()
-      await new Promise<void>((resolve, reject) => {
-        const storeNames = [STORE_NAME, MANAGED_STORE_NAME, OUTBOX_STORE_NAME].filter((s) =>
-          db.objectStoreNames.contains(s)
-        )
-        if (storeNames.length === 0) {
-          db.close()
-          resolve()
-          return
-        }
-        const tx = db.transaction(storeNames, 'readwrite')
-        for (const s of storeNames) {
-          tx.objectStore(s).clear()
-        }
-        tx.oncomplete = () => {
-          db.close()
-          resolve()
-        }
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error)
-        }
-      })
-    } catch {
-      // Ignore if DB cannot be opened
-    }
-  }
 }
 
 export function openDatabase(): Promise<IDBDatabase> {
@@ -148,260 +129,175 @@ export function openDatabase(): Promise<IDBDatabase> {
   })
 }
 
-// --- Direct Snapshot Storage Helpers ---
+// Wire default db opener and instantiate store drivers
+IdbStore.defaultOpenDb = openDatabase
+export const directStore = new IdbStore<AghConfigSnapshot>(STORE_NAME, 'meta.id')
+export const managedStore = new IdbStore<ManagedSnapshotRecord>(MANAGED_STORE_NAME, 'id')
+export const outboxStore = new IdbStore<OutboxTask>(OUTBOX_STORE_NAME, 'taskId')
 
-export async function saveDirectSnapshot(snapshot: AghConfigSnapshot): Promise<void> {
+/**
+ * Resets in-memory storage vaults for testing.
+ */
+export function resetMemoryVaultsForTesting(): void {
+  directStore.clearMemory()
+  managedStore.clearMemory()
+  outboxStore.clearMemory()
+}
+
+/**
+ * Clears all data from both in-memory vaults and IndexedDB stores for clean test isolation.
+ */
+export async function clearAllDatabase(): Promise<void> {
+  resetMemoryVaultsForTesting()
+  if (isIdbAvailable()) {
+    try {
+      const db = await openDatabase()
+      await new Promise<void>((resolve, reject) => {
+        const storeNames = [STORE_NAME, MANAGED_STORE_NAME, OUTBOX_STORE_NAME].filter((s) =>
+          db.objectStoreNames.contains(s)
+        )
+        if (storeNames.length === 0) {
+          db.close()
+          resolve()
+          return
+        }
+        const tx = db.transaction(storeNames, 'readwrite')
+        for (const s of storeNames) tx.objectStore(s).clear()
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error)
+        }
+      })
+    } catch {
+      // Ignore if DB cannot be opened
+    }
+  }
+}
+
+/**
+ * Commits managed snapshot record and outbox task atomically in a single IndexedDB transaction.
+ * Completely resolves hanging pending upload state if write is interrupted.
+ */
+export async function commitManagedSnapshotWithOutbox(
+  record: ManagedSnapshotRecord,
+  task: OutboxTask
+): Promise<void> {
   if (!isIdbAvailable()) {
-    memoryVault.set(snapshot.meta.id, JSON.parse(JSON.stringify(snapshot)))
+    await managedStore.put(record)
+    await outboxStore.put(task)
     return
   }
 
   const db = await openDatabase()
   return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    const req = store.put(snapshot)
+    const tx = db.transaction([MANAGED_STORE_NAME, OUTBOX_STORE_NAME], 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('Transaction failed'))
+    tx.onabort = () => reject(tx.error ?? new Error('Transaction aborted'))
 
-    req.onsuccess = () => resolve()
-    req.onerror = () => reject(req.error)
+    try {
+      void managedStore.put(record, tx).catch(reject)
+      void outboxStore.put(task, tx).catch(reject)
+    } catch (err) {
+      reject(err)
+    }
   })
 }
 
-export async function getDirectSnapshot(id: string): Promise<AghConfigSnapshot | null> {
+/**
+ * Deletes managed snapshot record and commits outbox delete task atomically in a single IndexedDB transaction.
+ * Completely eliminates orphaned local deletion without remote outbox task.
+ */
+export async function commitDeleteManagedSnapshotWithOutbox(
+  id: string,
+  task: OutboxTask
+): Promise<void> {
   if (!isIdbAvailable()) {
-    return memoryVault.get(id) || null
+    await managedStore.delete(id)
+    await outboxStore.put(task)
+    return
   }
 
   const db = await openDatabase()
-  return new Promise<AghConfigSnapshot | null>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly')
-    const store = tx.objectStore(STORE_NAME)
-    const req = store.get(id)
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([MANAGED_STORE_NAME, OUTBOX_STORE_NAME], 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('Transaction failed'))
+    tx.onabort = () => reject(tx.error ?? new Error('Transaction aborted'))
 
-    req.onsuccess = () => resolve(req.result || null)
-    req.onerror = () => reject(req.error)
+    try {
+      void managedStore.delete(id, tx).catch(reject)
+      void outboxStore.put(task, tx).catch(reject)
+    } catch (err) {
+      reject(err)
+    }
   })
 }
+
+// --- Direct Snapshot Storage Helpers ---
+
+export const saveDirectSnapshot = (snapshot: AghConfigSnapshot): Promise<void> => directStore.put(snapshot)
+
+export const getDirectSnapshot = (id: string): Promise<AghConfigSnapshot | null> => directStore.get(id)
 
 export async function listDirectSnapshots(instanceId?: string): Promise<AghConfigSnapshot[]> {
-  if (!isIdbAvailable()) {
-    const all = Array.from(memoryVault.values())
-    const filtered = instanceId ? all.filter((s) => s.meta.sourceInstance.id === instanceId) : all
-    return filtered.sort(
-      (a, b) => new Date(b.meta.createdAt).getTime() - new Date(a.meta.createdAt).getTime()
-    )
-  }
-
-  const db = await openDatabase()
-  return new Promise<AghConfigSnapshot[]>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly')
-    const store = tx.objectStore(STORE_NAME)
-    const req = store.getAll()
-
-    req.onsuccess = () => {
-      const results: AghConfigSnapshot[] = req.result || []
-      const filtered = instanceId
-        ? results.filter((s) => s.meta.sourceInstance.id === instanceId)
-        : results
-      filtered.sort(
-        (a, b) => new Date(b.meta.createdAt).getTime() - new Date(a.meta.createdAt).getTime()
-      )
-      resolve(filtered)
-    }
-    req.onerror = () => reject(req.error)
-  })
+  const all = await directStore.getAll()
+  const filtered = instanceId ? all.filter((s) => s.meta?.sourceInstance?.id === instanceId) : all
+  return filtered.sort(
+    (a, b) => new Date(b.meta.createdAt).getTime() - new Date(a.meta.createdAt).getTime()
+  )
 }
 
-export async function deleteDirectSnapshot(id: string): Promise<boolean> {
-  if (!isIdbAvailable()) {
-    return memoryVault.delete(id)
-  }
-
-  const db = await openDatabase()
-  return new Promise<boolean>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    const req = store.delete(id)
-
-    req.onsuccess = () => resolve(true)
-    req.onerror = () => reject(req.error)
-  })
-}
+export const deleteDirectSnapshot = (id: string): Promise<boolean> => directStore.delete(id)
 
 // --- Managed Snapshot Storage Helpers ---
 
-export async function saveManagedSnapshot(record: ManagedSnapshotRecord): Promise<void> {
-  if (!isIdbAvailable()) {
-    memoryManagedVault.set(record.id, JSON.parse(JSON.stringify(record)))
-    return
-  }
+export const saveManagedSnapshot = (record: ManagedSnapshotRecord): Promise<void> => managedStore.put(record)
 
-  const db = await openDatabase()
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(MANAGED_STORE_NAME, 'readwrite')
-    const store = tx.objectStore(MANAGED_STORE_NAME)
-    const req = store.put(record)
-
-    req.onsuccess = () => resolve()
-    req.onerror = () => reject(req.error)
-  })
-}
-
-export async function getManagedSnapshot(id: string): Promise<ManagedSnapshotRecord | null> {
-  if (!isIdbAvailable()) {
-    return memoryManagedVault.get(id) || null
-  }
-
-  const db = await openDatabase()
-  return new Promise<ManagedSnapshotRecord | null>((resolve, reject) => {
-    const tx = db.transaction(MANAGED_STORE_NAME, 'readonly')
-    const store = tx.objectStore(MANAGED_STORE_NAME)
-    const req = store.get(id)
-
-    req.onsuccess = () => resolve(req.result || null)
-    req.onerror = () => reject(req.error)
-  })
-}
+export const getManagedSnapshot = (id: string): Promise<ManagedSnapshotRecord | null> => managedStore.get(id)
 
 export async function listManagedSnapshots(instanceId?: string): Promise<ManagedSnapshotRecord[]> {
-  if (!isIdbAvailable()) {
-    const all = Array.from(memoryManagedVault.values())
-    const filtered = instanceId ? all.filter((s) => s.instanceId === instanceId) : all
-    return filtered.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-  }
-
-  const db = await openDatabase()
-  return new Promise<ManagedSnapshotRecord[]>((resolve, reject) => {
-    const tx = db.transaction(MANAGED_STORE_NAME, 'readonly')
-    const store = tx.objectStore(MANAGED_STORE_NAME)
-    const req = store.getAll()
-
-    req.onsuccess = () => {
-      const results: ManagedSnapshotRecord[] = req.result || []
-      const filtered = instanceId
-        ? results.filter((s) => s.instanceId === instanceId)
-        : results
-      filtered.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
-      resolve(filtered)
-    }
-    req.onerror = () => reject(req.error)
-  })
+  const all = await managedStore.getAll()
+  const filtered = instanceId ? all.filter((s) => s.instanceId === instanceId) : all
+  return filtered.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
 }
 
-export async function deleteManagedSnapshot(id: string): Promise<boolean> {
-  if (!isIdbAvailable()) {
-    return memoryManagedVault.delete(id)
-  }
-
-  const db = await openDatabase()
-  return new Promise<boolean>((resolve, reject) => {
-    const tx = db.transaction(MANAGED_STORE_NAME, 'readwrite')
-    const store = tx.objectStore(MANAGED_STORE_NAME)
-    const req = store.delete(id)
-
-    req.onsuccess = () => resolve(true)
-    req.onerror = () => reject(req.error)
-  })
-}
+export const deleteManagedSnapshot = (id: string): Promise<boolean> => managedStore.delete(id)
 
 export async function updateManagedSnapshotStatus(
   id: string,
   status: ManagedSnapshotStatus
 ): Promise<void> {
-  const record = await getManagedSnapshot(id)
+  const record = await managedStore.get(id)
   if (!record) return
   record.status = status
   record.updatedAt = new Date().toISOString()
-  await saveManagedSnapshot(record)
+  await managedStore.put(record)
 }
 
 // --- Offline Outbox Storage Helpers ---
 
-export async function saveOutboxTask(task: OutboxTask): Promise<void> {
-  if (!isIdbAvailable()) {
-    memoryOutboxVault.set(task.taskId, JSON.parse(JSON.stringify(task)))
-    return
-  }
+export const saveOutboxTask = (task: OutboxTask): Promise<void> => outboxStore.put(task)
 
-  const db = await openDatabase()
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(OUTBOX_STORE_NAME, 'readwrite')
-    const store = tx.objectStore(OUTBOX_STORE_NAME)
-    const req = store.put(task)
-
-    req.onsuccess = () => resolve()
-    req.onerror = () => reject(req.error)
-  })
-}
-
-export async function getOutboxTask(taskId: string): Promise<OutboxTask | null> {
-  if (!isIdbAvailable()) {
-    return memoryOutboxVault.get(taskId) || null
-  }
-
-  const db = await openDatabase()
-  return new Promise<OutboxTask | null>((resolve, reject) => {
-    const tx = db.transaction(OUTBOX_STORE_NAME, 'readonly')
-    const store = tx.objectStore(OUTBOX_STORE_NAME)
-    const req = store.get(taskId)
-
-    req.onsuccess = () => resolve(req.result || null)
-    req.onerror = () => reject(req.error)
-  })
-}
+export const getOutboxTask = (taskId: string): Promise<OutboxTask | null> => outboxStore.get(taskId)
 
 export async function listOutboxTasks(instanceId?: string): Promise<OutboxTask[]> {
-  if (!isIdbAvailable()) {
-    const all = Array.from(memoryOutboxVault.values())
-    const filtered = instanceId ? all.filter((t) => t.instanceId === instanceId) : all
-    return filtered.sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    )
-  }
-
-  const db = await openDatabase()
-  return new Promise<OutboxTask[]>((resolve, reject) => {
-    const tx = db.transaction(OUTBOX_STORE_NAME, 'readonly')
-    const store = tx.objectStore(OUTBOX_STORE_NAME)
-    const req = store.getAll()
-
-    req.onsuccess = () => {
-      const results: OutboxTask[] = req.result || []
-      const filtered = instanceId
-        ? results.filter((t) => t.instanceId === instanceId)
-        : results
-      filtered.sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      )
-      resolve(filtered)
-    }
-    req.onerror = () => reject(req.error)
-  })
+  const all = await outboxStore.getAll()
+  const filtered = instanceId ? all.filter((t) => t.instanceId === instanceId) : all
+  return filtered.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  )
 }
 
-export async function deleteOutboxTask(taskId: string): Promise<boolean> {
-  if (!isIdbAvailable()) {
-    return memoryOutboxVault.delete(taskId)
-  }
+export const deleteOutboxTask = (taskId: string): Promise<boolean> => outboxStore.delete(taskId)
 
-  const db = await openDatabase()
-  return new Promise<boolean>((resolve, reject) => {
-    const tx = db.transaction(OUTBOX_STORE_NAME, 'readwrite')
-    const store = tx.objectStore(OUTBOX_STORE_NAME)
-    const req = store.delete(taskId)
-
-    req.onsuccess = () => resolve(true)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-export async function updateOutboxTask(task: OutboxTask): Promise<void> {
-  await saveOutboxTask(task)
-}
+export const updateOutboxTask = (task: OutboxTask): Promise<void> => outboxStore.put(task)
 
 // --- Dual-Track High-Level Snapshot Operations ---
 
@@ -409,36 +305,46 @@ export async function updateOutboxTask(task: OutboxTask): Promise<void> {
  * Persists a snapshot to storage vault.
  * - In direct mode: saves directly to local snapshots store.
  * - In managed mode: encrypts locally via encryptSnapshotBlob, stores in managed_snapshots
- *   with status 'pending_upload', queues upload task in managed_outbox, and asynchronously
- *   triggers OutboxSyncCoordinator without blocking local save completion.
+ *   with status 'pending_upload', queues upload task in managed_outbox atomically, and
+ *   asynchronously triggers registered sync without blocking local save completion.
  */
 export async function saveSnapshot(
   snapshot: AghConfigSnapshot,
   options?: SaveSnapshotOptions
 ): Promise<void> {
-  const instId = snapshot.meta.sourceInstance.id
-  let isManaged = Boolean(
-    options?.managed || options?.managedConfig || options?.password || options?.key
-  )
-  let managedConfig = options?.managedConfig
-  let key = options?.key
+  let isManaged = options?.managed
   let password = options?.password
+  let key = options?.key
+  let managedConfig = options?.managedConfig
+  const instId = snapshot.meta.sourceInstance.id
 
-  if (instId) {
-    const store = loadStore()
-    const inst = store?.instances.find((i) => i.id === instId)
-    if (inst?.managed) {
+  if (isManaged === undefined) {
+    if (options?.managedConfig || options?.password || options?.key) {
       isManaged = true
-      if (!managedConfig) {
-        managedConfig = inst.managed
+    } else if (instId) {
+      const store = loadStore()
+      const inst = store?.instances.find((i) => i.id === instId)
+      if (inst?.managed) {
+        isManaged = true
+        if (!managedConfig) {
+          managedConfig = inst.managed
+        }
+
       }
     }
+  }
+
+  if (isManaged && instId) {
     if (!key) {
       key = getSessionKey(instId)
     }
-    if (!key && !password && inst) {
-      const ep = inst.endpoints[0]
-      if (ep?.password) password = ep.password
+    if (!key && !password) {
+      const store = loadStore()
+      const inst = store?.instances.find((i) => i.id === instId)
+      if (inst) {
+        const ep = inst.endpoints[0]
+        if (ep?.password) password = ep.password
+      }
     }
   }
 
@@ -456,17 +362,27 @@ export async function saveSnapshot(
     ? base64ToUint8Array(managedConfig.salt)
     : undefined
 
-  const blob = await encryptSnapshotBlob({
+  const baseEncryptParams = {
     id: snapshot.meta.id,
     instanceId: snapshot.meta.sourceInstance.id,
     createdAt: snapshot.meta.createdAt,
     plaintext: snapshot as unknown as Record<string, unknown>,
-    password,
-    key,
-    salt: saltBytes,
-  })
+  }
 
-  // 2. Put into managed_snapshots marked 'pending_upload'
+  const blob = key
+    ? await encryptSnapshotBlob({
+        ...baseEncryptParams,
+        key,
+        salt: saltBytes!,
+        password,
+      })
+    : await encryptSnapshotBlob({
+        ...baseEncryptParams,
+        password: password!,
+        salt: saltBytes,
+      })
+
+  // 2. Prepare record and outbox upload task
   const record: ManagedSnapshotRecord = {
     id: snapshot.meta.id,
     instanceId: snapshot.meta.sourceInstance.id,
@@ -476,9 +392,7 @@ export async function saveSnapshot(
     snapshot: JSON.parse(JSON.stringify(snapshot)),
     updatedAt: new Date().toISOString(),
   }
-  await saveManagedSnapshot(record)
 
-  // 3. Put upload task into managed_outbox
   const outboxTask: OutboxTask = {
     taskId: `outbox-${snapshot.meta.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     instanceId: snapshot.meta.sourceInstance.id,
@@ -488,21 +402,44 @@ export async function saveSnapshot(
     createdAt: new Date().toISOString(),
     retryCount: 0,
   }
-  await saveOutboxTask(outboxTask)
 
-  // 4. Asynchronously trigger OutboxSyncCoordinator without blocking saveSnapshot
+  // 3. Atomically commit both into managed_snapshots and managed_outbox
+  await commitManagedSnapshotWithOutbox(record, outboxTask)
+
+  // 4. Asynchronously trigger registered sync without blocking saveSnapshot
   if (!options?.skipAutoSync) {
-    void OutboxSyncCoordinator.triggerSync(
-      managedConfig?.serverUrl,
-      snapshot.meta.sourceInstance.id
-    ).catch(() => {
-      // Expected when offline or server unreachable; tasks are safely persisted in outbox
-    })
+    notifySyncTrigger(managedConfig?.serverUrl, snapshot.meta.sourceInstance.id)
   }
 
   // Auto-prune managed snapshots if needed
   if (snapshot.meta.trigger === 'pre_sync' || snapshot.meta.trigger === 'pre_rollback') {
     await pruneAutoSnapshots(snapshot.meta.sourceInstance.id, DEFAULT_MAX_AUTO_SNAPSHOTS, true)
+  }
+}
+
+/**
+ * Creates a lightweight locked snapshot placeholder for an un-decrypted managed record.
+ */
+function createLockedSnapshotPlaceholder(record: ManagedSnapshotRecord): AghConfigSnapshot {
+  return {
+    meta: {
+      id: record.id,
+      schemaVersion: '1.0',
+      createdAt: record.createdAt,
+      label: 'Encrypted Snapshot',
+      description: 'This snapshot is encrypted and cannot be viewed without the decryption key.',
+      trigger: 'manual',
+      sourceInstance: {
+        id: record.instanceId,
+        label: 'Encrypted Snapshot',
+        url: '',
+        aghVersion: '',
+      },
+      modules: [],
+      checksum: '',
+    },
+    data: {},
+    isLocked: true,
   }
 }
 
@@ -516,7 +453,8 @@ export async function getSnapshot(
 ): Promise<AghConfigSnapshot | null> {
   if (options?.managed === true) {
     const record = await getManagedSnapshot(id)
-    return record?.snapshot || null
+    if (!record) return null
+    return record.snapshot || createLockedSnapshotPlaceholder(record)
   }
 
   const direct = await getDirectSnapshot(id)
@@ -524,7 +462,9 @@ export async function getSnapshot(
 
   if (options?.managed !== false) {
     const managed = await getManagedSnapshot(id)
-    if (managed?.snapshot) return managed.snapshot
+    if (managed) {
+      return managed.snapshot || createLockedSnapshotPlaceholder(managed)
+    }
   }
 
   return null
@@ -533,6 +473,7 @@ export async function getSnapshot(
 /**
  * Lists all snapshots, optionally filtered by instanceId, sorted by createdAt descending.
  * When options.managed is true, returns snapshots from managed storage.
+ * Does not silently drop undecrypted records, returning an isLocked placeholder instead.
  */
 export async function listSnapshots(
   instanceId?: string,
@@ -549,9 +490,12 @@ export async function listSnapshots(
 
   if (isManaged === true) {
     const records = await listManagedSnapshots(instanceId)
-    return records
-      .map((r) => r.snapshot)
-      .filter((s): s is AghConfigSnapshot => Boolean(s))
+    return records.map((record) => {
+      if (record.snapshot) {
+        return record.snapshot
+      }
+      return createLockedSnapshotPlaceholder(record)
+    })
   }
 
   return listDirectSnapshots(instanceId)
@@ -559,7 +503,7 @@ export async function listSnapshots(
 
 /**
  * Deletes a snapshot by UUID.
- * In managed mode, enqueues a delete task into the outbox and triggers synchronization.
+ * In managed mode, atomically deletes the local managed record and enqueues an outbox delete task.
  */
 export async function deleteSnapshot(
   id: string,
@@ -590,9 +534,6 @@ export async function deleteSnapshot(
     const managedRecord = await getManagedSnapshot(id)
     if (managedRecord || isManaged) {
       const targetInstId = managedRecord?.instanceId || instId || ''
-      await deleteManagedSnapshot(id)
-      deleted = true
-
       const delTask: OutboxTask = {
         taskId: `outbox-del-${id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         instanceId: targetInstId,
@@ -601,10 +542,11 @@ export async function deleteSnapshot(
         createdAt: new Date().toISOString(),
         retryCount: 0,
       }
-      await saveOutboxTask(delTask)
+      await commitDeleteManagedSnapshotWithOutbox(id, delTask)
+      deleted = true
 
       if (!options?.skipAutoSync) {
-        void OutboxSyncCoordinator.triggerSync(serverUrl, targetInstId).catch(() => {})
+        notifySyncTrigger(serverUrl, targetInstId)
       }
     }
   }
@@ -662,16 +604,18 @@ export function exportSnapshotJson(snapshot: AghConfigSnapshot): string {
 
 /**
  * Packs multiple snapshots into a unified snapshot bundle.
+ * Filters out locked/un-decrypted placeholders to preserve bundle integrity.
  */
 export function exportSnapshotBundleJson(
   snapshots: AghConfigSnapshot[],
   instanceLabel?: string
 ): string {
+  const exportable = snapshots.filter((s) => !s.isLocked)
   const bundle: SnapshotBundle = {
     bundleVersion: '1.0',
     createdAt: new Date().toISOString(),
     instanceLabel,
-    snapshots,
+    snapshots: exportable,
   }
   return JSON.stringify(bundle, null, 2)
 }

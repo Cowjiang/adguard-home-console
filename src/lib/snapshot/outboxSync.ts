@@ -20,22 +20,17 @@ import {
   listSnapshots,
   saveManagedSnapshot,
   saveSnapshot,
+  setSyncTrigger,
   updateManagedSnapshotStatus,
   updateOutboxTask,
   type ManagedSnapshotRecord,
+  type OutboxTask,
 } from './snapshotStorage'
 import type { AghConfigSnapshot } from './types'
 
-export interface OutboxTask {
-  taskId: string
-  instanceId: string
-  snapshotId: string
-  action: 'upload' | 'delete'
-  blob?: SnapshotEncryptedBlob
-  createdAt: string
-  retryCount: number
-  lastError?: string
-}
+export type { OutboxTask }
+
+export const MAX_OUTBOX_RETRIES = 5
 
 export interface TaskSyncResult {
   taskId: string
@@ -78,12 +73,20 @@ export function buildSnapshotApiUrl(
 }
 
 export class OutboxSyncCoordinatorClass {
-  private activeSync: Promise<SyncExecutionResult> | null = null
-  private syncLock: Promise<void> | null = null
+  private activeSyncs = new Map<string, Promise<SyncExecutionResult>>()
+  private syncLocks = new Map<string, Promise<void>>()
   private listeners: Array<(result: SyncExecutionResult) => void> = []
 
-  public isSyncing(): boolean {
-    return this.activeSync !== null || this.syncLock !== null
+  public isSyncing(instanceId?: string): boolean {
+    if (instanceId) {
+      return (
+        this.activeSyncs.has(instanceId) ||
+        this.activeSyncs.has('__global__') ||
+        this.syncLocks.has(instanceId) ||
+        this.syncLocks.has('__global__')
+      )
+    }
+    return this.activeSyncs.size > 0 || this.syncLocks.size > 0
   }
 
   public onSyncComplete(listener: (result: SyncExecutionResult) => void): () => void {
@@ -94,41 +97,69 @@ export class OutboxSyncCoordinatorClass {
   }
 
   /**
+   * Resets active synchronization state, locks, and listeners for testing.
+   */
+  public resetForTesting(): void {
+    this.activeSyncs.clear()
+    this.syncLocks.clear()
+    this.listeners = []
+  }
+
+  /**
    * Triggers an asynchronous synchronization run.
-   * If a sync is already in flight, returns the active promise to avoid duplicate runs.
+   * If a sync is already in flight for this instanceId (or globally), returns the active promise to avoid duplicate runs.
    */
   public triggerSync(serverUrl?: string, instanceId?: string): Promise<SyncExecutionResult> {
-    if (this.activeSync) {
-      return this.activeSync
+    const key = instanceId || '__global__'
+    const existing = this.activeSyncs.get(key)
+    if (existing) {
+      return existing
     }
+    if (instanceId && this.activeSyncs.has('__global__')) {
+      return this.activeSyncs.get('__global__')!
+    }
+
     const p = this.syncPendingTasks(instanceId, serverUrl).finally(() => {
-      this.activeSync = null
+      this.activeSyncs.delete(key)
     })
-    this.activeSync = p
+    this.activeSyncs.set(key, p)
     return p
   }
 
   /**
-   * Synchronously processes pending tasks in the outbox with mutex locking.
+   * Synchronously processes pending tasks in the outbox with mutex locking per instance.
    * Uploads or deletes snapshots on the managed server, updating local status on success.
    */
   public async syncPendingTasks(
     instanceId?: string,
     serverUrl?: string
   ): Promise<SyncExecutionResult> {
-    while (this.syncLock) {
-      await this.syncLock
+    const key = instanceId || '__global__'
+
+    if (key === '__global__') {
+      while (this.syncLocks.size > 0) {
+        await Promise.all(Array.from(this.syncLocks.values()))
+      }
+    } else {
+      while (this.syncLocks.has(key) || this.syncLocks.has('__global__')) {
+        await Promise.race(
+          [this.syncLocks.get(key), this.syncLocks.get('__global__')].filter(
+            (p): p is Promise<void> => Boolean(p)
+          )
+        )
+      }
     }
 
     let releaseLock: () => void = () => {}
-    this.syncLock = new Promise<void>((resolve) => {
+    const lockPromise = new Promise<void>((resolve) => {
       releaseLock = resolve
     })
+    this.syncLocks.set(key, lockPromise)
 
     try {
       return await this.executeSync(instanceId, serverUrl)
     } finally {
-      this.syncLock = null
+      this.syncLocks.delete(key)
       releaseLock()
     }
   }
@@ -138,21 +169,22 @@ export class OutboxSyncCoordinatorClass {
     serverUrl?: string
   ): Promise<SyncExecutionResult> {
     const tasks = await listOutboxTasks(instanceId)
+    const executableTasks = tasks.filter((t) => (t.retryCount || 0) < MAX_OUTBOX_RETRIES)
     const result: SyncExecutionResult = {
-      total: tasks.length,
+      total: executableTasks.length,
       succeeded: 0,
       failed: 0,
       tasks: [],
     }
 
-    if (tasks.length === 0) {
+    if (executableTasks.length === 0) {
       this.notifyListeners(result)
       return result
     }
 
     const store = loadStore()
 
-    for (const task of tasks) {
+    for (const task of executableTasks) {
       let targetServerUrl = serverUrl
       if (!targetServerUrl && store) {
         const inst = store.instances.find((i) => i.id === task.instanceId)
@@ -166,7 +198,9 @@ export class OutboxSyncCoordinatorClass {
       try {
         if (task.action === 'upload') {
           if (!task.blob) {
-            throw new Error(`Upload task ${task.taskId} missing encrypted blob`)
+            const err = new Error(`Upload task ${task.taskId} missing encrypted blob`) as Error & { fatal?: boolean }
+            err.fatal = true
+            throw err
           }
 
           const res = await fetch(url, {
@@ -175,11 +209,15 @@ export class OutboxSyncCoordinatorClass {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(task.blob),
+            signal: AbortSignal.timeout(15_000),
           })
 
           if (!res.ok) {
             const errText = await res.text().catch(() => '')
-            throw new Error(`Upload failed HTTP ${res.status}: ${errText || res.statusText}`)
+            const isFatal = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+            const err = new Error(`Upload failed HTTP ${res.status}: ${errText || res.statusText}`) as Error & { fatal?: boolean }
+            err.fatal = isFatal
+            throw err
           }
 
           // Successfully uploaded: remove from outbox and update status to 'synced'
@@ -196,12 +234,16 @@ export class OutboxSyncCoordinatorClass {
         } else if (task.action === 'delete') {
           const res = await fetch(url, {
             method: 'DELETE',
+            signal: AbortSignal.timeout(15_000),
           })
 
           // 200 OK or 404 Not Found are both considered successful deletion
           if (!res.ok && res.status !== 404) {
             const errText = await res.text().catch(() => '')
-            throw new Error(`Delete failed HTTP ${res.status}: ${errText || res.statusText}`)
+            const isFatal = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429
+            const err = new Error(`Delete failed HTTP ${res.status}: ${errText || res.statusText}`) as Error & { fatal?: boolean }
+            err.fatal = isFatal
+            throw err
           }
 
           // Successfully deleted: remove from outbox
@@ -216,7 +258,11 @@ export class OutboxSyncCoordinatorClass {
           })
         }
       } catch (err: any) {
-        task.retryCount = (task.retryCount || 0) + 1
+        if (err?.fatal) {
+          task.retryCount = MAX_OUTBOX_RETRIES
+        } else {
+          task.retryCount = (task.retryCount || 0) + 1
+        }
         task.lastError = err?.message || String(err)
         await updateOutboxTask(task)
 
@@ -247,6 +293,9 @@ export class OutboxSyncCoordinatorClass {
 }
 
 export const OutboxSyncCoordinator = new OutboxSyncCoordinatorClass()
+
+// Wire up storage trigger to OutboxSyncCoordinator
+setSyncTrigger((serverUrl, instanceId) => OutboxSyncCoordinator.triggerSync(serverUrl, instanceId))
 
 /**
  * Triggers an immediate outbox synchronization flush.
@@ -279,7 +328,10 @@ export async function pullRemoteSnapshots(
 
   let summaries: Array<{ id: string; instanceId: string; createdAt: string }> = []
   try {
-    const res = await fetch(listUrl)
+    const res = await fetch(listUrl, {
+      method: 'GET',
+      signal: AbortSignal.timeout(15_000),
+    })
     if (!res.ok) {
       if (res.status === 404) return { total: 0, pulled: 0, failed: 0 }
       throw new Error(`Failed to list remote snapshots HTTP ${res.status}`)
@@ -315,7 +367,10 @@ export async function pullRemoteSnapshots(
 
     try {
       const snapUrl = `${listUrl}/${encodeURIComponent(item.id)}`
-      const snapRes = await fetch(snapUrl)
+      const snapRes = await fetch(snapUrl, {
+        method: 'GET',
+        signal: AbortSignal.timeout(15_000),
+      })
       if (!snapRes.ok) {
         result.failed++
         continue
@@ -384,11 +439,6 @@ export function registerAutoSync(): () => void {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }
-}
-
-// Auto-register in browser runtime
-if (typeof window !== 'undefined') {
-  registerAutoSync()
 }
 
 /**
