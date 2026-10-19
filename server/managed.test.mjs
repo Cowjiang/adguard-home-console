@@ -7,8 +7,11 @@ import express from 'express';
 import {
   createManagedHandler,
   isValidId,
-  atomicWriteJsonSync,
+  resolveSafePath,
+  atomicWriteJson,
   resolveDataDir,
+  withLock,
+  rebuildSnapshotsIndex,
 } from './managed.mjs';
 
 function createTempDir(prefix = 'test-managed-') {
@@ -37,13 +40,30 @@ test('isValidId: strictly validates IDs and blocks path traversal attempts', () 
   assert.equal(isValidId(123), false);
 });
 
-test('atomicWriteJsonSync: writes JSON atomically and creates missing directories', () => {
+test('resolveSafePath: prevents path traversal beyond base directory', () => {
+  const baseDir = '/tmp/safe-base';
+  assert.equal(
+    resolveSafePath(baseDir, 'snapshots', 'inst-1'),
+    path.resolve(baseDir, 'snapshots', 'inst-1')
+  );
+
+  assert.throws(
+    () => resolveSafePath(baseDir, '..', 'evil'),
+    /Path traversal attempt detected/
+  );
+  assert.throws(
+    () => resolveSafePath(baseDir, 'snapshots', '..', '..', 'etc', 'passwd'),
+    /Path traversal attempt detected/
+  );
+});
+
+test('atomicWriteJson: writes JSON atomically and creates missing directories asynchronously', async () => {
   const tempDir = createTempDir();
   try {
     const targetPath = path.join(tempDir, 'nested', 'dir', 'sample.json');
     const data = { hello: 'world', count: 42 };
 
-    atomicWriteJsonSync(targetPath, data);
+    await atomicWriteJson(targetPath, data);
 
     assert.ok(fs.existsSync(targetPath));
     const content = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
@@ -53,7 +73,52 @@ test('atomicWriteJsonSync: writes JSON atomically and creates missing directorie
   }
 });
 
-test('managed API: full workflow test against isolated temporary directory', async (t) => {
+test('withLock: guarantees FIFO serial execution and handles task errors gracefully', async () => {
+  const order = [];
+  const results = [];
+
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Run two tasks concurrently
+  const p1 = withLock('test-lock', async () => {
+    await delay(30);
+    order.push('task1');
+    return 1;
+  });
+
+  const p2 = withLock('test-lock', async () => {
+    order.push('task2');
+    return 2;
+  });
+
+  results.push(await p1);
+  results.push(await p2);
+
+  assert.deepEqual(order, ['task1', 'task2']);
+  assert.deepEqual(results, [1, 2]);
+
+  // Error resilience: an error in task3 does not block task4
+  let task3Caught = false;
+  const p3 = withLock('test-lock', async () => {
+    throw new Error('Task 3 failure');
+  }).catch((err) => {
+    task3Caught = true;
+    return 'caught-task3';
+  });
+
+  const p4 = withLock('test-lock', async () => {
+    return 'task4-ok';
+  });
+
+  const res3 = await p3;
+  const res4 = await p4;
+
+  assert.equal(task3Caught, true);
+  assert.equal(res3, 'caught-task3');
+  assert.equal(res4, 'task4-ok');
+});
+
+test('managed API: full workflow test against isolated temporary directory with snapshots index', async (t) => {
   const tempDir = createTempDir('test-managed-workflow-');
   const app = express();
   app.use(express.json({ limit: '4mb' }));
@@ -226,7 +291,6 @@ test('managed API: full workflow test against isolated temporary directory', asy
       tagLength: 128,
     },
     ciphertext: 'Y2lwaGVydGV4dGRhdGEx',
-    checksum: 'checksum11111111111111111111111111111111111111111111111111111111111111',
     metaSummary: {
       trigger: 'manual',
       moduleCount: 9,
@@ -249,7 +313,6 @@ test('managed API: full workflow test against isolated temporary directory', asy
       tagLength: 128,
     },
     ciphertext: 'Y2lwaGVydGV4dGRhdGEy',
-    checksum: 'checksum22222222222222222222222222222222222222222222222222222222222222',
   };
 
   const put1Res = await fetch(`${baseUrl}/instances/inst-1/snapshots/snap-1`, {
@@ -266,7 +329,15 @@ test('managed API: full workflow test against isolated temporary directory', asy
   });
   assert.equal(put2Res.status, 200);
 
-  // 11. Idempotency test: Re-uploading snap-1 with identical checksum
+  // Verify snapshots_index.json was created and indexed correctly
+  const indexPath = path.join(tempDir, 'snapshots', 'inst-1', 'snapshots_index.json');
+  assert.ok(fs.existsSync(indexPath));
+  const initialIndex = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+  assert.equal(initialIndex.length, 2);
+  assert.equal(initialIndex[0].id, 'snap-2');
+  assert.equal(initialIndex[1].id, 'snap-1');
+
+  // 11. Idempotency test: Re-uploading snap-1 with identical ciphertext
   const putIdempotentRes = await fetch(`${baseUrl}/instances/inst-1/snapshots/snap-1`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -288,8 +359,21 @@ test('managed API: full workflow test against isolated temporary directory', asy
     trigger: 'manual',
     moduleCount: 9,
   });
-  // Ciphertext should not be in the summary
+  // Ciphertext and checksum must not be exposed in the summary
   assert.equal(snapshotSummaries[0].ciphertext, undefined);
+  assert.equal(snapshotSummaries[0].checksum, undefined);
+  assert.equal(snapshotSummaries[1].checksum, undefined);
+
+  // 12b. Verify automatic index reconstruction if snapshots_index.json is deleted
+  fs.unlinkSync(indexPath);
+  assert.equal(fs.existsSync(indexPath), false);
+  const listRecoveredRes = await fetch(`${baseUrl}/instances/inst-1/snapshots`);
+  assert.equal(listRecoveredRes.status, 200);
+  const recoveredList = await listRecoveredRes.json();
+  assert.equal(recoveredList.length, 2);
+  assert.equal(recoveredList[0].id, 'snap-2');
+  assert.equal(recoveredList[1].id, 'snap-1');
+  assert.ok(fs.existsSync(indexPath)); // Successfully regenerated on the fly
 
   // 13. GET /instances/:id/snapshots/:snapshotId: Fetch full encrypted blob
   const getSnap1Res = await fetch(`${baseUrl}/instances/inst-1/snapshots/snap-1`);
@@ -307,7 +391,7 @@ test('managed API: full workflow test against isolated temporary directory', asy
   });
   assert.equal(deleteSnapRes.status, 200);
 
-  // Verify snap-2 is deleted from disk and snapshot list
+  // Verify snap-2 is deleted from disk and snapshot index
   const listAfterSnapDeleteRes = await fetch(`${baseUrl}/instances/inst-1/snapshots`);
   const listAfterSnapDelete = await listAfterSnapDeleteRes.json();
   assert.equal(listAfterSnapDelete.length, 1);
@@ -316,6 +400,10 @@ test('managed API: full workflow test against isolated temporary directory', asy
     fs.existsSync(path.join(tempDir, 'snapshots', 'inst-1', 'snap-2.json')),
     false
   );
+  // Verify snapshots_index.json reflects the deletion
+  const indexAfterDelete = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+  assert.equal(indexAfterDelete.length, 1);
+  assert.equal(indexAfterDelete[0].id, 'snap-1');
 
   // 16. DELETE instance and ensure its snapshots directory is cleaned up
   const deleteInstRes = await fetch(`${baseUrl}/instances/inst-1`, {
@@ -333,4 +421,170 @@ test('managed API: full workflow test against isolated temporary directory', asy
     fs.existsSync(path.join(tempDir, 'snapshots', 'inst-1')),
     false
   );
+});
+
+test('managed API: rejects malformed snapshot payloads according to contract validation', async (t) => {
+  const tempDir = createTempDir('test-managed-validation-');
+  const app = express();
+  app.use(express.json({ limit: '4mb' }));
+  const router = createManagedHandler({ dataDir: tempDir });
+  app.use('/api/managed', router);
+
+  const server = await new Promise((resolve) => {
+    const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
+  });
+
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}/api/managed`;
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const validBase = {
+    id: 'snap-val',
+    instanceId: 'inst-val',
+    ciphertext: 'Y2lwaGVydGV4dA==',
+    kdf: {
+      algorithm: 'PBKDF2-HMAC-SHA256',
+      iterations: 600000,
+      salt: 'c2FsdDE2Ynl0ZXNhbHQ=',
+    },
+    cipher: {
+      algorithm: 'AES-256-GCM',
+      iv: 'aXZmb3JzbmFwMQ==',
+      tagLength: 128,
+    },
+  };
+
+  // 1. Missing ciphertext
+  const resNoCiphertext = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...validBase, ciphertext: undefined }),
+  });
+  assert.equal(resNoCiphertext.status, 400);
+
+  // 2. Invalid Base64 in ciphertext
+  const resBadBase64 = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...validBase, ciphertext: 'Not-Valid-Base64!@#$' }),
+  });
+  assert.equal(resBadBase64.status, 400);
+
+  // 3. Invalid or missing KDF
+  const resNoKdf = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...validBase, kdf: null }),
+  });
+  assert.equal(resNoKdf.status, 400);
+
+  const resBadKdfIterations = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...validBase,
+      kdf: { ...validBase.kdf, iterations: -5 },
+    }),
+  });
+  assert.equal(resBadKdfIterations.status, 400);
+
+  const resMissingSalt = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...validBase,
+      kdf: { ...validBase.kdf, salt: '' },
+    }),
+  });
+  assert.equal(resMissingSalt.status, 400);
+
+  // 4. Invalid or missing Cipher
+  const resNoCipher = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...validBase, cipher: null }),
+  });
+  assert.equal(resNoCipher.status, 400);
+
+  const resMissingIv = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...validBase,
+      cipher: { ...validBase.cipher, iv: '' },
+    }),
+  });
+  assert.equal(resMissingIv.status, 400);
+
+  const resBadTagLength = await fetch(`${baseUrl}/instances/inst-val/snapshots/snap-val`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...validBase,
+      cipher: { ...validBase.cipher, tagLength: 0 },
+    }),
+  });
+  assert.equal(resBadTagLength.status, 400);
+});
+
+test('managed API: handles concurrent instance registrations without lost updates (Async Mutex)', async (t) => {
+  const tempDir = createTempDir('test-managed-concurrent-');
+  const app = express();
+  app.use(express.json({ limit: '4mb' }));
+  const router = createManagedHandler({ dataDir: tempDir });
+  app.use('/api/managed', router);
+
+  const server = await new Promise((resolve) => {
+    const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
+  });
+
+  const port = server.address().port;
+  const baseUrl = `http://127.0.0.1:${port}/api/managed`;
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  const CONCURRENCY_COUNT = 20;
+
+  // Fire CONCURRENCY_COUNT requests simultaneously
+  const requests = Array.from({ length: CONCURRENCY_COUNT }, (_, i) => {
+    return fetch(`${baseUrl}/instances`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `inst-conc-${i}`,
+        label: `Concurrent Node ${i}`,
+        url: `http://10.0.0.${i}:3000`,
+        username: `user_${i}`,
+        salt: `c2FsdF9jb25jXzE2Ynl0ZXNf${i}=`,
+      }),
+    });
+  });
+
+  const responses = await Promise.all(requests);
+  for (const res of responses) {
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+  }
+
+  // Verify all CONCURRENCY_COUNT instances are saved with no lost updates
+  const listRes = await fetch(`${baseUrl}/instances`);
+  assert.equal(listRes.status, 200);
+  const instancesList = await listRes.json();
+  assert.equal(instancesList.length, CONCURRENCY_COUNT);
+
+  const savedIds = new Set(instancesList.map((inst) => inst.id));
+  for (let i = 0; i < CONCURRENCY_COUNT; i++) {
+    assert.ok(
+      savedIds.has(`inst-conc-${i}`),
+      `Expected inst-conc-${i} to be present in instances.json`
+    );
+  }
 });
