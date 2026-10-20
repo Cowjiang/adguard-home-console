@@ -21,6 +21,7 @@ import { createAghProxy } from './proxy.mjs'
 import { createVersionHandler } from './version.mjs'
 import { createUpgradeHandler } from './upgrade.mjs'
 import { checkCliUpdate } from './cli-update.mjs'
+import { createManagedHandler } from './managed.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -110,6 +111,9 @@ app.get('/api/system/version', createVersionHandler())
 const { upgradeHandler, statusHandler } = createUpgradeHandler()
 app.post('/api/system/upgrade', upgradeHandler)
 app.get('/api/system/upgrade/status', statusHandler)
+
+// —— Managed mode blind storage (see managed.mjs) ——
+app.use('/api/managed', createManagedHandler())
 
 // —— AGH reverse proxy (see proxy.mjs) ——
 app.use('/api/agh', createAghProxy())

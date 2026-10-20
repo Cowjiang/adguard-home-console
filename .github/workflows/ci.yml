@@ -52,5 +52,11 @@ jobs:
       - name: Frontend build
         run: pnpm build
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright E2E tests
+        run: pnpm test:e2e
+
       - name: Verify npm packaging
         run: pnpm check:pack

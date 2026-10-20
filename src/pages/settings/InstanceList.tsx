@@ -67,8 +67,15 @@ export function ServerSettings() {
               title={it.label}
               subtitle={it.url}
               value={
-                !manage && it.id === activeId ? (
-                  <Badge kind="ok">{t('settings.instancesActive')}</Badge>
+                !manage ? (
+                  <div className="flex items-center gap-1.5">
+                    {it.managed && (
+                      <Badge kind="info">{t('settings.instanceManaged')}</Badge>
+                    )}
+                    {it.id === activeId && (
+                      <Badge kind="ok">{t('settings.instancesActive')}</Badge>
+                    )}
+                  </div>
                 ) : undefined
               }
               right={

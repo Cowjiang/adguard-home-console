@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Layers } from 'lucide-react'
+import { Layers, Lock } from 'lucide-react'
 import { PageHeader, Screen } from '../../components/ui/primitives'
 import { EmptyState, Loading } from '../../components/ui/atoms'
 import { SnapshotDiff } from '../../components/snapshot/SnapshotDiff'
@@ -59,6 +59,12 @@ export function SnapshotDiffPage() {
         <EmptyState
           icon={<Layers size={30} className="text-t3" />}
           title={t('settings.snapshotMissing')}
+        />
+      ) : snapshot.isLocked ? (
+        <EmptyState
+          icon={<Lock size={30} className="text-warn" />}
+          title={t('settings.snapshotLocked')}
+          subtitle={t('settings.snapshotLockedDesc')}
         />
       ) : (
         <SnapshotDiff

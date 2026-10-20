@@ -31,6 +31,7 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 # 施工日志与验收快照仅留本机(见 .agents/README.md 存放约定)
 .agents/logs/
 .agents/reviews/
+.agents/diagrams/
 
 # 本机 agent 工具产物与本地专属规则/备份
 .playwright-mcp/
@@ -38,3 +39,14 @@ src-tauri/gen/apple/adguard-home-console.xcodeproj/
 .impeccable/
 AGENTS.local.md
 .local-backup/
+.seecode/
+
+# Playwright 测试报告与产物
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Console server 本地数据存储与日志
+data/
+*.log

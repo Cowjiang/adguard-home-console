@@ -97,17 +97,27 @@ export interface SnapshotPayload {
   safesearch?: SafeSearchPayload
 }
 
+/** Alias for snapshot configuration payload */
+export type AghConfigSnapshotPayload = SnapshotPayload
+
 export interface AghConfigSnapshot {
   meta: SnapshotMeta
   data: SnapshotPayload
+  /** When true, indicates this managed snapshot was pulled from server but not yet decrypted locally */
+  isLocked?: boolean
 }
 
-export interface ClusterSnapshotBundle {
+export interface SnapshotBundle {
   bundleVersion: '1.0'
   createdAt: string
+  instanceLabel?: string
+  /** Kept for backward compatibility with pre-managed-mode v1.0 bundles */
   clusterName?: string
   snapshots: AghConfigSnapshot[]
 }
+
+/** @deprecated Use SnapshotBundle instead */
+export type ClusterSnapshotBundle = SnapshotBundle
 
 export interface DiffItem {
   module: SnapshotModule
