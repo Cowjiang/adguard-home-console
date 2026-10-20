@@ -45,11 +45,11 @@ export function GeneralSettings() {
         // Refetch before refilling each draft: the server copy becomes its
         // dirty baseline, so a successful save clears the button
         if (ql.dirty && ql.draft) {
-          await api(cfg, '/querylog/config/update', { method: 'PUT', body: { ...ql.draft, ignored: normList(ql.draft.ignored.join('\n')) } })
+          await api(cfg, '/querylog/config/update', { method: 'PUT', body: { ...ql.draft, ignored: normList((ql.draft.ignored ?? []).join('\n')) } })
           ql.reset(await mQl())
         }
         if (sc.dirty && sc.draft) {
-          await api(cfg, '/stats/config/update', { method: 'PUT', body: { ...sc.draft, ignored: normList(sc.draft.ignored.join('\n')) } })
+          await api(cfg, '/stats/config/update', { method: 'PUT', body: { ...sc.draft, ignored: normList((sc.draft.ignored ?? []).join('\n')) } })
           sc.reset(await mSc())
         }
       },
@@ -115,7 +115,7 @@ export function GeneralSettings() {
           <div className="px-4 pb-4 pt-2">
             <textarea
               className="field"
-              value={qlDraft.ignored.join('\n')}
+              value={(qlDraft.ignored ?? []).join('\n')}
               onChange={(e) => ql.patch('ignored', e.target.value.split('\n'))}
               placeholder={t('settings.ignoredDomainsPlaceholder')}
               spellCheck={false}
@@ -166,7 +166,7 @@ export function GeneralSettings() {
           <div className="px-4 pb-4 pt-2">
             <textarea
               className="field"
-              value={scDraft.ignored.join('\n')}
+              value={(scDraft.ignored ?? []).join('\n')}
               onChange={(e) => sc.patch('ignored', e.target.value.split('\n'))}
               placeholder={t('settings.ignoredDomainsPlaceholder')}
               spellCheck={false}

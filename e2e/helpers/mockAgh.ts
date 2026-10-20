@@ -177,30 +177,32 @@ export async function setupAghMock(page: Page, options: MockAghOptions = {}) {
       return;
     }
 
-    // 9. /api/agh/querylog_info
-    if (url.includes('/api/agh/querylog_info')) {
+    // 9. /api/agh/querylog/config & /api/agh/querylog_info
+    if (url.includes('/api/agh/querylog/config') || url.includes('/api/agh/querylog_info')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           enabled: true,
-          interval: 2160,
+          interval: 604800000,
           anonymize_client_ip: false,
           ignored: [],
+          ignored_enabled: false,
         }),
       });
       return;
     }
 
-    // 10. /api/agh/stats_info
-    if (url.includes('/api/agh/stats_info')) {
+    // 10. /api/agh/stats/config & /api/agh/stats_info
+    if (url.includes('/api/agh/stats/config') || url.includes('/api/agh/stats_info')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           enabled: true,
-          interval: 24,
+          interval: 604800000,
           ignored: [],
+          ignored_enabled: false,
         }),
       });
       return;

@@ -46,3 +46,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+
+# Console server 本地数据存储与日志
+data/
+*.log
