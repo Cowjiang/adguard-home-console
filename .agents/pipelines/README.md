@@ -18,6 +18,7 @@
 | 2026-10-18 | feature | [交付 Windows 桌面壳的本地打包路径，并把桌面视口钉在桌面布局宽度](proposals/feature/2026-10-18-windows-desktop-package.md) | implemented |
 | 2026-10-18 | process | [在 release 工作流里构建并附带 Windows 安装包](proposals/process/2026-10-18-release-windows-installers.md) | implemented |
 | 2026-10-18 | bug-fix | [让 Windows 桌面图标带上圆角盘面与透明边距](proposals/bug-fix/2026-10-18-desktop-app-icon-squircle.md) | implemented |
+| 2026-10-21 | process | [让 nightly Release 每次构建重建并刷新发布日期](proposals/process/2026-10-21-nightly-release-recreate.md) | implemented |
 
 ## 与 docs/ 的分工
 
