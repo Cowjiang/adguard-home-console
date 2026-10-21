@@ -1,7 +1,7 @@
 # 引入托管模式：直连 / 托管双形态与端侧零知识加密归属
 
 **Class:** feature
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-17
 **Source:** 用户 2026-10-17 讨论：快照存储在哪 → 服务端安装场景下多浏览器/多设备割裂 → 提出登录双形态（直连 AGH / 填写远端 AGH Console 地址）→ 深入安全威胁建模（不预设内网安全假定、服务端被攻破防泄露）→ 确立客户端利用 AGH 凭据派生密钥的端到端零知识加密（E2EE）托管架构，锁定 WebUI/Node 与 Rust (Tauri) 的 AES-256-GCM 双轨实现
 
