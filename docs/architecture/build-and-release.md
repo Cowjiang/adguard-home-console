@@ -42,7 +42,7 @@ Persistent=true
 
 ### npm / pnpm
 
-`server/npm-upgrade.mjs` 随 npm 包发布，由 `server/upgrade.mjs` 调起：stable 映射 npm dist-tag `latest`，nightly 映射 `nightly`；默认执行 `npm install -g agh-console@<tag>`，`AGH_PACKAGE_MANAGER=pnpm` 时改用 `pnpm add -g`。安装后重启 `AGH_SERVICE_NAME`（默认 `agh-console`）并轮询 `AGH_HEALTH_URL`（默认 `http://127.0.0.1:$PORT/api/health`）；重启或健康检查失败会回装旧版本。
+`server/npm-upgrade.mjs` 随 npm 包发布，由 `server/upgrade.mjs` 调起：stable 映射 npm dist-tag `latest`，nightly 映射 `nightly`；默认执行 `npm install -g agh-console@<tag>`，`AGH_PACKAGE_MANAGER=pnpm` 时改用 `pnpm add -g ... --config.minimumReleaseAge=0`（pnpm 12 的供应链策略否则会把刚发布的 nightly 解析成旧构建）。安装后重启 `AGH_SERVICE_NAME`（默认 `agh-console`）并轮询 `AGH_HEALTH_URL`（默认 `http://127.0.0.1:$PORT/api/health`）；重启或健康检查失败会回装旧版本。
 
 ### 分离执行与状态文件
 
