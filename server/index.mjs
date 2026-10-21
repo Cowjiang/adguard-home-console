@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { createAghProxy } from './proxy.mjs'
 import { createVersionHandler } from './version.mjs'
 import { createUpgradeHandler } from './upgrade.mjs'
+import { createUpdateChannelHandler } from './update-channel.mjs'
 import { checkCliUpdate } from './cli-update.mjs'
 import { createManagedHandler } from './managed.mjs'
 
@@ -108,6 +109,8 @@ app.get('/community-source.json', (_req, res) => {
 app.get('/api/system/version', createVersionHandler())
 
 // System self-upgrade endpoints (guarded by AGH_ENABLE_SELF_UPGRADE)
+// The update channel is persisted server-side so Web clients and timers agree.
+app.post('/api/system/channel', createUpdateChannelHandler())
 const { upgradeHandler, statusHandler } = createUpgradeHandler()
 app.post('/api/system/upgrade', upgradeHandler)
 app.get('/api/system/upgrade/status', statusHandler)

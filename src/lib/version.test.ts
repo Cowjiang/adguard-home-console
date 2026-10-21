@@ -8,6 +8,7 @@ import {
   getUpgradeStatus,
   getStoredUpdateChannel,
   setStoredUpdateChannel,
+  setTargetChannel,
   DEFAULT_RELEASE_LATEST_URL,
   DEFAULT_RELEASE_NIGHTLY_URL,
   UPDATE_CHANNEL_KEY,
@@ -136,7 +137,7 @@ describe('version library', () => {
 
       const result = await fetchSystemVersion({ fetch: mockFetch as any })
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/system/version?channel=stable', expect.any(Object))
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/version', expect.any(Object))
       expect(result).toEqual(mockResponse)
     })
 
@@ -320,6 +321,48 @@ describe('version library', () => {
       expect(res.ok).toBe(true)
       expect(res.status).toBe('running')
       expect(res.logs).toBe('pulling...')
+    })
+
+    it('triggerSelfUpgrade sends the selected channel in the body', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, status: 'started', channel: 'nightly' }),
+      })
+
+      const res = await triggerSelfUpgrade({ fetch: mockFetch as any, channel: 'nightly' })
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'nightly' }),
+      })
+      expect(res.ok).toBe(true)
+      expect(res.channel).toBe('nightly')
+    })
+
+    it('setTargetChannel posts the channel and parses the server target', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ ok: true, targetChannel: 'nightly' }),
+      })
+
+      const res = await setTargetChannel('nightly', { fetch: mockFetch as any })
+      expect(mockFetch).toHaveBeenCalledWith('/api/system/channel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: 'nightly' }),
+      })
+      expect(res).toEqual({ ok: true, targetChannel: 'nightly' })
+    })
+
+    it('setTargetChannel surfaces server errors (e.g. 403 disabled)', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ ok: false, error: 'Self-upgrade is disabled on this server' }),
+      })
+
+      const res = await setTargetChannel('stable', { fetch: mockFetch as any })
+      expect(res).toEqual({ ok: false, error: 'Self-upgrade is disabled on this server' })
     })
   })
 })

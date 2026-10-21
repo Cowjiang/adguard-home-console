@@ -24,6 +24,7 @@ import {
   triggerSelfUpgrade,
   getUpgradeStatus,
   type AppRuntime,
+  type UpdateChannel,
   type VersionManifest,
 } from '../../lib/version'
 import { Badge, IconBubble, Spinner } from '../ui/atoms'
@@ -36,6 +37,8 @@ export interface AppUpdateContentProps {
   runtime: AppRuntime
   currentVersion: string
   canSelfUpgrade?: boolean
+  /** Target channel shown to the user; defaults to the manifest channel. */
+  channel?: UpdateChannel
 }
 
 /** Command / source well: solid elevated surface with an optional action slot */
@@ -110,6 +113,7 @@ export function AppUpdateContent({
   runtime,
   currentVersion,
   canSelfUpgrade,
+  channel,
 }: AppUpdateContentProps) {
   const { t } = useTranslation()
   const confirm = useConfirm()
@@ -144,7 +148,7 @@ export function AppUpdateContent({
       onConfirm: async () => {
         setUpgrading(true)
         toast(t('settings.selfUpgradeStarting'))
-        const res = await triggerSelfUpgrade()
+        const res = await triggerSelfUpgrade({ channel })
         if (!res.ok) {
           setUpgrading(false)
           toast(t('settings.selfUpgradeFailed', { msg: res.error || t('common.unknown', 'Error') }), 'err')
@@ -201,9 +205,9 @@ export function AppUpdateContent({
   }
 
   const dockerComposeCmd = 'docker compose pull && docker compose up -d'
-  const npmCmd = manifest.downloads?.npm
-    ? `npm i -g ${manifest.downloads.npm}`
-    : 'npm i -g agh-console@latest'
+  const activeChannel = channel ?? (manifest.channel === 'nightly' ? 'nightly' : 'stable')
+  const npmDistTag = activeChannel === 'nightly' ? 'nightly' : 'latest'
+  const npmCmd = `npm i -g agh-console@${npmDistTag}`
   const altStoreUrl = manifest.downloads?.ipa
     ? `altstore://install?url=${encodeURIComponent(manifest.downloads.ipa)}`
     : undefined

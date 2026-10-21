@@ -7,7 +7,7 @@
  * - Self-upgrade trigger and status API
  * - Direct remote manifest fetch on Tauri (runtime='ios')
  * - Server proxy fetch on Web/PWA (/api/system/version)
- * - Channel selection: stable vs nightly with local persistence
+ * - Channel selection: server-persisted target on Web, localStorage on Tauri/iOS
  * - Semver comparison
  * - Graceful error resilience without crashing the UI
  */
@@ -63,10 +63,15 @@ export interface VersionManifest {
 
 export type AppRuntime = 'docker' | 'systemd' | 'npm' | 'standalone' | 'ios'
 
+export type UpdateChannelSource = 'query' | 'state' | 'env' | 'option' | 'installed'
+
 export interface SystemVersionResponse {
   ok: boolean
   currentVersion: string
   channel: string
+  /** Server-persisted target channel; absent when the server has not chosen one. */
+  targetChannel?: UpdateChannel | null
+  channelSource?: UpdateChannelSource
   runtime: AppRuntime
   canSelfUpgrade?: boolean
   hasUpdate: boolean
@@ -82,6 +87,8 @@ export interface UpgradeStatusResponse {
   exitCode?: number | null
   logs?: string
   error?: string | null
+  channel?: UpdateChannel | null
+  detached?: boolean
 }
 
 export const DEFAULT_UPDATE_MANIFEST_URL =
@@ -181,13 +188,16 @@ export async function fetchSystemVersion(
 ): Promise<SystemVersionResponse> {
   const isTauri = isTauriShell()
   const currentVersion = APP_VERSION
-  const channel = opts?.channel ?? getStoredUpdateChannel()
+  // On Web the server owns the target channel: only forward an explicit
+  // request channel, otherwise let /api/system/version resolve persisted state.
+  const localChannel = opts?.channel ?? getStoredUpdateChannel()
+  const requestChannel = opts?.channel
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const fetchFn = opts?.fetch ?? globalThis.fetch
 
   if (isTauri) {
     try {
-      const defaultUrl = channel === 'nightly' ? DEFAULT_RELEASE_NIGHTLY_URL : DEFAULT_RELEASE_LATEST_URL
+      const defaultUrl = localChannel === 'nightly' ? DEFAULT_RELEASE_NIGHTLY_URL : DEFAULT_RELEASE_LATEST_URL
       const updateUrl = opts?.updateUrl ?? defaultUrl
       const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
       const response = await fetchFn(updateUrl, { signal })
@@ -202,7 +212,7 @@ export async function fetchSystemVersion(
       return {
         ok: true,
         currentVersion,
-        channel,
+        channel: localChannel,
         runtime: 'ios',
         canSelfUpgrade: false,
         hasUpdate,
@@ -212,7 +222,7 @@ export async function fetchSystemVersion(
       return {
         ok: true,
         currentVersion,
-        channel,
+        channel: localChannel,
         runtime: 'ios',
         canSelfUpgrade: false,
         checkFailed: true,
@@ -226,7 +236,7 @@ export async function fetchSystemVersion(
   try {
     const params = new URLSearchParams()
     if (opts?.force) params.set('force', '1')
-    if (channel) params.set('channel', channel)
+    if (requestChannel) params.set('channel', requestChannel)
     const qs = params.toString() ? `?${params.toString()}` : ''
     const url = `/api/system/version${qs}`
     const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined
@@ -240,7 +250,7 @@ export async function fetchSystemVersion(
     return {
       ok: true,
       currentVersion,
-      channel,
+      channel: localChannel,
       runtime: 'standalone',
       canSelfUpgrade: false,
       checkFailed: true,
@@ -250,13 +260,22 @@ export async function fetchSystemVersion(
   }
 }
 
+export interface TriggerSelfUpgradeOptions {
+  fetch?: typeof fetch
+  channel?: UpdateChannel
+}
+
 /**
- * Triggers server self-upgrade via POST /api/system/upgrade
+ * Triggers server self-upgrade via POST /api/system/upgrade.
+ * The selected channel travels in the body so the server installs the same
+ * channel the UI just showed.
  */
-export async function triggerSelfUpgrade(opts?: { fetch?: typeof fetch }): Promise<{
+export async function triggerSelfUpgrade(opts?: TriggerSelfUpgradeOptions): Promise<{
   ok: boolean
   status?: string
   message?: string
+  channel?: UpdateChannel
+  detached?: boolean
   error?: string
 }> {
   const fetchFn = opts?.fetch ?? globalThis.fetch
@@ -264,12 +283,38 @@ export async function triggerSelfUpgrade(opts?: { fetch?: typeof fetch }): Promi
     const response = await fetchFn('/api/system/upgrade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      ...(opts?.channel ? { body: JSON.stringify({ channel: opts.channel }) } : {}),
     })
     const data = await response.json()
     if (!response.ok) {
       return { ok: false, error: data?.error || `HTTP ${response.status}` }
     }
     return data
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Persists the target update channel on the server (Web). Tauri/iOS shells
+ * stay on localStorage because they never talk to this server endpoint.
+ */
+export async function setTargetChannel(
+  channel: UpdateChannel,
+  opts?: { fetch?: typeof fetch }
+): Promise<{ ok: boolean; targetChannel?: UpdateChannel; error?: string }> {
+  const fetchFn = opts?.fetch ?? globalThis.fetch
+  try {
+    const response = await fetchFn('/api/system/channel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel }),
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      return { ok: false, error: data?.error || `HTTP ${response.status}` }
+    }
+    return { ok: true, targetChannel: data?.targetChannel === 'nightly' ? 'nightly' : 'stable' }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

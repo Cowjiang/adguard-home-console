@@ -14,6 +14,7 @@
 - 网卡名条目经 `os.networkInterfaces()` 解析；地址变化时每 60 秒轮询并重新绑定，网卡暂无 IPv4 或端口占用时 10 秒后重试。
 - 启动前加载仓库根 `.env`，不覆盖已存在的环境变量；`AGH_DEFAULT_URL` 经 `GET /api/config` 作为默认实例地址下发给前端。
 - 托管模式盲存储数据目录按优先级解析：`options.dataDir > env.AGH_DATA_DIR > env.DATA_DIR > <ROOT>/data`（Docker 镜像默认为 `/app/data` 并暴露为数据卷）。直连模式下服务端不产生任何磁盘写入。
+- 更新渠道与升级状态使用 `AGH_STATE_DIR`（回退 `AGH_DATA_DIR`、`/var/lib/agh-console`、用户状态目录），与更新检查、自升级共用，详见 `docs/architecture/build-and-release.md`。
 
 ## 路由
 
@@ -21,6 +22,9 @@
 | --- | --- |
 | `GET /api/health` | `{ok, name, time}` |
 | `GET /api/config` | `{defaultUrl}` |
+| `GET /api/system/version` | 版本清单检查；渠道来自查询参数、持久化状态或环境默认值 |
+| `POST /api/system/channel` | 持久化目标更新渠道（需 `AGH_ENABLE_SELF_UPGRADE`） |
+| `POST /api/system/upgrade`、`GET /api/system/upgrade/status` | 自升级触发与状态（同一开关），详见 `docs/architecture/build-and-release.md` |
 | `app.use('/api/managed', …)` | 托管模式零知识盲存储（实例清单与端侧 E2EE 密文快照），持久化至 `AGH_DATA_DIR`（默认 `<ROOT>/data`） |
 | `app.use('/api/agh', …)` | AGH 代理，见下节 |
 | `express.static(dist, {maxAge:'1h', index:false})` | 静态资源缓存 1 小时 |

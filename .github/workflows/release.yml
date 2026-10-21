@@ -179,7 +179,9 @@ jobs:
         run: node scripts/check-npm-pack.mjs
 
       - name: Package the release tarball
-        run: tar czf agh-console.tar.gz dist server package.json
+        # server-pull.sh is the tarball updater and must ship inside the
+        # archive so /opt/agh-console/scripts/server-pull.sh exists at runtime.
+        run: tar czf agh-console.tar.gz dist server package.json scripts/server-pull.sh
 
       - uses: actions/upload-artifact@v7
         with:

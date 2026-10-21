@@ -144,6 +144,13 @@ All environment variables are optional. The server also reads a `.env` file in t
 | `HOSTS` | all interfaces | Comma-separated bind addresses or interface names (e.g. `127.0.0.1,tailscale0`); interface names re-resolve on address change |
 | `AGH_DEFAULT_URL` | — | Prefills the AGH address on the login page; switching instances is just entering another address |
 | `AGH_DATA_DIR` | `<ROOT>/data` (Docker: `/app/data`) | Directory for managed mode zero-knowledge blind storage (encrypted snapshots & instance metadata) |
+| `AGH_ENABLE_SELF_UPGRADE` | — | `1` enables the channel and self-upgrade endpoints; keep the listener on trusted networks |
+| `AGH_UPDATE_CHANNEL` | `stable` | Fallback update channel when the server has no persisted choice |
+| `AGH_STATE_DIR` | `/var/lib/agh-console` | State directory for `deployed-tag`, `update-channel`, upgrade status and logs; falls back to `AGH_DATA_DIR`, then the user state dir |
+| `AGH_DEPLOYMENT` | `auto` | Updater selection: `tarball`, `npm`, or `docker` |
+| `AGH_PACKAGE_MANAGER` | `npm` | Set to `pnpm` for pnpm global installs |
+| `AGH_SERVICE_NAME` | `agh-console` | systemd unit restarted after a self-upgrade |
+| `AGH_UPGRADE_SCRIPT` | — | Custom shell updater with highest priority; receives `AGH_UPGRADE_CHANNEL` |
 
 ### Access from your LAN
 
