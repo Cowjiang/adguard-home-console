@@ -8,13 +8,14 @@ import { PageHeader, Screen, Group, GroupTitle, Rows, Row } from '../../componen
 import { usePick, PickSelect } from '../../components/ui/menu'
 import { useSheet } from '../../components/ui/sheet'
 import { toast } from '../../components/ui/toast'
-import { isAppleMobile } from '../../lib/native/shell'
+import { isAppleMobile, isTauriShell } from '../../lib/native/shell'
 import { useIsDesktop } from '../../lib/useIsDesktop'
 import { APP_NAME, APP_VERSION } from '../../lib/constants'
 import {
   fetchSystemVersion,
   getStoredUpdateChannel,
   setStoredUpdateChannel,
+  setTargetChannel,
   type UpdateChannel,
   type SystemVersionResponse,
 } from '../../lib/version'
@@ -47,6 +48,7 @@ export function AboutSettings() {
           runtime={data.runtime}
           currentVersion={data.currentVersion}
           canSelfUpgrade={data.canSelfUpgrade}
+          channel={data.targetChannel ?? (data.channel === 'nightly' ? 'nightly' : 'stable')}
           onClose={sheet.close}
         />,
         { title: t('settings.updateDetails') }
@@ -57,12 +59,27 @@ export function AboutSettings() {
     }
   }
 
-  async function handleCheckUpdate(force = false, targetChannel: UpdateChannel = channel) {
+  function applyResolvedChannel(res: SystemVersionResponse) {
+    const resolved = res.targetChannel
+    if (resolved === 'stable' || resolved === 'nightly') {
+      setChannel(resolved)
+      setStoredUpdateChannel(resolved)
+    }
+  }
+
+  async function handleCheckUpdate(force = false, targetChannel?: UpdateChannel) {
     if (checking) return
     setChecking(true)
     try {
-      const res = await fetchSystemVersion({ force, channel: targetChannel })
+      // Web defers to the server-persisted target unless a channel is explicit;
+      // deployments without self-upgrade keep the original per-browser choice.
+      const localOnly =
+        isTauriShell() ||
+        (versionData !== null && (versionData.canSelfUpgrade !== true || !versionData.targetChannel))
+      const requested = targetChannel ?? (localOnly ? channel : undefined)
+      const res = await fetchSystemVersion(requested ? { force, channel: requested } : { force })
       setVersionData(res)
+      applyResolvedChannel(res)
       if (force) {
         if (res.checkFailed) {
           toast(t('settings.appUpdateFailed', { msg: res.error || t('common.unknown', 'Error') }), 'err')
@@ -83,20 +100,46 @@ export function AboutSettings() {
     }
   }
 
-  function handleChannelChange(newChannel: UpdateChannel) {
+  async function handleChannelChange(newChannel: UpdateChannel) {
     if (newChannel === channel) return
     setStoredUpdateChannel(newChannel)
     setChannel(newChannel)
     const label = newChannel === 'nightly' ? t('settings.channelNightly') : t('settings.channelStable')
     toast(t('settings.channelChanged', { channel: label }), 'ok')
+
+    if (isTauriShell() || (versionData !== null && versionData.canSelfUpgrade !== true)) {
+      handleCheckUpdate(true, newChannel)
+      return
+    }
+
+    const saved = await setTargetChannel(newChannel)
+    if (saved.ok) {
+      handleCheckUpdate(true)
+      return
+    }
+
+    // Self-upgrade disabled or server offline: the browser choice still drives
+    // the check, but the timer and one-click upgrade keep the old target.
+    toast(t('settings.channelPersistFailed', { msg: saved.error || t('common.unknown', 'Error') }), 'err')
     handleCheckUpdate(true, newChannel)
   }
 
   useEffect(() => {
     let active = true
-    fetchSystemVersion({ channel })
+    fetchSystemVersion()
       .then((res) => {
-        if (active) setVersionData(res)
+        if (!active) return
+        setVersionData(res)
+        applyResolvedChannel(res)
+        if (!isTauriShell() && !res.targetChannel) {
+          const stored = getStoredUpdateChannel()
+          setChannel(stored)
+          fetchSystemVersion({ channel: stored })
+            .then((localRes) => {
+              if (active) setVersionData(localRes)
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => {})
     return () => {

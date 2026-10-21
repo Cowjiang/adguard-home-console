@@ -35,6 +35,10 @@ function mockReqRes(query = {}) {
   };
 }
 
+function createHandler(options = {}) {
+  return createVersionHandler({ readTargetChannel: () => null, ...options });
+}
+
 const mockManifest = {
   schemaVersion: '1.0',
   appName: 'agh-console',
@@ -99,10 +103,10 @@ test('versionHandler: detects available update and reflects canSelfUpgrade', asy
     };
   };
 
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.2.1',
     channel: 'stable',
-    detectRuntime: () => 'docker',
+    detectRuntime: () => 'systemd',
     env: { AGH_ENABLE_SELF_UPGRADE: '1' },
     fetch: mockFetch,
   });
@@ -114,7 +118,7 @@ test('versionHandler: detects available update and reflects canSelfUpgrade', asy
   assert.equal(ctx.response.ok, true);
   assert.equal(ctx.response.currentVersion, '0.2.1');
   assert.equal(ctx.response.channel, 'stable');
-  assert.equal(ctx.response.runtime, 'docker');
+  assert.equal(ctx.response.runtime, 'systemd');
   assert.equal(ctx.response.canSelfUpgrade, true);
   assert.equal(ctx.response.hasUpdate, true);
   assert.deepEqual(ctx.response.latest, mockManifest);
@@ -122,7 +126,7 @@ test('versionHandler: detects available update and reflects canSelfUpgrade', asy
 });
 
 test('versionHandler: current version is up to date (hasUpdate: false, canSelfUpgrade defaults to false)', async () => {
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.3.0',
     channel: 'stable',
     env: {},
@@ -153,7 +157,7 @@ test('versionHandler: caches manifest for 12 hours', async () => {
     };
   };
 
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.2.1',
     cacheTtlMs: CACHE_TTL_MS,
     now: () => currentTime,
@@ -202,7 +206,7 @@ test('versionHandler: allows selecting channel via req.query.channel and isolate
     };
   };
 
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.2.1',
     fetch: mockFetch,
   });
@@ -230,7 +234,7 @@ test('versionHandler: allows selecting channel via req.query.channel and isolate
 });
 
 test('versionHandler: error resilience when remote is unreachable', async () => {
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.2.1',
     channel: 'stable',
     detectRuntime: () => 'standalone',
@@ -253,7 +257,7 @@ test('versionHandler: error resilience when remote is unreachable', async () => 
 });
 
 test('versionHandler: error resilience when upstream returns HTTP error status', async () => {
-  const handler = createVersionHandler({
+  const handler = createHandler({
     currentVersion: '0.2.1',
     fetch: async () => ({
       ok: false,
@@ -268,4 +272,92 @@ test('versionHandler: error resilience when upstream returns HTTP error status',
   assert.equal(ctx.response.ok, true);
   assert.equal(ctx.response.checkFailed, true);
   assert.match(ctx.response.error, /HTTP 404/);
+});
+
+test('versionHandler: persisted target channel wins without a query parameter', async () => {
+  const handler = createVersionHandler({
+    currentVersion: '0.2.1',
+    detectRuntime: () => 'standalone',
+    env: {},
+    readTargetChannel: () => 'nightly',
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ ...mockManifest, channel: 'nightly', version: '0.3.0-nightly.1' }),
+    }),
+  });
+
+  const ctx = mockReqRes();
+  await handler(ctx.req, ctx.res);
+
+  assert.equal(ctx.response.channel, 'nightly');
+  assert.equal(ctx.response.channelSource, 'state');
+  assert.equal(ctx.response.targetChannel, 'nightly');
+});
+
+test('versionHandler: a query channel overrides the persisted target for one request', async () => {
+  const handler = createVersionHandler({
+    currentVersion: '0.2.1',
+    detectRuntime: () => 'standalone',
+    env: {},
+    readTargetChannel: () => 'nightly',
+    fetch: async () => ({ ok: true, json: async () => mockManifest }),
+  });
+
+  const ctx = mockReqRes({ channel: 'stable' });
+  await handler(ctx.req, ctx.res);
+
+  assert.equal(ctx.response.channel, 'stable');
+  assert.equal(ctx.response.channelSource, 'query');
+  assert.equal(ctx.response.targetChannel, 'nightly');
+});
+
+test('versionHandler: AGH_UPDATE_CHANNEL and installed version provide the remaining fallbacks', async () => {
+  const envHandler = createVersionHandler({
+    currentVersion: '0.2.1',
+    env: { AGH_UPDATE_CHANNEL: 'nightly' },
+    readTargetChannel: () => null,
+    detectRuntime: () => 'standalone',
+    fetch: async () => ({ ok: true, json: async () => mockManifest }),
+  });
+  const envCtx = mockReqRes();
+  await envHandler(envCtx.req, envCtx.res);
+  assert.equal(envCtx.response.channel, 'nightly');
+  assert.equal(envCtx.response.channelSource, 'env');
+
+  const nightlyHandler = createVersionHandler({
+    currentVersion: '0.2.1-nightly.20261020.97eb214',
+    env: {},
+    readTargetChannel: () => null,
+    detectRuntime: () => 'standalone',
+    fetch: async () => ({ ok: true, json: async () => mockManifest }),
+  });
+  const nightlyCtx = mockReqRes();
+  await nightlyHandler(nightlyCtx.req, nightlyCtx.res);
+  assert.equal(nightlyCtx.response.channel, 'nightly');
+  assert.equal(nightlyCtx.response.channelSource, 'installed');
+});
+
+test('versionHandler: canSelfUpgrade requires a restartable deployment', async () => {
+  const fetchOk = async () => ({ ok: true, json: async () => mockManifest });
+  const dockerHandler = createVersionHandler({
+    currentVersion: '0.2.1',
+    env: { AGH_ENABLE_SELF_UPGRADE: '1' },
+    detectRuntime: () => 'docker',
+    readTargetChannel: () => null,
+    fetch: fetchOk,
+  });
+  const dockerCtx = mockReqRes();
+  await dockerHandler(dockerCtx.req, dockerCtx.res);
+  assert.equal(dockerCtx.response.canSelfUpgrade, false);
+
+  const systemdHandler = createVersionHandler({
+    currentVersion: '0.2.1',
+    env: { AGH_ENABLE_SELF_UPGRADE: '1' },
+    detectRuntime: () => 'systemd',
+    readTargetChannel: () => null,
+    fetch: fetchOk,
+  });
+  const systemdCtx = mockReqRes();
+  await systemdHandler(systemdCtx.req, systemdCtx.res);
+  assert.equal(systemdCtx.response.canSelfUpgrade, true);
 });

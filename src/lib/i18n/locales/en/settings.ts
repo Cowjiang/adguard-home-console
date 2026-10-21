@@ -114,6 +114,7 @@ const enSettings = {
   channelStableDesc: 'Official releases, recommended for daily use',
   channelNightlyDesc: 'Early access to the latest features and fixes',
   channelChanged: 'Switched to {{channel}} channel',
+  channelPersistFailed: 'Server did not save the channel, this browser only: {{msg}}',
   checkAppUpdate: 'Check for Console Updates',
   checkingAppUpdate: 'Checking...',
   appUpToDate: 'Console is up to date',

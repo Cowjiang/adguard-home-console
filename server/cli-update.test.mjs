@@ -177,6 +177,38 @@ test('checkCliUpdate: does not show banner if current version is up to date or n
   }
 });
 
+test('checkCliUpdate: follows the persisted channel and prints its dist-tag', async () => {
+  const tmpCache = path.join(os.tmpdir(), `test-agh-cache-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agh-cli-state-'));
+  fs.writeFileSync(path.join(stateDir, 'update-channel'), 'nightly\n');
+  const logs = [];
+  const urls = [];
+
+  const mockFetch = async (url) => {
+    urls.push(String(url));
+    return { ok: true, json: async () => ({ version: '0.3.0-nightly.1' }) };
+  };
+
+  try {
+    const res = await checkCliUpdate({
+      isTTY: true,
+      env: {},
+      currentVersion: '0.2.1',
+      stateDir,
+      cacheFile: tmpCache,
+      fetch: mockFetch,
+      log: (msg) => logs.push(msg),
+    });
+
+    assert.equal(res.channel, 'nightly');
+    assert.match(urls[0], /\/nightly\/version\.json$/);
+    assert.match(logs[0], /agh-console@nightly/);
+  } finally {
+    if (fs.existsSync(tmpCache)) fs.unlinkSync(tmpCache);
+    fs.rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
 test('checkCliUpdate: error resilience on network or HTTP failure', async () => {
   const tmpCache = path.join(os.tmpdir(), `test-agh-cache-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
   const logs = [];

@@ -20,6 +20,7 @@
 | 2026-10-18 | bug-fix | [让 Windows 桌面图标带上圆角盘面与透明边距](proposals/bug-fix/2026-10-18-desktop-app-icon-squircle.md) | implemented |
 | 2026-10-21 | process | [让 nightly Release 每次构建重建并刷新发布日期](proposals/process/2026-10-21-nightly-release-recreate.md) | implemented |
 | 2026-10-21 | process | [规范 Docker 托管模式盲存储数据卷挂载与文档对齐](proposals/process/2026-10-21-docker-managed-mode-storage.md) | implemented |
+| 2026-10-21 | feature | [让更新渠道贯通服务端与按渠道执行升级](proposals/feature/2026-10-21-channel-aware-update-upgrade.md) | proposed |
 
 ## 与 docs/ 的分工
 

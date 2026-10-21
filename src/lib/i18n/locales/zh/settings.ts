@@ -114,6 +114,7 @@ const zhSettings = {
   channelStableDesc: '官方正式发布，推荐日常使用',
   channelNightlyDesc: '抢先体验最新特性与实验性改动',
   channelChanged: '已切换至{{channel}}通道',
+  channelPersistFailed: '服务端未保存渠道，仅当前浏览器生效：{{msg}}',
   checkAppUpdate: '检查控制台更新',
   checkingAppUpdate: '正在检查更新...',
   appUpToDate: '控制台已是最新版本',
