@@ -42,7 +42,12 @@ RUN PNPM_VERSION="$(node -p 'require("./package.json").packageManager.split("@")
 COPY server ./server
 COPY --from=build /app/dist ./dist
 
-# Stateless by design: no volumes, no local writes; env carries configuration
+# Persistent data directory for managed mode blind storage (E2EE snapshots & instance metadata).
+# In direct mode, no data is written to disk.
+RUN mkdir -p /app/data && chown -R node:node /app/data
+ENV AGH_DATA_DIR=/app/data
+VOLUME /app/data
+
 ENV PORT=8787
 EXPOSE 8787
 USER node

@@ -9,7 +9,7 @@
 | 2026-10-17 | bug-fix | [修掉同期批次（快照/更新/测速/同步/透视）页面的设计体系失配](proposals/bug-fix/2026-10-17-batch-ui-design-conformance.md) | implemented |
 | 2026-10-17 | bug-fix | [按「小面板可浮窗、超过半屏走子页」校准移动端面板形态](proposals/bug-fix/2026-10-17-mobile-content-sheets-to-subpages.md) | implemented |
 | 2026-10-17 | bug-fix | [修掉概览页移动端英文文案的两处溢出](proposals/bug-fix/2026-10-17-mobile-overview-en-overflow.md) | implemented |
-| 2026-10-17 | feature | [引入托管模式：直连 / 托管双形态与快照归属](proposals/feature/2026-10-17-console-managed-mode.md) | proposed |
+| 2026-10-17 | feature | [引入托管模式：直连 / 托管双形态与快照归属](proposals/feature/2026-10-17-console-managed-mode.md) | implemented |
 | 2026-10-18 | bug-fix | [让移动端趋势卡不再与图例打架，并统一图表的语义配色](proposals/bug-fix/2026-10-18-mobile-trend-legend-and-chart-colors.md) | implemented |
 | 2026-10-18 | bug-fix | [修掉 iOS 原生顶栏按钮按文字固有宽度溢出、压住同槽位按钮与标题的问题](proposals/bug-fix/2026-10-18-native-header-button-overflow.md) | implemented |
 | 2026-10-18 | bug-fix | [把过滤器子页的「同步到其他实例」从页头收进页底行卡片](proposals/bug-fix/2026-10-18-filter-subpage-sync-entry.md) | implemented |
@@ -19,6 +19,7 @@
 | 2026-10-18 | process | [在 release 工作流里构建并附带 Windows 安装包](proposals/process/2026-10-18-release-windows-installers.md) | implemented |
 | 2026-10-18 | bug-fix | [让 Windows 桌面图标带上圆角盘面与透明边距](proposals/bug-fix/2026-10-18-desktop-app-icon-squircle.md) | implemented |
 | 2026-10-21 | process | [让 nightly Release 每次构建重建并刷新发布日期](proposals/process/2026-10-21-nightly-release-recreate.md) | implemented |
+| 2026-10-21 | process | [规范 Docker 托管模式盲存储数据卷挂载与文档对齐](proposals/process/2026-10-21-docker-managed-mode-storage.md) | implemented |
 
 ## 与 docs/ 的分工
 

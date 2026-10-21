@@ -1,11 +1,11 @@
 # Web/PWA 运行时
 
 **Status:** current
-**Updated:** 2026-10-06
+**Updated:** 2026-10-21
 
-生产形态只有一个 Node 进程：`server/index.mjs` 托管 `dist/` 并把 `/api/agh/*` 反代到目标 AGH。开发形态是 Vite dev server 加同一个进程。
+生产形态只有一个 Node 进程：`server/index.mjs` 托管 `dist/`、把 `/api/agh/*` 反代到目标 AGH，并在托管模式下提供 `/api/managed/*` 零知识盲存储。开发形态是 Vite dev server 加同一个进程。
 
-代码入口：`server/index.mjs`、`vite.config.ts`、`index.html`、`package.json`。
+代码入口：`server/index.mjs`、`server/managed.mjs`、`vite.config.ts`、`index.html`、`package.json`。
 
 ## 进程与监听
 
@@ -13,6 +13,7 @@
 - `HOSTS` 是逗号分隔的绑定地址，既接受 IPv4 字面量也接受网卡名（如 `tailscale0`）；为空时监听全部网卡。
 - 网卡名条目经 `os.networkInterfaces()` 解析；地址变化时每 60 秒轮询并重新绑定，网卡暂无 IPv4 或端口占用时 10 秒后重试。
 - 启动前加载仓库根 `.env`，不覆盖已存在的环境变量；`AGH_DEFAULT_URL` 经 `GET /api/config` 作为默认实例地址下发给前端。
+- 托管模式盲存储数据目录按优先级解析：`options.dataDir > env.AGH_DATA_DIR > env.DATA_DIR > <ROOT>/data`（Docker 镜像默认为 `/app/data` 并暴露为数据卷）。直连模式下服务端不产生任何磁盘写入。
 
 ## 路由
 
@@ -20,6 +21,7 @@
 | --- | --- |
 | `GET /api/health` | `{ok, name, time}` |
 | `GET /api/config` | `{defaultUrl}` |
+| `app.use('/api/managed', …)` | 托管模式零知识盲存储（实例清单与端侧 E2EE 密文快照），持久化至 `AGH_DATA_DIR`（默认 `<ROOT>/data`） |
 | `app.use('/api/agh', …)` | AGH 代理，见下节 |
 | `express.static(dist, {maxAge:'1h', index:false})` | 静态资源缓存 1 小时 |
 | SPA 回退 | 非 GET 或 `/api/` 前缀放行；其余返回 `dist/index.html`，文件缺失时 503 |
