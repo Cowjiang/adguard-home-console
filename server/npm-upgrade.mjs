@@ -172,8 +172,22 @@ export async function runNpmUpgrade(options = {}) {
   return 0;
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-if (isDirectRun) {
+/**
+ * pnpm's node_modules layout makes the package directory a symlink. Node ESM
+ * reports import.meta.url through the real path while argv keeps the symlink,
+ * so compare real paths before deciding whether this file was executed.
+ */
+export function isDirectExecution(argv1 = process.argv[1], moduleUrl = import.meta.url) {
+  if (!argv1) return false;
+  const entry = fileURLToPath(moduleUrl);
+  try {
+    return fs.realpathSync(argv1) === fs.realpathSync(entry);
+  } catch {
+    return path.resolve(argv1) === path.resolve(entry);
+  }
+}
+
+if (isDirectExecution()) {
   runNpmUpgrade({ argv: process.argv.slice(2) })
     .then((code) => process.exit(code))
     .catch((err) => {

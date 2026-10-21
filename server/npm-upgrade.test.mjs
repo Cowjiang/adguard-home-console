@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   buildInstallArgs,
+  isDirectExecution,
   channelDistTag,
   packageManager,
   parseChannel,
@@ -50,6 +52,18 @@ test('packageManager defaults to npm and supports pnpm explicitly', () => {
 test('resolveHealthUrl honors AGH_HEALTH_URL and PORT', () => {
   assert.equal(resolveHealthUrl({ AGH_HEALTH_URL: 'http://127.0.0.1:9999/health' }), 'http://127.0.0.1:9999/health');
   assert.equal(resolveHealthUrl({ PORT: '9000' }), 'http://127.0.0.1:9000/api/health');
+});
+
+test('isDirectExecution: follows symlinked package paths', () => {
+  const dir = tempDir();
+  const real = path.join(dir, 'real.mjs');
+  fs.writeFileSync(real, '');
+  const link = path.join(dir, 'link.mjs');
+  fs.symlinkSync(real, link);
+
+  assert.equal(isDirectExecution(link, pathToFileURL(real).href), true);
+  assert.equal(isDirectExecution(path.join(dir, 'other.mjs'), pathToFileURL(real).href), false);
+  assert.equal(isDirectExecution('', pathToFileURL(real).href), false);
 });
 
 test('runNpmUpgrade: installs the nightly dist-tag without restarting', async () => {
