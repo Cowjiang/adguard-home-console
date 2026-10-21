@@ -46,7 +46,12 @@ export function packageManager(env = process.env) {
 
 export function buildInstallArgs({ manager = 'npm', channel = 'stable', version, packageName = PACKAGE_NAME } = {}) {
   const target = version ? `${packageName}@${version}` : `${packageName}@${channelDistTag(channel)}`;
-  return manager === 'pnpm' ? ['add', '-g', target] : ['install', '-g', target];
+  if (manager === 'pnpm') {
+    // pnpm 12's minimumReleaseAge would otherwise resolve a freshly published
+    // nightly dist-tag to an older build that passed the age policy.
+    return ['add', '-g', target, '--config.minimumReleaseAge=0'];
+  }
+  return ['install', '-g', target];
 }
 
 export function readInstalledVersion() {

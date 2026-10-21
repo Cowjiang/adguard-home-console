@@ -22,7 +22,12 @@ test('channelDistTag / buildInstallArgs map stable and nightly to dist-tags', ()
   assert.equal(channelDistTag('nightly'), 'nightly');
   assert.deepEqual(buildInstallArgs({ manager: 'npm', channel: 'stable' }), ['install', '-g', 'agh-console@latest']);
   assert.deepEqual(buildInstallArgs({ manager: 'npm', channel: 'nightly' }), ['install', '-g', 'agh-console@nightly']);
-  assert.deepEqual(buildInstallArgs({ manager: 'pnpm', channel: 'nightly' }), ['add', '-g', 'agh-console@nightly']);
+  assert.deepEqual(buildInstallArgs({ manager: 'pnpm', channel: 'nightly' }), [
+    'add',
+    '-g',
+    'agh-console@nightly',
+    '--config.minimumReleaseAge=0',
+  ]);
   assert.deepEqual(buildInstallArgs({ manager: 'npm', version: '0.2.1' }), ['install', '-g', 'agh-console@0.2.1']);
 });
 
@@ -88,7 +93,10 @@ test('runNpmUpgrade: pnpm install, restart and health check', async () => {
   });
 
   assert.equal(code, 0);
-  assert.deepEqual(calls[0], { cmd: 'pnpm', args: ['add', '-g', 'agh-console@latest'] });
+  assert.deepEqual(calls[0], {
+    cmd: 'pnpm',
+    args: ['add', '-g', 'agh-console@latest', '--config.minimumReleaseAge=0'],
+  });
   assert.ok(calls.some((call) => call.cmd === 'systemctl' && call.args[0] === 'restart' && call.args[1] === 'agh-console'));
   assert.ok(calls.some((call) => call.cmd === 'systemctl' && call.args[0] === 'is-active'));
 });
