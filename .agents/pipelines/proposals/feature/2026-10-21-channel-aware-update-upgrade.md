@@ -1,9 +1,9 @@
 # 让更新渠道贯通服务端与按渠道执行升级
 
 **Class:** feature
-**Status:** proposed
+**Status:** implemented
 **Date:** 2026-10-21
-**Updated:** 2026-10-21（并入 Docker `AGH_DATA_DIR` 对齐与服务器级渠道的多设备语义；实现完成，待部署验证）
+**Updated:** 2026-10-21（并入 Docker `AGH_DATA_DIR` 对齐与服务器级渠道的多设备语义；实现与部署验证完成）
 **Source:** 用户要求进入方案 B：把「关于」页的渠道选择与一键升级真正落到服务端和升级脚本。2026-10-21 的部署验证确认了两个断点：渠道只写浏览器 localStorage，升级请求不携带渠道。
 
 ## Goal
@@ -73,19 +73,19 @@
 
 ## Accept
 
-- [ ] 在 Web 上切换渠道后，服务端写入 `update-channel`；新开浏览器/清理站点数据后仍显示同一目标渠道。
-- [ ] 设置 `AGH_DATA_DIR`（模拟 Docker `/app/data`）时 `update-channel` 落在该目录，未设置时回落到 `/var/lib/agh-console` 或用户状态目录。
-- [ ] 托管模式多浏览器/多设备看到同一 `targetChannel`；`?channel=` 单次检查另一渠道不改变持久化值。
-- [ ] `GET /api/system/version` 返回 `targetChannel`；查询参数、持久化渠道、`AGH_UPDATE_CHANNEL`、安装版本四种来源的优先级有单测覆盖。
-- [ ] `POST /api/system/channel` 校验渠道与自升级开关（400/403），写入失败返回可读错误且不破坏服务。
-- [ ] `POST /api/system/upgrade` 接受渠道并注入 `AGH_UPGRADE_CHANNEL`；不带 body 的旧请求仍可工作；状态接口返回本次渠道。
-- [ ] `scripts/server-pull.sh --channel nightly --dry-run` 指向 nightly 清单与标签，`--check` 按渠道比较 `deployed-tag`；stable 行为不回归。
-- [ ] npm/pnpm 执行器能把目标 dist-tag 安装到全局目录，重启 unit 并在失败时回滚；`AGH_PACKAGE_MANAGER=pnpm` 路径有验证记录。
-- [ ] 不带渠道参数的 timer 运行会读取持久化渠道（dry-run 或日志证据），切换渠道后下一轮跟随新渠道。
+- [x] 在 Web 上切换渠道后，服务端写入 `update-channel`；新开浏览器/清理站点数据后仍显示同一目标渠道。
+- [x] 设置 `AGH_DATA_DIR`（模拟 Docker `/app/data`）时 `update-channel` 落在该目录，未设置时回落到 `/var/lib/agh-console` 或用户状态目录。
+- [x] 托管模式多浏览器/多设备看到同一 `targetChannel`；`?channel=` 单次检查另一渠道不改变持久化值。
+- [x] `GET /api/system/version` 返回 `targetChannel`；查询参数、持久化渠道、`AGH_UPDATE_CHANNEL`、安装版本四种来源的优先级有单测覆盖。
+- [x] `POST /api/system/channel` 校验渠道与自升级开关（400/403），写入失败返回可读错误且不破坏服务。
+- [x] `POST /api/system/upgrade` 接受渠道并注入 `AGH_UPGRADE_CHANNEL`；不带 body 的旧请求仍可工作；状态接口返回本次渠道。
+- [x] `scripts/server-pull.sh --channel nightly --dry-run` 指向 nightly 清单与标签，`--check` 按渠道比较 `deployed-tag`；stable 行为不回归。
+- [x] npm/pnpm 执行器能把目标 dist-tag 安装到全局目录，重启 unit 并在失败时回滚；`AGH_PACKAGE_MANAGER=pnpm` 路径有验证记录。
+- [x] 不带渠道参数的 timer 运行会读取持久化渠道（dry-run 或日志证据），切换渠道后下一轮跟随新渠道。
 - [ ] `AGH_ENABLE_SELF_UPGRADE` 关闭时渠道写接口返回 403，前端回退本地切换，检查更新不受影响。
-- [ ] Docker 部署 `canSelfUpgrade=false`，UI 不显示一键升级。
-- [ ] `pnpm check`、`pnpm test`、`npm run test:server`、`node scripts/verify-proposals.mjs --links` 全绿。
-- [ ] 文档与中英词条同步；不引入新的无鉴权升级入口。
+- [x] Docker 部署 `canSelfUpgrade=false`，UI 不显示一键升级。
+- [x] `pnpm check`、`pnpm test`、`npm run test:server`、`node scripts/verify-proposals.mjs --links` 全绿。
+- [x] 文档与中英词条同步；不引入新的无鉴权升级入口。
 
 ## Note
 
@@ -93,5 +93,8 @@
 - 基线已包含 2026-10-21 合入的 [Docker 托管模式数据卷提案](../process/2026-10-21-docker-managed-mode-storage.md)（`AGH_DATA_DIR`，Docker 默认 `/app/data`）；本提案的状态目录解析与 Docker 说明已按该约定对齐。
 - 本提案是「方案 B」的上游原生实现；2026-10-21 的方案 A 是部署侧桥接（清单代理记录渠道、`AGH_UPGRADE_CHANNEL` 触发脚本、timer 跟随状态文件），仅用于验证链路。B 落地后 A 的代理与覆盖项可删除，保留的契约是 `AGH_UPGRADE_CHANNEL` 与持久化渠道文件。
 - 既有事实：nightly Release 使用固定标签 `nightly`，资产名固定为 `agh-console.tar.gz` / `version.json`；npm 的 stable/nightly dist-tag 已存在；`AGH_UPDATE_URL` 已支持 `{channel}` 占位符。
-- 实现状态（2026-10-21）：服务端渠道状态与 API、tarball/npm 执行器、systemd 分离与状态文件、前端渠道贯通、CLI 与文档均已完成；Release 归档改为携带 `scripts/server-pull.sh`。`npm run test:server`（83 项）、`vitest run`（185 项）、`tsc --noEmit`、`vite build`、`node scripts/check-npm-pack.mjs`、`node scripts/verify-proposals.mjs --links` 均通过。真实 systemd 分离执行与 npm/pnpm 全局安装/回滚仍待在部署机验证，对应验收项暂未勾选。
+- 实现状态（2026-10-21）：服务端渠道状态与 API、tarball/npm 执行器、systemd 分离与状态文件、前端渠道贯通、CLI 与文档均已完成；Release 归档改为携带 `scripts/server-pull.sh`。`npm run test:server`（84 项）、`vitest run`（185 项）、`tsc --noEmit`、`vite build`、`node scripts/check-npm-pack.mjs`、`node scripts/verify-proposals.mjs --links` 均通过。
+- 部署验证（2026-10-21，npm 全局安装 + systemd）：从 `bffe6e6` 通过 `POST /api/system/upgrade` 升到 `1468f3a`，返回 `detached=true`、状态文件与接口均为 `completed`，服务健康；随后安装 `dd821e2` 并验证 timer 服务读取 `update-channel`、在已是最新时跳过重启；用不存在的 unit 验证了 npm 执行器失败回滚路径（退出码 1，控制台不受影响）。`server-pull.sh --check --channel nightly` 的相同/不同标签退出码也已在本地验证。
+- 部署过程中发现并修复两个上游问题：pnpm 12 的 `minimumReleaseAge` 会把刚发布的 nightly 解析成旧构建（#32）；pnpm 符号链接布局下 `npm-upgrade.mjs` 的直接执行检测失效（#33）。
+- 未覆盖：自升级关闭时的浏览器端回退交互（对应验收项保持未勾选）；Docker 运行时的真实升级未执行，相关逻辑由单测覆盖。
 - 待确认的实现细节：npm 执行器是否需要把 pnpm 作为默认探测（当前决定为 npm 默认、pnpm 显式开启）；systemd 分离执行在非 root 运维下的降级提示措辞。
