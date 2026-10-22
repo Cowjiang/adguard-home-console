@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readTargetChannel, resolveChannel, resolveStateDir } from './update-channel.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_PATH = path.join(__dirname, '..', 'package.json');
@@ -68,6 +69,21 @@ export function detectRuntime(env = process.env, fsModule = fs) {
   }
 
   return 'standalone';
+}
+
+/**
+ * One-click upgrade only makes sense when the server can replace its own
+ * installation and restart the process. Docker images are replaced, not
+ * upgraded in place; plain npm/standalone runs have no supervisor to restart.
+ * A custom AGH_UPGRADE_SCRIPT is trusted to handle its own restart.
+ */
+export function detectSelfUpgradeCapability(env = process.env, runtime = detectRuntime(env), fsModule = fs) {
+  const enabled = env.AGH_ENABLE_SELF_UPGRADE === '1' || env.AGH_ENABLE_SELF_UPGRADE === 'true';
+  if (!enabled) return false;
+  if (runtime === 'docker') return false;
+  if (env.AGH_UPGRADE_SCRIPT) return true;
+  if (env.AGH_SKIP_RESTART === '1' || env.AGH_SKIP_RESTART === 'true') return false;
+  return runtime === 'systemd';
 }
 
 export function parseSemver(v) {
@@ -128,9 +144,9 @@ export function isNewerVersion(currentVersion, latestVersion) {
   return compareVersions(latestVersion, currentVersion) > 0;
 }
 
-export function resolveUpdateUrl(options = {}, channel = 'stable') {
+export function resolveUpdateUrl(options = {}, channel = 'stable', env = process.env) {
   if (options.updateUrl) return options.updateUrl;
-  if (process.env.AGH_UPDATE_URL) return process.env.AGH_UPDATE_URL.replace('{channel}', channel);
+  if (env.AGH_UPDATE_URL) return env.AGH_UPDATE_URL.replace('{channel}', channel);
   if (channel === 'nightly') {
     return DEFAULT_RELEASE_NIGHTLY_URL;
   }
@@ -146,6 +162,9 @@ export function createVersionHandler(options = {}) {
   const fetchFn = options.fetch ?? globalThis.fetch;
   const nowFn = options.now ?? Date.now;
   const detectRuntimeFn = options.detectRuntime ?? detectRuntime;
+  const env = options.env || process.env;
+  const stateDir = options.stateDir ?? resolveStateDir({ env });
+  const readChannel = options.readTargetChannel ?? (() => readTargetChannel({ stateDir }));
 
   const cache = {
     stable: { manifest: null, cachedAt: 0 },
@@ -153,15 +172,28 @@ export function createVersionHandler(options = {}) {
   };
 
   return async function versionHandler(req, res) {
-    const env = options.env || process.env;
     const currentVersion = options.currentVersion || env.APP_VERSION || getPackageVersion();
-    const queryChannel = req?.query?.channel;
-    const channel = (queryChannel === 'nightly' || queryChannel === 'stable')
-      ? queryChannel
-      : (options.channel || (currentVersion.includes('nightly') ? 'nightly' : 'stable'));
+    const targetChannel = readChannel() || null;
+    const { channel, source: channelSource } = resolveChannel({
+      queryChannel: req?.query?.channel,
+      targetChannel,
+      env,
+      fallbackChannel: options.channel,
+      currentVersion,
+    });
     const runtime = detectRuntimeFn(env, fs);
-    const updateUrl = resolveUpdateUrl(options, channel);
-    const canSelfUpgrade = Boolean(env.AGH_ENABLE_SELF_UPGRADE === '1' || env.AGH_ENABLE_SELF_UPGRADE === 'true');
+    const updateUrl = resolveUpdateUrl(options, channel, env);
+    const canSelfUpgrade = detectSelfUpgradeCapability(env, runtime, fs);
+
+    const base = {
+      ok: true,
+      currentVersion,
+      channel,
+      channelSource,
+      targetChannel,
+      runtime,
+      canSelfUpgrade,
+    };
 
     const isForce = req?.query?.force === '1' || req?.query?.force === 'true';
     const channelCache = cache[channel] || { manifest: null, cachedAt: 0 };
@@ -170,11 +202,7 @@ export function createVersionHandler(options = {}) {
     if (isCacheValid) {
       const hasUpdate = isNewerVersion(currentVersion, channelCache.manifest.version);
       return res.json({
-        ok: true,
-        currentVersion,
-        channel,
-        runtime,
-        canSelfUpgrade,
+        ...base,
         hasUpdate,
         latest: channelCache.manifest,
       });
@@ -194,21 +222,13 @@ export function createVersionHandler(options = {}) {
       cache[channel] = { manifest, cachedAt: nowFn() };
       const hasUpdate = isNewerVersion(currentVersion, manifest.version);
       return res.json({
-        ok: true,
-        currentVersion,
-        channel,
-        runtime,
-        canSelfUpgrade,
+        ...base,
         hasUpdate,
         latest: manifest,
       });
     } catch (err) {
       return res.json({
-        ok: true,
-        currentVersion,
-        channel,
-        runtime,
-        canSelfUpgrade,
+        ...base,
         checkFailed: true,
         error: err.message,
       });

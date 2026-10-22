@@ -45,6 +45,7 @@ export function UpdatePage() {
           runtime={data.runtime}
           currentVersion={data.currentVersion}
           canSelfUpgrade={data.canSelfUpgrade}
+          channel={data.targetChannel ?? (data.channel === 'nightly' ? 'nightly' : 'stable')}
         />
       ) : (
         <EmptyState

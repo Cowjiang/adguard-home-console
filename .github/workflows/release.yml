@@ -8,17 +8,22 @@ name: Release
 # same ref (both unsigned — see .agents/pipelines/proposals/process/2026-10-15-release-ipa-artifact.md
 # and 2026-10-18-release-windows-installers.md).
 #
-#   nightly  schedule from `dev` / dispatch   one rolling prerelease, tag `nightly` moved to each build
+#   nightly  schedule from `dev` / dispatch   one rolling prerelease, tag `nightly` recreated on each build
 #                                              npm dist-tag nightly, image :nightly :<version> :sha-<sha>
 #   stable   push tag vX.Y.Z                   Release vX.Y.Z
 #                                              npm dist-tag latest,  image :latest :X.Y.Z :X.Y :sha-<sha>
 #
-# The nightly rolls: its tag is force-moved to the newest build and the release
-# is updated in place, so the release list holds exactly one nightly. Being a
-# prerelease, it also leaves `releases/latest` (what scripts/server-pull.sh
-# reads), the npm `latest` dist-tag and the `:latest` image on stable. A nightly
-# whose `dev` has not moved since the last one is skipped, so idle days do not
-# publish empty versions. Scheduled workflows only run from the default
+# The nightly rolls by being deleted and recreated: Update a release cannot change
+# published_at, so an in-place upsert would keep the date of the first nightly
+# forever. Each build removes the previous `nightly` release and tag at the end
+# of the release job, then the new release recreates both at its commit — same
+# fixed tag, same asset URLs, exactly one nightly in the list, fresh publish
+# date. Being a prerelease, it also leaves `releases/latest` (what
+# scripts/server-pull.sh reads), the npm `latest` dist-tag and the `:latest`
+# image on stable. A nightly whose `dev` has not moved and whose release is
+# complete is skipped, so idle days do not publish empty versions. A failure
+# after the deletion removes the tag too, so the next schedule retries instead
+# of skipping on an unchanged sha. Scheduled workflows only run from the default
 # branch, so this file has to sit on `main` for the timer to fire at all.
 on:
   schedule:
@@ -96,9 +101,9 @@ jobs:
           INPUT_PUBLISH: ${{ inputs.publish }}
         run: node .github/scripts/release-plan.mjs
 
-      # The nightly tag rolls: it always points at the newest build, and the
-      # commit it currently holds doubles as the baseline for the next notes.
-      # An idle day must not mint a new version, so the same commit is skipped.
+      # The previous nightly's tag doubles as the baseline for the next notes.
+      # An idle day must not mint a new version, so the same commit is skipped —
+      # but only when the release and its assets are complete.
       - name: Check the rolling nightly tag
         id: nightly
         # force is the manual escape hatch: a dispatch is deliberate, the timer is not
@@ -106,15 +111,35 @@ jobs:
         env:
           TAG: ${{ steps.plan.outputs.release_tag }}
           SHA: ${{ steps.commit.outputs.sha }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRIVATE: ${{ github.event.repository.private }}
         run: |
           # --verify --quiet: a missing tag must yield an empty string, not the ref name
           last="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || true)"
           echo "previous_sha=$last" >> "$GITHUB_OUTPUT"
-          if [ -n "$last" ] && [ "$last" = "$SHA" ]; then
+          # The recreate flow deletes the release before the tag, so a crash between
+          # the two leaves a tag with no (or a partial) release. Checking the sha
+          # alone would then freeze that state until dev moved again.
+          expected=(agh-console.tar.gz version.json community-source.json)
+          if [ "$PRIVATE" != "true" ]; then
+            expected+=(agh-console.ipa agh-console-setup.exe agh-console.msi)
+          fi
+          complete=false
+          if gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/nightly-assets" 2>/dev/null; then
+            complete=true
+            for name in "${expected[@]}"; do
+              grep -qx "$name" "$RUNNER_TEMP/nightly-assets" || complete=false
+            done
+          fi
+          if [ -n "$last" ] && [ "$last" = "$SHA" ] && [ "$complete" = true ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::$TAG already points at $SHA — skipping this nightly"
+            echo "::notice::$TAG already points at $SHA with a complete release — skipping this nightly"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            if [ -n "$last" ] && [ "$last" = "$SHA" ]; then
+              echo "::notice::$TAG points at $SHA but the release is missing or incomplete — rebuilding"
+            fi
           fi
 
   build:
@@ -154,7 +179,9 @@ jobs:
         run: node scripts/check-npm-pack.mjs
 
       - name: Package the release tarball
-        run: tar czf agh-console.tar.gz dist server package.json
+        # server-pull.sh is the tarball updater and must ship inside the
+        # archive so /opt/agh-console/scripts/server-pull.sh exists at runtime.
+        run: tar czf agh-console.tar.gz dist server package.json scripts/server-pull.sh
 
       - uses: actions/upload-artifact@v7
         with:
@@ -248,8 +275,8 @@ jobs:
         run: ./scripts/ios-signing.sh tauri build --target aarch64 --no-sign
 
       # Fixed asset name, like agh-console.tar.gz: the nightly release is
-      # upserted in place, so a name carrying the version would pile up one IPA
-      # per night instead of replacing the previous one.
+      # recreated in place, so a versioned name would move the download URL
+      # every night; stable releases keep one fixed name per version.
       - name: Collect the IPA
         run: |
           ipa="$(find src-tauri/gen/apple/build -name '*.ipa' -print -quit)"
@@ -334,8 +361,9 @@ jobs:
         run: pnpm tauri build
 
       # Fixed asset names, like agh-console.tar.gz and agh-console.ipa: the
-      # nightly release is upserted in place, so a name carrying the version
-      # would pile up one set per night instead of replacing the previous one.
+      # nightly release is recreated in place, so a versioned name would move
+      # the download URL every night; stable releases keep one fixed name per
+      # version.
       - name: Collect the installers
         shell: bash
         run: |
@@ -362,13 +390,21 @@ jobs:
 
   release:
     needs: [prepare, build, ios, windows]
-    # The platform jobs must not be able to block the web, npm and image
-    # channels, and they must not race them either (an artifact that arrives
-    # after the release has been created would be missing from it), hence both
-    # the extra needs and !cancelled(). A failed build still blocks publishing:
-    # without its tarball there is nothing to publish. The IPA and the Windows
-    # installer steps at the end attach only what the platform job produced.
-    if: ${{ !cancelled() && needs.build.result == 'success' && needs.prepare.outputs.publish == 'true' && needs.prepare.outputs.skip != 'true' }}
+    # The extra needs stop the platform artifacts from racing the release (an
+    # artifact that arrives after the release is created would be missing), and
+    # !cancelled() keeps a failed platform job from taking the whole workflow
+    # down. A failed build still blocks publishing: without its tarball there is
+    # nothing to publish. For nightly the release is recreated, not updated, so
+    # it also requires the platform jobs not to have failed: rebuilding without
+    # an IPA or installer would silently drop assets the previous nightly had.
+    # Stable keeps the older behavior; the upload steps below still gate on each
+    # platform job's result.
+    if: >-
+      !cancelled() && needs.build.result == 'success' &&
+      needs.prepare.outputs.publish == 'true' &&
+      needs.prepare.outputs.skip != 'true' &&
+      (needs.prepare.outputs.channel != 'nightly' ||
+      (needs.ios.result != 'failure' && needs.windows.result != 'failure'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -391,23 +427,6 @@ jobs:
           BRANCH: ${{ needs.prepare.outputs.ref }}
         run: bash .github/scripts/release-notes.sh
 
-      # One rolling nightly: the tag moves to the newest build and the release is
-      # updated in place, so the release list never grows past a single entry.
-      # Stable keeps one tag and one release per version.
-      - name: Move the rolling nightly tag
-        if: needs.prepare.outputs.channel == 'nightly'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ needs.prepare.outputs.release_tag }}
-          SHA: ${{ needs.prepare.outputs.sha }}
-        run: |
-          if gh api -X PATCH "repos/$REPO/git/refs/tags/$TAG" -f sha="$SHA" -F force=true >/dev/null 2>&1; then
-            echo "moved $TAG to $SHA"
-          else
-            echo "$TAG is not there yet — the release creates it"
-          fi
-
       - name: Generate release manifest
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
@@ -425,8 +444,37 @@ jobs:
           OUTPUT: community-source.json
         run: node scripts/generate-altstore-source.mjs
 
-      # Upserts by tag: the nightly release is updated in place, and an asset
-      # with the same name is replaced instead of piling up.
+      # Update a release cannot change published_at, so the nightly is deleted and
+      # recreated instead of upserted; the create step below recreates the tag at
+      # target_commitish with a fresh publish date. Deleting the tag as well makes
+      # a crash here self-healing: without a tag the next schedule cannot skip on
+      # an unchanged sha. Neovim's nightly works the same way. Kept after the
+      # notes/manifests so a failure in those leaves the previous nightly intact.
+      - name: Delete the previous nightly release and tag
+        if: needs.prepare.outputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes --repo "$REPO"
+            echo "deleted release $TAG"
+          else
+            echo "no release $TAG yet"
+          fi
+          if gh api "repos/$REPO/git/refs/tags/$TAG" >/dev/null 2>&1; then
+            gh api -X DELETE "repos/$REPO/git/refs/tags/$TAG"
+            echo "deleted tag $TAG"
+          else
+            echo "no tag $TAG yet"
+          fi
+          # Releases and tags are eventually consistent; give the create below a
+          # moment before it reuses the same names.
+          sleep 5
+
+      # The nightly was deleted above, so this creates it and its tag anew;
+      # stable releases are still created once per version.
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
@@ -443,8 +491,8 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.prerelease }}
 
       # The IPA rides along only when the macOS job produced one. A step of its
-      # own, so a missing file can never fail the release upsert above; --clobber
-      # replaces the asset the same way the tarball is replaced.
+      # own, so a missing file can never fail the release creation above;
+      # --clobber replaces the asset on a rerun.
       - uses: actions/download-artifact@v8
         if: needs.ios.result == 'success'
         with:
@@ -470,7 +518,7 @@ jobs:
 
       # Same shape as the IPA above: the installers ride along only when the
       # Windows job produced them, in a step of its own so a missing file can
-      # never fail the release upsert.
+      # never fail the release creation.
       - uses: actions/download-artifact@v8
         if: needs.windows.result == 'success'
         with:

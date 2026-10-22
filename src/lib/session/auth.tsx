@@ -20,8 +20,11 @@ import {
   type Instance,
   type InstanceStoreData,
   type SvrConfig,
+  type InstanceManagedMetadata,
 } from './instances'
 import { createProbeEngine, createStatusFetcher, PROBE_INTERVAL_MS, type ProbeOutcome } from './probe'
+import { removeSessionKey, clearSessionKeys } from '../crypto/keyVault'
+import { registerAutoSync } from '../snapshot/outboxSync'
 
 export type { SvrConfig }
 
@@ -38,6 +41,21 @@ interface InstanceSession {
   latencyMs?: number
 }
 
+/** Explicit managed mode action for connect */
+export type ManagedAction =
+  | { type: 'set'; metadata: InstanceManagedMetadata }
+  | { type: 'remove' }
+  | { type: 'preserve' }
+
+export interface ConnectOptions {
+  activate?: boolean
+  id?: string
+  label?: string
+  managedAction?: ManagedAction
+  /** @deprecated Prefer explicit `managedAction` instead */
+  managed?: InstanceManagedMetadata | null
+}
+
 /** What the instance UIs (switcher, list) need per instance */
 export interface InstanceView {
   id: string
@@ -47,6 +65,7 @@ export interface InstanceView {
   latencyMs?: number
   version?: string
   protectionEnabled?: boolean
+  managed?: InstanceManagedMetadata
 }
 
 interface AuthCtx {
@@ -70,7 +89,10 @@ interface AuthCtx {
    *  (keeping the active pointer), otherwise add a new instance or update the
    *  endpoint of the instance matching url+username; activates unless told
    *  otherwise */
-  connect: (cfg: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }) => Promise<boolean>
+  connect: (
+    cfg: SvrConfig,
+    opts?: ConnectOptions
+  ) => Promise<boolean>
   /** Remove one instance; the active one falls back to the first remaining */
   removeInstance: (id: string) => void
   /** Legacy logout: forget every instance (and the migrated v1 copy) */
@@ -167,6 +189,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [fetchStatus]
   )
 
+  // Register automatic background outbox sync on online and visibilitychange
+  useEffect(() => {
+    return registerAutoSync()
+  }, [])
+
   useEffect(() => applyTheme(theme), [theme])
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -250,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           latencyMs: s?.latencyMs,
           version: s?.status?.version,
           protectionEnabled: s?.status?.protection_enabled,
+          managed: i.managed,
         }
       }),
     [store, sessions]
@@ -264,7 +292,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const connect = useCallback(
-    async (next: SvrConfig, opts?: { activate?: boolean; id?: string; label?: string }): Promise<boolean> => {
+    async (
+      next: SvrConfig,
+      opts?: ConnectOptions
+    ): Promise<boolean> => {
       const activate = opts?.activate ?? true
       setConnecting(true)
       setError(null)
@@ -279,19 +310,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // With an explicit id: edit that instance in place. Otherwise add a
         // new one or update the instance already pointing at the same
         // url+username
-        const editId =
-          opts?.id && prev?.instances.some((x) => x.id === opts.id) ? opts.id : undefined
+        const isExistingEdit = Boolean(opts?.id && prev?.instances.some((x) => x.id === opts.id))
         const targetId =
-          editId ??
+          opts?.id ??
           prev?.instances.find((i) => {
             const e = activeEndpoint(i)
             return e && e.url === clean.url && e.username === clean.username
           })?.id ??
           newId()
+        const existingInst = prev?.instances.find((x) => x.id === targetId)
         const entry: Instance = {
           id: targetId,
-          label: opts?.label?.trim() || labelFromUrl(clean.url),
+          label: opts?.label?.trim() || existingInst?.label || labelFromUrl(clean.url),
           endpoints: [{ ...clean }],
+        }
+        // Determine explicit managed action (with fallback for legacy opts.managed)
+        let action: ManagedAction
+        if (opts?.managedAction) {
+          action = opts.managedAction
+        } else if (opts && 'managed' in opts) {
+          action = opts.managed ? { type: 'set', metadata: opts.managed } : { type: 'remove' }
+        } else {
+          action = { type: 'preserve' }
+        }
+
+        if (action.type === 'set') {
+          entry.managed = action.metadata
+        } else if (action.type === 'remove') {
+          delete entry.managed
+          removeSessionKey(targetId)
+        } else if (action.type === 'preserve' && existingInst?.managed) {
+          entry.managed = existingInst.managed
         }
         const instances = prev ? [...prev.instances] : []
         const idx = instances.findIndex((x) => x.id === targetId)
@@ -301,7 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           instances,
           // Editing never moves the pointer; adding activates the new entry
           // unless asked not to (debug auto-login of a second instance)
-          activeId: editId
+          activeId: isExistingEdit
             ? prev
               ? prev.activeId
               : targetId
@@ -332,6 +381,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       const prev = storeRef.current
       if (!prev) return
+      removeSessionKey(id)
       const remaining = prev.instances.filter((x) => x.id !== id)
       if (remaining.length) {
         const next: InstanceStoreData = {
@@ -360,6 +410,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const logout = useCallback(() => {
+    clearSessionKeys()
     clearStore()
     setStore(null)
     setSessions({})

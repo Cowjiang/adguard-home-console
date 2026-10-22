@@ -12,6 +12,7 @@ import { restoreSnapshot, validateSnapshot } from './snapshotRestore'
 import {
   deleteSnapshot,
   exportClusterBundleJson,
+  exportSnapshotBundleJson,
   exportSnapshotJson,
   getSnapshot,
   listSnapshots,
@@ -19,7 +20,7 @@ import {
   pruneAutoSnapshots,
   saveSnapshot,
 } from './snapshotStorage'
-import type { AghConfigSnapshot, SnapshotPayload, SnapshotSourceInstance } from './types'
+import type { AghConfigSnapshot, SnapshotBundle, SnapshotPayload, SnapshotSourceInstance } from './types'
 
 vi.mock('../api', () => ({
   api: vi.fn(),
@@ -287,7 +288,7 @@ describe('Snapshot Storage Vault', () => {
     expect(remainingManual).toHaveLength(2)
   })
 
-  it('exports and parses snapshot JSON files and bundle packages', () => {
+  it('exports and parses snapshot JSON files and bundle packages (including backward compatibility)', () => {
     const snap: AghConfigSnapshot = {
       meta: {
         id: 'json-snap-1',
@@ -307,10 +308,44 @@ describe('Snapshot Storage Vault', () => {
     expect(parsedSingle.isBundle).toBe(false)
     expect(parsedSingle.snapshots[0].meta.id).toBe('json-snap-1')
 
-    const bundleJson = exportClusterBundleJson([snap], 'Test Cluster')
+    // New SnapshotBundle format with instanceLabel
+    const bundleJson = exportSnapshotBundleJson([snap], 'Test Instance')
+    const rawParsed: SnapshotBundle = JSON.parse(bundleJson)
+    expect(rawParsed.bundleVersion).toBe('1.0')
+    expect(rawParsed.instanceLabel).toBe('Test Instance')
+    expect(rawParsed.clusterName).toBeUndefined()
+
     const parsedBundle = parseSnapshotImport(bundleJson)
     expect(parsedBundle.isBundle).toBe(true)
     expect(parsedBundle.snapshots).toHaveLength(1)
+    expect(parsedBundle.instanceLabel).toBe('Test Instance')
+
+    // Legacy format with clusterName backward compatibility
+    const legacyBundle = {
+      bundleVersion: '1.0',
+      createdAt: new Date().toISOString(),
+      clusterName: 'Legacy Cluster',
+      snapshots: [snap],
+    }
+    const parsedLegacy = parseSnapshotImport(JSON.stringify(legacyBundle))
+    expect(parsedLegacy.isBundle).toBe(true)
+    expect(parsedLegacy.snapshots).toHaveLength(1)
+    expect(parsedLegacy.instanceLabel).toBe('Legacy Cluster')
+
+    // Deprecated exportClusterBundleJson alias
+    const legacyExportJson = exportClusterBundleJson([snap], 'Legacy Alias')
+    const parsedLegacyExport = parseSnapshotImport(legacyExportJson)
+    expect(parsedLegacyExport.isBundle).toBe(true)
+    expect(parsedLegacyExport.snapshots).toHaveLength(1)
+
+    // Filters out locked snapshots
+    const lockedSnap: AghConfigSnapshot = {
+      ...snap,
+      isLocked: true,
+    }
+    const filteredBundleJson = exportSnapshotBundleJson([snap, lockedSnap], 'Test Instance')
+    const parsedFiltered = parseSnapshotImport(filteredBundleJson)
+    expect(parsedFiltered.snapshots).toHaveLength(1)
   })
 })
 
@@ -409,6 +444,14 @@ describe('Snapshot Restore Engine', () => {
     const validation = await validateSnapshot(badSnapshot)
     expect(validation.valid).toBe(false)
     expect(validation.errors.some((e) => e.includes('Unsupported schemaVersion'))).toBe(true)
+
+    const lockedSnapshot = {
+      meta: { schemaVersion: '1.0' },
+      isLocked: true,
+    } as any
+    const lockedValidation = await validateSnapshot(lockedSnapshot)
+    expect(lockedValidation.valid).toBe(false)
+    expect(lockedValidation.errors[0]).toContain('Cannot restore locked encrypted snapshot')
   })
 
   it('performs restore sequentially, restores whitelists, prunes obsolete filters, and captures pre-rollback safety snapshot', async () => {

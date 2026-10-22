@@ -16,6 +16,7 @@ import {
   isNewerVersion,
   resolveUpdateUrl,
 } from './version.mjs';
+import { readTargetChannel, resolveChannel } from './update-channel.mjs';
 
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const DEFAULT_CACHE_FILE = path.join(os.tmpdir(), 'agh-console-update-cache.json');
@@ -132,16 +133,18 @@ export async function checkCliUpdate(options = {}) {
     const fetchFn = options.fetch || globalThis.fetch;
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+    const storedChannel = options.channel || readTargetChannel({ env, stateDir: options.stateDir });
+    const { channel } = resolveChannel({ targetChannel: storedChannel, env, currentVersion });
+
     let latestVersion = null;
     let fromCache = false;
 
     const cached = readUpdateCache(cacheFile, nowFn);
-    if (cached) {
+    if (cached && (!cached.channel || cached.channel === channel)) {
       latestVersion = cached.latestVersion;
       fromCache = true;
     } else {
-      const channel = options.channel || (currentVersion.includes('nightly') ? 'nightly' : 'stable');
-      const updateUrl = resolveUpdateUrl(options, channel);
+      const updateUrl = resolveUpdateUrl(options, channel, env);
       const signal = typeof AbortSignal?.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined;
       const res = await fetchFn(updateUrl, { signal });
       if (!res.ok) {
@@ -152,19 +155,20 @@ export async function checkCliUpdate(options = {}) {
         return { checkFailed: true, error: 'Invalid manifest received' };
       }
       latestVersion = manifest.version;
-      writeUpdateCache(cacheFile, { lastChecked: nowFn(), latestVersion });
+      writeUpdateCache(cacheFile, { lastChecked: nowFn(), latestVersion, channel });
     }
 
     if (isNewerVersion(currentVersion, latestVersion)) {
+      const distTag = channel === 'nightly' ? 'nightly' : 'latest';
       const banner = formatBox([
         `Update available: ${currentVersion} → ${latestVersion}`,
-        'Run npm i -g agh-console or npx agh-console@latest to update',
+        `Run npm i -g agh-console@${distTag} or npx agh-console@${distTag} to update`,
       ]);
       logFn(`\n${banner}\n`);
-      return { updateAvailable: true, currentVersion, latestVersion, fromCache, banner };
+      return { updateAvailable: true, currentVersion, latestVersion, channel, fromCache, banner };
     }
 
-    return { updateAvailable: false, currentVersion, latestVersion, fromCache };
+    return { updateAvailable: false, currentVersion, latestVersion, channel, fromCache };
   } catch (err) {
     return { checkFailed: true, error: err?.message || String(err) };
   }

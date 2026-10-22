@@ -54,6 +54,32 @@ describe('parseStore', () => {
     expect(out!.instances[1].label).toBe('y:3000')
   })
 
+  it('preserves valid managed metadata and discards invalid managed shape', () => {
+    const validManaged = {
+      serverUrl: 'https://console.example.com',
+      salt: 'c2FsdDEyMzQ1Njc4OTAxMg==',
+      syncedAt: '2026-10-18T00:00:00.000Z',
+    }
+    const storeWithManaged = parseStore({
+      instances: [
+        {
+          id: 'inst-m',
+          endpoints: [{ url: 'http://x:3000', username: 'admin' }],
+          managed: validManaged,
+        },
+        {
+          id: 'inst-bad-m',
+          endpoints: [{ url: 'http://y:3000', username: 'admin' }],
+          managed: { serverUrl: 'only url' }, // missing salt
+        },
+      ],
+      activeId: 'inst-m',
+    })
+    expect(storeWithManaged).not.toBeNull()
+    expect(storeWithManaged!.instances[0].managed).toEqual(validManaged)
+    expect(storeWithManaged!.instances[1].managed).toBeUndefined()
+  })
+
   it('rejects garbage: null, non-objects, instances without endpoints, empty lists', () => {
     expect(parseStore(null)).toBeNull()
     expect(parseStore('x')).toBeNull()

@@ -34,6 +34,14 @@ export async function validateSnapshot(snapshot: AghConfigSnapshot): Promise<Sna
     return { valid: false, errors: ['Snapshot is not a valid object'], warnings: [] }
   }
 
+  if (snapshot.isLocked) {
+    return {
+      valid: false,
+      errors: ['Cannot restore locked encrypted snapshot. Please decrypt it first.'],
+      warnings: [],
+    }
+  }
+
   const meta = snapshot.meta
   const data = snapshot.data
 
