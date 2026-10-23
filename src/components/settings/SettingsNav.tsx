@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../lib/session/auth'
 import { fetchSystemVersion, getStoredUpdateChannel, type SystemVersionResponse } from '../../lib/version'
 import { isSettingsNavActive } from '../../lib/nav/routes'
+import { Badge } from '../ui/atoms'
 
 export function SettingsNav() {
   const { t } = useTranslation()
@@ -88,12 +89,9 @@ export function SettingsNav() {
                   </span>
                   <span className="min-w-0 flex-1 truncate">{it.title}</span>
                   {it.to === '/settings/about' && hasUpdate && (
-                    <span
-                      className="pulse-dot ml-auto h-2 w-2 flex-none rounded-full"
-                      style={{ background: 'var(--accent)' }}
-                      aria-label={t('settings.updateAvailable')}
-                      title={t('settings.updateAvailable')}
-                    />
+                    <span className="ml-auto flex-none">
+                      <Badge kind="ok">{t('settings.updateAvailableButton')}</Badge>
+                    </span>
                   )}
                 </NavLink>
               )

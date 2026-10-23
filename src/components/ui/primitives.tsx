@@ -42,8 +42,9 @@ export function NavScrim({ className = '' }: { className?: string }) {
       className={`pointer-events-none absolute inset-x-0 top-0 ${className}`}
       style={{
         // Tailwind arbitrary class names with spaces are not generated; height
-        // goes in inline style
-        height: 'calc(env(safe-area-inset-top, 0px) + 72px)',
+        // goes in inline style. End at the page-shell content top (safe+84) so
+        // the resting content is not dimmed by the scroll mask.
+        height: 'calc(env(safe-area-inset-top, 0px) + 84px)',
         background: 'linear-gradient(to bottom, color-mix(in srgb, var(--bg) 98%, transparent) 58%, transparent)',
       }}
     />
@@ -97,6 +98,17 @@ export function PageHeader({ title, subtitle, back, right }: { title: string; su
     if (rightRef.current) ro.observe(rightRef.current)
     return () => ro.disconnect()
   }, [floating, hasRight, title])
+
+  // Secondary mobile pages get their own top gap from the page shell; the flag
+  // is set here so tab-root pages (no floating header) keep their original top.
+  useLayoutEffect(() => {
+    if (!floating) return
+    const shell = document.querySelector('.page-shell')
+    shell?.setAttribute('data-floating-page', '')
+    return () => {
+      shell?.removeAttribute('data-floating-page')
+    }
+  }, [floating])
 
   if (floating) {
     // The fixed nav bar translates in sync with the page layer (push/pop),

@@ -22,10 +22,7 @@ export function ToastHost() {
     }
   }, [])
   return createPortal(
-    <div
-      className="pointer-events-none fixed left-1/2 z-[60] flex w-max max-w-[86vw] -translate-x-1/2 flex-col items-center gap-2"
-      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
-    >
+    <div className="toast-host pointer-events-none fixed left-1/2 z-[60] flex w-max max-w-[86vw] -translate-x-1/2 flex-col items-center gap-2">
       {items.map((i) => (
         <div
           key={i.id}

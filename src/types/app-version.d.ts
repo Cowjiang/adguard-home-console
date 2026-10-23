@@ -4,3 +4,5 @@
  * APP_VERSION), package.json#version otherwise.
  */
 declare const __APP_VERSION__: string
+/** Injected by vite.config.ts#define: the build timestamp (ISO string) */
+declare const __BUILD_TIME__: string

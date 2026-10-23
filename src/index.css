@@ -24,7 +24,7 @@
 
   --glass: #121419;
   --glass-strong: #15171d;
-  --glass-pop: rgba(21, 23, 29, 0.72);
+  --glass-pop: rgba(21, 23, 29, 0.84);
   --glass-nav: rgba(40, 42, 50, 0.45);
   --nav-bright: brightness(1.08);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -456,15 +456,42 @@ body {
      native glass TabBar mode; the default matches the CSS tab bar height */
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tabbar-space, 112px));
 }
+/* Secondary pages carry the floating back/title bar; give their content the
+   same 30px gap below that bar regardless of whether the first block is a
+   section title, a card, a filter row or an empty state. */
+.page-shell[data-floating-page] {
+  padding-top: calc(var(--safe-top) + 84px);
+}
 @media (min-width: 1024px) {
   .page-shell {
     max-width: 1160px;
     padding-top: 44px;
     padding-bottom: 56px;
   }
+  .page-shell[data-floating-page] {
+    padding-top: 44px;
+  }
+}
+/* The page shell owns the top gap on floating pages; the first content block
+   (title, card, filter row, empty state) must not add its own top margin. */
+@media (max-width: 1023px) {
+  .page-shell[data-floating-page] > :first-child {
+    margin-top: 0;
+  }
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Toasts clear the floating mobile nav; desktop keeps them near the top edge */
+.toast-host {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+}
+@media (min-width: 1024px) {
+  .toast-host {
+    top: 0.875rem;
+    bottom: auto;
+  }
 }
 input,
 textarea,

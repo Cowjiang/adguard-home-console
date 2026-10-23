@@ -20,10 +20,14 @@ const packageVersion = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ).version as string
 const appVersion = process.env.APP_VERSION || packageVersion
+// Baked into the bundle for Settings → About; BUILD_TIME allows reproducible
+// artifacts, otherwise it is the moment this build started.
+const buildTime = process.env.BUILD_TIME || new Date().toISOString()
 
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_TIME__: JSON.stringify(buildTime),
   },
   plugins: [react(), tailwindcss()],
   // vitest covers src/ only; server/ uses the node:test runner (npm run test:server)

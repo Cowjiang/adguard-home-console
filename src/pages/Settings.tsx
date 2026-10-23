@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import {
   ScrollText, Network, Lock, Wifi, Wrench,
   Trash, RotateCcw, DownloadCloud, Server, Plus, SunMoon,
-  Info, Eraser, ShieldQuestion, Layers,
+  Info, Eraser, ShieldQuestion, Layers, ChevronRight,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/session/auth'
@@ -21,6 +21,7 @@ import { IconBubble } from '../components/ui/atoms'
 import { isAppleMobile } from '../lib/native/shell'
 import { hoursLabel, fmtDate } from '../lib/format'
 import { APP_NAME, APP_VERSION } from '../lib/constants'
+import { fetchSystemVersion, getStoredUpdateChannel, type SystemVersionResponse } from '../lib/version'
 import { useIsDesktop } from '../lib/useIsDesktop'
 
 /* ================= Settings hub ================= */
@@ -30,6 +31,13 @@ export default function Settings() {
   const { t } = useTranslation()
   const isDesktop = useIsDesktop()
   const { offline } = useAuth()
+  // Same SWR key as the desktop SettingsNav so the hub and sidebar share one check
+  const { data: versionData } = useSWR<SystemVersionResponse>(
+    ['system-version', getStoredUpdateChannel()],
+    () => fetchSystemVersion(),
+    { revalidateOnFocus: false, shouldRetryOnError: false }
+  )
+  const hasUpdate = Boolean(versionData?.hasUpdate)
 
   const serverItems = [
     { icon: <ScrollText size={17} />, color: 'var(--accent-2)', title: t('settings.itemQueryStats'), desc: t('settings.itemQueryStatsDesc'), to: '/settings/general' },
@@ -70,6 +78,14 @@ export default function Settings() {
                     icon={<IconBubble color={it.color} bg="color-mix(in srgb, currentColor 12%, transparent)">{it.icon}</IconBubble>}
                     title={it.title}
                     subtitle={it.desc}
+                    right={
+                      it.to === '/settings/about' && hasUpdate ? (
+                        <span className="flex flex-none items-center gap-1">
+                          <Badge kind="ok">{t('settings.updateAvailableButton')}</Badge>
+                          <ChevronRight size={17} className="text-t3" />
+                        </span>
+                      ) : undefined
+                    }
                     onClick={() => nav(it.to)}
                     last={i === g.items.length - 1}
                   />

@@ -63,3 +63,7 @@ export const APP_NAME = 'AGH Console'
 /** Build-time constant: the release version in shipped artifacts, otherwise
  *  package.json#version (see vite.config.ts and src/types/app-version.d.ts) */
 export const APP_VERSION = __APP_VERSION__
+/** Build timestamp of the frontend bundle, injected by Vite */
+export const APP_BUILD_TIME = __BUILD_TIME__
+export const APP_REPO_URL = 'https://github.com/Cowjiang/adguard-home-console'
+export const APP_RELEASES_URL = `${APP_REPO_URL}/releases`

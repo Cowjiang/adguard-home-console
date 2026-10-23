@@ -80,6 +80,14 @@ export interface SystemVersionResponse {
   error?: string
 }
 
+/** In-place upgrade needs both a capable server and a runtime that can restart;
+ *  Docker replaces images and the iOS shell has no service to restart */
+export function supportsSelfUpgrade(
+  data: Pick<SystemVersionResponse, 'canSelfUpgrade' | 'runtime'>
+): boolean {
+  return data.canSelfUpgrade === true && data.runtime !== 'docker' && data.runtime !== 'ios'
+}
+
 export interface UpgradeStatusResponse {
   ok: boolean
   status: 'idle' | 'running' | 'failed' | 'completed'

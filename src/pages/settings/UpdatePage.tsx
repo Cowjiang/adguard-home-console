@@ -1,7 +1,7 @@
 /**
- * App update details sub-page (mobile): release notes and upgrade
- * instructions are browsing content, so it opens as a page while desktop
- * keeps the centered sheet (see docs/web-interaction.md).
+ * Mobile manual update details page: self-upgrade uses the confirmation sheet,
+ * and desktop keeps the compact manual sheet; this page holds the
+ * channel-accurate steps and the manual download without a cancel action.
  */
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -34,9 +34,14 @@ export function UpdatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const hasUpdate = Boolean(data?.hasUpdate && data.latest)
+
   return (
     <Screen>
-      <PageHeader back title={t('settings.updateDetails')} />
+      <PageHeader
+        back
+        title={hasUpdate ? t('settings.newVersionAvailableTitle') : t('settings.updateDetails')}
+      />
       {!data ? (
         <Loading />
       ) : data.hasUpdate && data.latest ? (
@@ -44,8 +49,8 @@ export function UpdatePage() {
           manifest={data.latest}
           runtime={data.runtime}
           currentVersion={data.currentVersion}
-          canSelfUpgrade={data.canSelfUpgrade}
           channel={data.targetChannel ?? (data.channel === 'nightly' ? 'nightly' : 'stable')}
+          showTitle={false}
         />
       ) : (
         <EmptyState

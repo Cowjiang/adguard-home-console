@@ -79,6 +79,14 @@ export function fmtDate(iso: string | undefined): string {
   return d.toLocaleString(lang(), { hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+/** Date without time, for narrow metadata rows */
+export function fmtDateShort(iso: string | undefined): string {
+  if (!iso) return i18n.t('units.never')
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString(lang(), { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
 export function relTime(iso: string): string {
   const d = new Date(iso).getTime()
   if (Number.isNaN(d)) return iso
