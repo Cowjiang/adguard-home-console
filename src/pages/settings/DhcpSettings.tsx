@@ -12,7 +12,18 @@ import { EmptyState, Loading } from '../../components/ui/atoms'
 import { usePick } from '../../components/ui/menu'
 import { fmtDate } from '../../lib/format'
 import { runMutation } from '../../lib/mutation'
+import { useDraftForm } from '../../lib/useDraftForm'
 /* ================= DHCP ================= */
+
+/** Config-only draft: lease lists change through their own endpoints and must
+ *  not dirty the form (and thus the Save button) */
+type DhcpConfigDraft = Pick<DhcpStatus, 'enabled' | 'interface_name' | 'v4' | 'v6'>
+const toConfigDraft = (d: DhcpStatus): DhcpConfigDraft => ({
+  enabled: d.enabled,
+  interface_name: d.interface_name,
+  v4: d.v4,
+  v6: d.v6,
+})
 
 export function DhcpSettings() {
   const { cfg, status } = useAuth()
@@ -25,7 +36,8 @@ export function DhcpSettings() {
   const [saving, setSaving] = useState(false)
   const [detecting, setDetecting] = useState(false)
   const [detectResult, setDetectResult] = useState<string[] | null>(null)
-  const [draftLocal, setDraftLocal] = useState<DhcpStatus | null>(null)
+  const form = useDraftForm<DhcpStatus, DhcpConfigDraft>(data, toConfigDraft)
+  const cur = form.draft
 
   if (!status?.dhcp_available) {
     return (
@@ -36,11 +48,9 @@ export function DhcpSettings() {
     )
   }
 
-  if (isLoading || !data) return <Screen><PageHeader back title={t('advanced.titleDhcp')} /><Loading /></Screen>
+  if (isLoading || !data || !cur) return <Screen><PageHeader back title={t('advanced.titleDhcp')} /><Loading /></Screen>
 
   const d = data
-  const cur = draftLocal ?? d
-  const setD = (patch: Partial<DhcpStatus>) => setDraftLocal({ ...cur, ...patch })
 
   // 所选接口的 v6 地址(决定 IPv6 表单的可用提示);接口数据是
   // /dhcp/interfaces 的裸键值对象,v4/v6 地址分别在 ipv4_addresses/ipv6_addresses
@@ -56,7 +66,7 @@ export function DhcpSettings() {
   const v6Complete = v6Filled && (cur.v6.lease_duration ?? 0) > 0
   const configValid = Boolean(cur.interface_name) && (!v4Filled || v4Complete) && (!v6Filled || v6Complete)
 
-  async function saveConfig(next: DhcpStatus) {
+  async function saveConfig(next: DhcpConfigDraft) {
     if (!cfg) return
     if (next.enabled) {
       if (!next.interface_name) return toast(t('advanced.needInterface'), 'err')
@@ -66,22 +76,23 @@ export function DhcpSettings() {
       }
       if (next.v6.range_start && !(next.v6.lease_duration > 0)) return toast(t('advanced.incompleteV6'), 'err')
     }
-    const ok = await runMutation({
-      action: () => api(cfg, '/dhcp/set_config', {
-        method: 'POST',
-        body: {
-          enabled: next.enabled,
-          interface_name: next.interface_name,
-          v4: next.v4,
-          v6: next.v6,
-        },
-      }),
-      invalidate: mutate,
+    await runMutation({
+      action: async () => {
+        await api(cfg, '/dhcp/set_config', {
+          method: 'POST',
+          body: {
+            enabled: next.enabled,
+            interface_name: next.interface_name,
+            v4: next.v4,
+            v6: next.v6,
+          },
+        })
+        // Refetch before refilling: the server copy becomes the dirty baseline
+        form.reset(await mutate())
+      },
       okKey: 'advanced.savedDhcp',
       setBusy: setSaving,
     })
-    // Back to following the server copy once the save landed
-    if (ok) setDraftLocal(null)
   }
 
   // v0.107.79 契约:结果在 v4/v6 的 other_server.found(yes/no/error)与
@@ -104,7 +115,7 @@ export function DhcpSettings() {
   }
 
   async function findActive() {
-    if (!cfg) return
+    if (!cfg || !cur) return
     setDetecting(true)
     setDetectResult(null)
     try {
@@ -193,18 +204,18 @@ export function DhcpSettings() {
 
   async function resetDhcp() {
     if (!cfg) return
-    const ok = await runMutation({
-      action: () => api(cfg, '/dhcp/reset', { method: 'POST', body: {} }),
-      invalidate: mutate,
+    await runMutation({
+      action: async () => {
+        await api(cfg, '/dhcp/reset', { method: 'POST', body: {} })
+        form.reset(await mutate())
+      },
       okKey: 'advanced.resetDhcpDone',
     })
-    // Back to following the server copy once the reset landed
-    if (ok) setDraftLocal(null)
   }
 
   return (
     <Screen>
-      <PageHeader back title={t('advanced.titleDhcp')} right={<Button size="header" loading={saving} onClick={() => saveConfig(cur)} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button>} />
+      <PageHeader back title={t('advanced.titleDhcp')} right={form.dirty ? <Button size="header" loading={saving} onClick={() => saveConfig(cur)} native={{ label: t('common.save'), foreground: 'accent' }}>{t('common.save')}</Button> : undefined} />
       {/* 官方说明与启用警告:不用卡片包裹,mt-5/mb-1.5 对齐其他设置页的间距节奏;警告句仅在停用态有意义 */}
       <div className="mt-5 mb-1.5 px-2 text-[12.5px] leading-relaxed">
         <p className="text-t2">{t('advanced.dhcpDesc')}</p>
@@ -229,7 +240,7 @@ export function DhcpSettings() {
                 if (v6Filled && !v6Complete) return toast(t('advanced.incompleteV6'), 'err')
                 setDetectResult(null)
               }
-              setD({ enabled: v })
+              form.patch('enabled', v)
             }} />}
           />
           <Row
@@ -248,7 +259,7 @@ export function DhcpSettings() {
                   const addrs = [...(ifs[n].ipv4_addresses ?? []), ...(ifs[n].ipv6_addresses ?? [])]
                   return { label: addrs.length ? `${n}(${addrs.join(', ')})` : n, value: n }
                 }),
-                onPick: (v) => setD({ interface_name: v }),
+                onPick: (v) => form.patch('interface_name', v),
               })
             }}
           />
@@ -289,19 +300,19 @@ export function DhcpSettings() {
             <GroupTitle>{t('advanced.v4Group')}</GroupTitle>
             <Group>
             <Rows>
-              <Row title={t('advanced.gateway')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.gateway_ip} onChange={(e) => setD({ v4: { ...cur.v4, gateway_ip: e.target.value } })} /></div>} />
-              <Row title={t('advanced.subnetMask')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.subnet_mask} onChange={(e) => setD({ v4: { ...cur.v4, subnet_mask: e.target.value } })} /></div>} />
-              <Row title={t('advanced.rangeStart')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_start} onChange={(e) => setD({ v4: { ...cur.v4, range_start: e.target.value } })} /></div>} />
-              <Row title={t('advanced.rangeEnd')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_end} onChange={(e) => setD({ v4: { ...cur.v4, range_end: e.target.value } })} /></div>} />
-              <Row title={t('advanced.leaseDuration')} right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={cur.v4.lease_duration} onChange={(e) => setD({ v4: { ...cur.v4, lease_duration: Number(e.target.value) } })} /></div>} last />
+              <Row title={t('advanced.gateway')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.gateway_ip} onChange={(e) => form.patch('v4', { ...cur.v4, gateway_ip: e.target.value })} /></div>} />
+              <Row title={t('advanced.subnetMask')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.subnet_mask} onChange={(e) => form.patch('v4', { ...cur.v4, subnet_mask: e.target.value })} /></div>} />
+              <Row title={t('advanced.rangeStart')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_start} onChange={(e) => form.patch('v4', { ...cur.v4, range_start: e.target.value })} /></div>} />
+              <Row title={t('advanced.rangeEnd')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v4.range_end} onChange={(e) => form.patch('v4', { ...cur.v4, range_end: e.target.value })} /></div>} />
+              <Row title={t('advanced.leaseDuration')} right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={cur.v4.lease_duration} onChange={(e) => form.patch('v4', { ...cur.v4, lease_duration: Number(e.target.value) })} /></div>} last />
             </Rows>
             </Group>
 
             <GroupTitle>{t('advanced.v6Group')}</GroupTitle>
             <Group>
             <Rows>
-              <Row title={t('advanced.rangeStart')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v6.range_start} onChange={(e) => setD({ v6: { ...cur.v6, range_start: e.target.value } })} /></div>} />
-              <Row title={t('advanced.leaseDuration')} right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={cur.v6.lease_duration} onChange={(e) => setD({ v6: { ...cur.v6, lease_duration: Number(e.target.value) } })} /></div>} last />
+              <Row title={t('advanced.rangeStart')} right={<div className="w-40 flex-none"><input className="field num !py-1.5 text-right" value={cur.v6.range_start} onChange={(e) => form.patch('v6', { ...cur.v6, range_start: e.target.value })} /></div>} />
+              <Row title={t('advanced.leaseDuration')} right={<div className="w-24 flex-none"><input className="field num !py-1.5 text-right" type="number" value={cur.v6.lease_duration} onChange={(e) => form.patch('v6', { ...cur.v6, lease_duration: Number(e.target.value) })} /></div>} last />
             </Rows>
             </Group>
             {cur.interface_name && !ifHasV6 && (
